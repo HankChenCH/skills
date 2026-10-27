@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.7 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.8 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -22,6 +22,8 @@
 > **v1.6 修订记录（dev-implement 评审 0004，2026-10-27）**：§12 范文 §1.2 首条校验项补 in-progress 重入语义——原文只写"status: ready"，与 §5.4 门禁契约"ready（或 in-progress 重入续接）"及范文 §5 中断交接的续接前提矛盾（评审 0004 标准轴建议采纳；先改文档再同步技能）。
 >
 > **v1.7 修订记录（dev-retro 实现，2026-10-27）**：§11 改题"技能规格"并新增 §11.10 dev-retro——复盘报告定为 `docs/retros/` 轻产物（§5.2 目录树与所有权表随之调整；frontmatter 仅 `id`/`status`/`created`，不进 check.sh 门禁）；§10.2 批 2 要点补 dev-retro 条目。
+>
+> **v1.8 修订记录（dev-fix 实现，2026-10-27）**：新增 §11.11 dev-fix——dev-fix 定位为"分诊定级 + 开 fix 票 + 转入实现链"，实现复用 dev-implement 的红绿纪律（失败测试先行即复现），不自带实现循环；§8 决策点全表 dev-fix 出口相应改为"自动调 dev-implement（经其出口到达 dev-review）"，§7.2 注明 ref-testing 经 dev-implement 链装载，§6.4 工单模板产出者补 dev-fix。
 >
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
@@ -268,7 +270,7 @@ created: <date>
 ## 备注
 ```
 
-### 6.4 ticket 模板（固定；dev-plan 产出、dev-implement 增补）
+### 6.4 ticket 模板（固定；dev-plan / dev-fix 产出、dev-implement 增补）
 
 ```markdown
 ---
@@ -325,7 +327,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 | dev-implement | ref-implementation + ref-testing + ref-git-commit | 开工装载；写测试前重读 ref-testing |
 | dev-review | ref-review + ref-implementation | 评审前 |
 | dev-ship | ref-git-commit | PR 描述与合并信息落盘前 |
-| dev-fix | ref-testing | 先写失败测试之前 |
+| dev-fix | ref-testing（经 dev-implement 链装载，dev-fix 正文不重复装载） | 先写失败测试之前 |
 | dev-accept / dev-retro | ref-writing | 报告落盘前 |
 
 dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通则 + 路由）；写哪类测试，再按其场景路由表读取对应 references/ 细则，一次只载一个——装载时机固定，细则加载随场景。
@@ -356,7 +358,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 | dev-review | 通过 → 自动准备 PR（dev-ship 前半） | 阻断项修复策略：机械问题自动修再审，设计级问题问人 |
 | dev-ship | 全部工单 done → 自动调 dev-accept | **合并确认**（单向门） |
 | dev-accept | 通过 → spec 标 done（末轮则 need 标 fulfilled） | 开不开下一轮（循环回转点） |
-| dev-fix | 自动调 dev-review | 定级与优先级 |
+| dev-fix | 自动调 dev-implement（fix 票进实现链，经其出口到达 dev-review） | 定级与修复时机 |
 | dev-retro | 产出改动清单 | 采纳哪些 |
 
 `/sdlc` 增加一个 `next` 模式：**自动推进到下一个决策点为止**——"你只管决策，重复劳动归流水线"。
@@ -417,7 +419,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
   10. dev-ship ✅ 2026-10-27（规格即 §11.8，PR 三节模板内嵌正文，PR 落点跟 config.sh 的 TRACKER 走不预设平台；§13.2 自测：pre-push 复用、重入判定 merge-base --is-ancestor、commit-msg [trivial] 豁免三项经门禁行为实测通过，触发/拒绝/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物）
   11. dev-accept ✅ 2026-10-27（规格即 §11.9，§6.5 模板内嵌正文；passed/rejected 判定机械化，fulfilled 前残余风险须逐条经用户显式接受；§13.2 自测：产物校验经 validate 正反往返实测通过——正例 draft/passed/rejected 三态过 validate，缺节、缺 spec、缺 round、非法状态、悬空 spec 引用五类反例全拦；拒绝依据经 phase 行为实测——工单含 implemented 时无"approved 且全 done"候选；publish 跳过路径实测 exit 0；触发/重入/衔接静态核验通过、行为验证待新会话）
   12. ref-git-commit（规范提交与合并信息；2026-10-27 经 spec 0001 增补）✅ 2026-10-27
-- **批 2（4 个）**：dev-clarify、dev-design、dev-fix、dev-retro（✅ 2026-10-27，规格即 §11.10，报告落 docs/retros/ 轻产物不进门禁；§13.2 自测：豁免审计命令链在本仓库 12 条 [trivial] 史上行为实测通过——grep 圈范围、逐条 git show 取证、绕过信号扫描三段均可机械执行，0692119 整树入库 2026 行为滥用判定阳性样本、b42d410 三文件纯文档为合规样本；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话，产物校验不适用——复盘报告非门禁产物）
+- **批 2（4 个）**：dev-clarify、dev-design、dev-fix（✅ 2026-10-27，规格即 §11.11，分诊定级 + 开 fix 票 + 自动调 dev-implement，不自带实现循环；§13.2 自测：产物校验经 validate/ticket/frontier 行为实测通过——合规 fix 票过三关，缺 spec、缺验收标准、缺 Progress、多行 blocked-by 四类反例全拦，done 状态 spec 的开票路径经 ticket 命令实测放行；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话）、dev-retro（✅ 2026-10-27，规格即 §11.10，报告落 docs/retros/ 轻产物不进门禁；§13.2 自测：豁免审计命令链在本仓库 12 条 [trivial] 史上行为实测通过——grep 圈范围、逐条 git show 取证、绕过信号扫描三段均可机械执行，0692119 整树入库 2026 行为滥用判定阳性样本、b42d410 三文件纯文档为合规样本；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话，产物校验不适用——复盘报告非门禁产物）
 - **批 3**：dev-research、dev-release、dev-docs、trackers 的 github/gitlab/codeup 适配器、L4 hooks
 
 批 2/3 技能要点：dev-design（spec→模块划分/数据流/seam/ADR；ADR 三条件：难逆转、无上下文会困惑、真实权衡）；dev-fix（先分诊定级，修复前必须先有失败测试）；dev-research（后台代理、只信一手来源、每条结论带引用）；dev-release（语义化版本 + CHANGELOG + 发布检查单）；dev-docs（面向人的文档，与实际行为一致性优先）；dev-retro（复盘 = 豁免审计 + 改动清单沉淀；结论三态合规/滥用/存疑、只认 diff 证据；报告落 docs/retros/ 轻产物，不进 check.sh 门禁）。
@@ -500,6 +502,14 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 - **出口**：改动清单三分类——标准修订（CODING_STANDARDS.md / docs/standards/ 增量条目）、检查增补（蓝图 + assets/check.sh 双写）、技能修订（先蓝图规格节后技能文件）——经用户逐条采纳后落实；复盘报告落盘 `docs/retros/NNNN-slug.md`（frontmatter 仅 `id`/`status`/`created`，draft → done，不进 check.sh 门禁）。无下游自动串联。
 - **决策点**：复盘范围（带默认建议）；采纳哪些（逐条带默认建议，沉默不算确认，不采纳的记录理由）。
 - 落盘前加载 ref-writing。
+
+### 11.11 dev-fix
+
+- **触发**：dev-accept rejected 指路、门禁对 done 工单的拒绝文案指路、用户直接报缺陷（"这个 bug""修复一下""线上出问题"）。
+- **定位**：分诊定级 + 开 fix 票 + 转入实现链；**不自带实现循环**——失败测试先行（复现）、红绿修复、全量回归全部复用 dev-implement 的既有纪律，终经其出口到达 dev-review。
+- **流程**：确定归属 spec（approved 或 done 均可，check.sh ticket 已受理；无法归属任何 spec = 需求缺口，指路 dev-clarify / dev-spec）→ 分诊定级（阻断 / 重要 / 一般 / 轻微四档，操作定义写进票；轻微且纯文档走 [trivial] 不开票，源码缺陷一律开票）→ 处置决策（现在修 / 排期——票保持 ready 进 frontier / 不修——记录理由）→ 开 `type: fix` 票（做什么 = 期望 vs 实际 + 复现路径；验收标准 = 失败测试转绿 + `check.sh all` 全绿）→ validate 通过 + publish → 处置为现在修则**自动调 dev-implement**。
+- **决策点**：定级与修复时机（带默认建议，沉默不算确认）。
+- **重入**：盘上已有 `ready` 的 fix 票 = 分诊已完成，列出让用户点名续接（禁止代挑）；`in-progress` 的 fix 票属 dev-implement 的重入域，dev-fix 指路不抢。
 
 ## 12. dev-implement 范文（文风与浓度基准，全文照此实现）
 

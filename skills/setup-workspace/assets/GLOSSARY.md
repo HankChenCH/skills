@@ -48,6 +48,7 @@
 - **哨兵块**：AGENTS.md 中 `<!-- sdlc:begin/end -->` 之间的内容，由 setup-workspace 管理，勿手改。
 - **盘上主本 / tracker 投影**：docs/ 是唯一真相源，tracker（GitHub/GitLab/Codeup）只单向接收发布，不回读。
 - **门禁分级**：commit-msg 查轻量项（[#NNNN] 状态合法或 [trivial]）；pre-push 查重项（implemented 工单须有 approved 评审覆盖）。
+- **分诊定级**：dev-fix 对缺陷的定级（阻断：主流程不可用/数据错误或丢失/安全漏洞；重要：功能受损有绕行、影响面大；一般：影响面小；轻微：文案样式纯文档）与处置决策（现在修/排期/不修），落进 fix 票正文。
 
 ## 项目术语
 
