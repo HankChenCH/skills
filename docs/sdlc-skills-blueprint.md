@@ -394,7 +394,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 - **批 1（13 个，最小闭环含质量标准）**，推荐顺序：
   1. setup-workspace（基础设施先就位）✅ 2026-10-26
   2. sdlc（总控）✅ 2026-10-27（next 模式路由表与上下文 token 水位线随 v1.3 定稿；§13.2 自测通过——拒绝/重入/只读/衔接断链四项实测，触发项因会话技能列表固定留待新会话复验）
-  3. ref-writing
+  3. ref-writing ✅ 2026-10-27
   4. dev-spec
   5. dev-plan
   6. ref-testing、ref-implementation（ref-implementation ✅ 2026-10-26；ref-testing 待建）
