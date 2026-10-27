@@ -1,6 +1,6 @@
 # tracker 平台模型参考：GitHub / GitLab / 云效 Codeup 的 issue 与合并请求
 
-本文件是 setup-workspace 技能的可移植操作参考，随技能分发（SKILL.md 同目录 references/ 下），跨机器可达。用途：① 决策 1 选定 GitLab/GitHub/Codeup 出口后，了解目标平台的 issue 与 PR/MR 模型；② 批 3 实现 `.sdlc/trackers/` 适配器前必读。检索日期 2026-10-27，实现适配器时请复核（平台 API 随版本演进）。本技能源仓库另有本内容的调研留档（2026-10-27 快照）；平台模型有更新时先改本文件（走技能工单），留档保持调研时点快照不回改。
+本文件是 setup-workspace 技能的可移植操作参考，随技能分发（SKILL.md 同目录 references/ 下），跨机器可达。用途：① 决策 1 选定 GitLab/GitHub/Codeup 出口后，了解目标平台的 issue 与 PR/MR 模型；② `.sdlc/trackers/` 适配器（github/gitlab/codeup）实现与维护时的平台模型参考。检索日期 2026-10-27，实现适配器时请复核（平台 API 随版本演进）。本技能源仓库另有本内容的调研留档（2026-10-27 快照）；平台模型有更新时先改本文件（走技能工单），留档保持调研时点快照不回改。
 
 ## 结论速览
 
@@ -59,7 +59,7 @@
 2. **closing keywords 吃平台编号**：`Closes #N` 里的 N 是平台 issue 编号。若希望"平台合并动作联动关闭投影对象"，适配器必须用平台 issue id 拼写关键词，而不是盘上 NNNN；否则联动静默失效。
 3. **评审投影不改门禁**：dev-review 的 approved 评审是本方法论的重门禁（pre-push 校验，依据 review 产物的 `tickets: []`）。平台侧的 approve / approval rules / 卡点只是投影展示，不改变盘上门禁语义；适配器失败时警告跳过（产物已在盘上）。
 4. **Codeup 坐标更复杂**：GitHub 用 `owner/repo`、GitLab 用 `group/project`，Codeup 需要 organizationId + projectId（+ 代码库 ID），且工作项与合并请求跨产品。TRACKER_REPO 的取值格式与 config 字段扩展是 Codeup 适配器的第一个设计决策。
-5. **版本漂移**：GitLab issue 已迁入 work items 框架（18.7 GA）即是一例。本文检索日期 2026-10-27；批 3 实现各适配器时应以当时官方文档复核端点与字段。
+5. **版本漂移**：GitLab issue 已迁入 work items 框架（18.7 GA）即是一例。本文检索日期 2026-10-27；适配器维护时应以当时官方文档复核端点与字段（codeup 的 CreateWorkitemV2 / CreateWorkitemComment 两端点已于 2026-10-27 按此核验）。
 
 ## 来源清单（检索日期均为 2026-10-27）
 

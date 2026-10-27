@@ -17,15 +17,14 @@
 1. 运行 `glab auth status` 验证登录态。
 2. 通过 → 问 `group/project` 标识（或从 `git remote get-url origin` 解析，向用户复述确认），写 TRACKER_REPO。
 3. 不通过 → 明确告知"glab 未安装或未登录，无法验证 GitLab 出口，已回落 local"；TRACKER 仍按用户意愿写 gitlab 亦可，但必须在收尾报告的"config 待补项"中列出。
-4. 平台模型参考（issue/合并请求模型、编号语法、API/CLI 入口）：实现 gitlab.sh 适配器前先读本技能 `references/tracker-platforms.md`（随技能分发，相对技能目录可达，跨机器可用）。
+4. 平台模型参考（issue/合并请求模型、编号语法、API/CLI 入口）：本技能 `references/tracker-platforms.md`（随技能分发，跨机器可用）——适配器实现与维护时以它为起点，端点与字段以当时官方文档复核。
 
 **选 Codeup**：
 1. 检查当前会话是否已配置 Codeup MCP（列出可用 MCP 工具即可判断）。
-2. 未配置 → 给出添加指引：按所用智能体的 MCP 配置方式添加 Codeup MCP server（具体指引待批 3 补充细化），并说明"配置后重启会话生效"。
-3. CODEUP_TOKEN 只是适配器就绪前的手动替代，如实说明。
-4. 不阻断初始化：TRACKER=codeup 照写，收尾报告列待办。
+2. 如实说明两条路径：**适配器直连优先**——publish 投影只需个人访问令牌与坐标，零 MCP 依赖，请用户准备四项：`TRACKER_REPO=<organizationId>/<spaceIdentifier>`（organizationId 见云效访问链接 `https://devops.aliyun.com/organization/<OrganizationId>`）、`CODEUP_TOKEN`（个人访问令牌，`pt-` 前缀）、`CODEUP_ASSIGNEE`（负责人阿里云 accountID）、`CODEUP_WORKITEM_TYPE`（项目下 Task 类工作项类型标识，OpenAPI Explorer 查得）；可写入 config.sh 或环境变量。**MCP 为可选增强**——只在需要对话内直接操作工作项时才配置：按所用智能体的 MCP 配置方式添加云效 OpenAPI MCP server，并说明"配置后重启会话生效"；未配置不影响适配器。
+3. 不阻断初始化：TRACKER=codeup 照写，适配器照装，待补项进收尾报告。
 
-**通用说明（如实相告，不隐瞒）**：github/gitlab/codeup 的 publish 适配器属批 3；在此之前 `check.sh publish` 会输出"适配器尚未实现"警告并跳过，产物安全在盘上（docs/ 是真相源）。
+**通用说明（如实相告，不隐瞒）**：github/gitlab/codeup 的 publish 适配器随本技能分发（assets/trackers/），生成阶段按所选出口安装；投影失败（CLI 缺失/未认证/API 报错/配置缺失）一律警告跳过（exit 0），不阻断技能出口链——产物在盘上（docs/ 是真相源）。
 
 ## 决策 2：执行环境缺口
 

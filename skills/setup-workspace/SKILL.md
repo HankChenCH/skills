@@ -48,7 +48,7 @@ CODING_STANDARDS.md、docs/standards/）。存在 .sdlc/check.sh → 升级模�
 | 目标 | 行为 |
 |---|---|
 | `.sdlc/check.sh` | 拷贝 assets/check.sh，chmod +x；可整体覆盖 |
-| `.sdlc/trackers/` | 写 local.sh；用户自定义适配器不删 |
+| `.sdlc/trackers/` | 写 local.sh；决策 1 非 local 时加装所选适配器（github/gitlab/codeup）；用户自定义适配器不删 |
 | `.sdlc/config.sh` | 仅缺失时按扫描与决策预填；**绝不覆盖** |
 | `docs/METHOD.md` | 拷贝 assets/METHOD.md；可整体覆盖 |
 | `docs/standards/` | 决策 3 导入的标准文件；同名不覆盖 |

@@ -10,9 +10,10 @@
 - 重跑整体覆盖（纯逻辑，无用户数据）。
 - `.sdlc/`、`.sdlc/trackers/` 目录随写随建。
 
-### .sdlc/trackers/local.sh
+### .sdlc/trackers/{local,github,gitlab,codeup}.sh
 
 - 拷贝 `assets/trackers/local.sh` → `<repo>/.sdlc/trackers/local.sh`，`chmod +x`，可整体覆盖。
+- 决策 1 选了 github / gitlab / codeup → 追加拷贝 `assets/trackers/<决策1>.sh` 并 `chmod +x`，可整体覆盖；codeup 适配器所需的 CODEUP_TOKEN / CODEUP_ASSIGNEE / CODEUP_WORKITEM_TYPE 在收尾报告"config 待补项"中列出（写法见 references/decisions.md 决策 1）。
 - 扫描发现的其他 `.sdlc/trackers/*.sh`（用户自定义适配器）**一律不动**。
 
 ### .sdlc/config.sh（仅缺失时生成）

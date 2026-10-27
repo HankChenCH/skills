@@ -47,7 +47,7 @@ description: 把已通过评审（review approved）的分支交付出去——�
 3. 落点跟 `.sdlc/config.sh` 里 setup 定下的 `TRACKER` 走，不自行预设：
    - `github` / `gitlab` → push 分支，用 `gh` / `glab` 创建（或更新）PR；CLI 未认证
      → 明确告知，抛决策问题（默认建议回落本地合并），不静默降级。
-   - `local`，或 `codeup`（适配器批 3 未就绪）→ 把正文作为合并清单在会话中完整
+   - `local`，或 `codeup`（publish 适配器只做产物投影，不承载 PR 创建）→ 把正文作为合并清单在会话中完整
      呈现，不让用户盲批。
 
 ## 4. 合并与收尾

@@ -455,7 +455,7 @@ cmd_publish() {
   case "$TRACKER" in
     local) die "TRACKER=local 但缺 ${adapter}——安装损坏，重跑 /setup-workspace" ;;
     *)
-      echo "⚠️  TRACKER=$TRACKER 的适配器尚未实现（计划批 3）。产物已在盘上（docs/ 是真相源），本次发布跳过。"
+      echo "⚠️  TRACKER=$TRACKER 的适配器未安装（缺 ${adapter}）。产物已在盘上（docs/ 是真相源），本次发布跳过；重跑 /setup-workspace 可装上，或参照 trackers/local.sh 自写适配器。"
       return 0
       ;;
   esac
