@@ -46,7 +46,10 @@
 - **哨兵块**：AGENTS.md 中 `<!-- sdlc:begin/end -->` 之间的内容，由 setup-workspace 管理，勿手改。
 - **盘上主本 / tracker 投影**：docs/ 是唯一真相源，tracker（GitHub/GitLab/Codeup）只单向接收发布，不回读。
 - **门禁分级**：commit-msg 查轻量项（[#NNNN] 状态合法或 [trivial]）；pre-push 查重项（implemented 工单须有 approved 评审覆盖）。
+- **红绿循环**：每个行为先写一个失败的测试（红），再写刚好让它通过的实现（绿）的实现节奏；标准细则见 ref-testing 技能。
 
 ## 项目术语
 
 （首个项目术语落盘时由对应技能在此追加；格式：`术语 —— 定义（首次出现的产物）`）
+
+- **稳态假设** —— 混沌测试的前置判据：一句可度量的系统正常状态描述，加"用哪些指标证明它成立"（如"下单成功率 ≥99.9%，以订单表增长与错误率为证"）；先有稳态假设才准注入故障（首次出现：ref-testing 技能 references/chaos.md）。

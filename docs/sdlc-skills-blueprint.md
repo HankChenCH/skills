@@ -7,13 +7,15 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.3 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.4 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
 > **v1.2 修订记录（spec 0001，2026-10-27）**：tracker 出口枚举全面增加 GitLab（§5.2/§5.5/§11.1/§14；选 GitLab 验 `glab auth status`，失败明确回落 local，适配器仍属批 3）；参考技能 4→5，新增 ref-git-commit——规范提交与合并信息（§7/§7.1/§7.2/§10.1/§10.2；dev-implement 开工装载、dev-ship 装载）。三平台 issue/PR 模型调研落盘 docs/research/0001，作批 3 tracker 适配器实现参考。
 >
 > **v1.3 修订记录（sdlc 实现，2026-10-27）**：§11.2 sdlc 总控规格操作化——默认模式报告固定结构（当前阶段/可做的事/被挡在哪/循环状态）；next 模式新增路由表（落技能 `references/next-mode.md`）、断链处理（目标技能未安装时报告并指路，禁止越权代劳）、多张可开工工单须问询（带默认建议）；新增**上下文 token 水位线**（`references/context-watermark.md`）：每次调用目标技能前评估会话上下文 token 用量占窗口百分比——绿 <30% 正常推进、黄 30%–50% 只推进单阶段且出口不自动串联、红 ≥50% 停止推进并建议新会话从盘上续接；拿不准按更高档执行，水位收窄的是推进距离，不是决策纪律。
+>
+> **v1.4 修订记录（ref-testing 实现，2026-10-27，spec 0003）**：ref-testing 规格化——测试细则从"红绿循环 + 集成两层"扩为六类测试参考（red-green 红绿循环 / table-driven 表格驱动 / integration 集成 / e2e / stress-capacity 压力与容量 / chaos 混沌），采用 SKILL.md（通则 + 场景路由）+ references/（六类细则）两级结构（§7.1/§7.2/§11.3）；通则新增"可重复确定"；§7.2 明确"固定时机装载技能本体、场景内按需加载细则"。
 >
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
@@ -302,7 +304,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 
 - **ref-writing（编写人类可理解文档）**：平实具体、例子优先、一段一个观点；术语一律来自 GLOSSARY 且首次出现给定义；禁用空洞抽象词（"提升效率""优化体验"），写成可验证的陈述；给数字、给命令、给文件名。
 - **ref-implementation（什么是好的实现）**：代码读起来像叙事；命名表意；模块深（接口窄、做的事多）；错误处理显式；边界情况被处理而不是被注释；无投机泛化；diff 最小化——只改工单要求的。
-- **ref-testing（什么是好的测试）**：只测外部行为不测实现；期望值来自独立来源（已知字面量、算例、spec），禁止用与实现相同的逻辑算出；只在预定 seam 上测；一个测试一个行为；测试名即规格；失败信息能直接定位。含反模式清单：实现耦合、同义反复、横向切片。
+- **ref-testing（什么是好的测试）**：通则——只测外部行为不测实现；期望值来自独立来源（已知字面量、算例、spec），禁止用与实现相同的逻辑算出；只在预定 seam 上测；一个测试一个行为；测试名即规格；失败信息能直接定位；可重复确定（不依赖执行顺序、真实时间与外部服务，随机须固定种子）。含反模式清单：实现耦合、同义反复、横向切片。细则按六类测试拆 references/（red-green 红绿循环、table-driven 表格驱动、integration 集成、e2e、stress-capacity 压力与容量、chaos 混沌），进入具体场景按 SKILL.md 路由表按需读取、一次只载一个（§11.3）。
 - **ref-review（什么是好的评审行为）**：只评 diff 范围内的事；每条 finding 可执行（文件:行 + 怎么改 + 为什么）；分级"阻断 / 建议"；区分"违反标准"与"个人品味"，后者不阻断；双轴独立不互相稀释；内置 Fowler 代码坏味道基线清单（每条：是什么 → 怎么修），repo 已文档化的标准优先于基线，工具已强制的跳过。
 - **ref-git-commit（规范的提交与合并信息）**：一次提交只做一件事（一个验收标准或一次红绿循环）；首行 `[#NNNN]`（豁免 `[trivial]`）+ 祈使句行为摘要，不报文件清单；正文写 diff 看不出来的"为什么"与证据；合并信息随合并方式收敛（merge commit 讲合入什么，squash 按首行规范重写，ff 历史即提交本身）；PR/MR 描述里的工单引用语法随平台，平台编号 ≠ 盘上工单编号（`Closes #N` 吃平台编号），三平台语法见 docs/research/0001。
 
@@ -316,6 +318,8 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 | dev-ship | ref-git-commit | PR 描述与合并信息落盘前 |
 | dev-fix | ref-testing | 先写失败测试之前 |
 | dev-accept / dev-retro | ref-writing | 报告落盘前 |
+
+ref-testing 按 §7.2 的固定时机装载**技能本体**（通则 + 路由）；写哪类测试，再按其场景路由表读取对应 references/ 细则，一次只载一个——装载时机固定，细则加载随场景。
 
 ### 7.3 参考技能的调用规则
 
@@ -385,7 +389,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 | dev-docs | 流程 | 面向人的文档（README/API/用户文档）维护 |
 | ref-writing | 参考 | 编写人类可理解文档的标准 |
 | ref-implementation | 参考 | 好实现的标准 |
-| ref-testing | 参考 | 好测试的标准 |
+| ref-testing | 参考 | 好测试的标准（含六类测试参考与场景路由） |
 | ref-review | 参考 | 好评审行为的标准（含坏味道基线） |
 | ref-git-commit | 参考 | 规范提交与合并信息的标准 |
 
@@ -397,7 +401,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
   3. ref-writing ✅ 2026-10-27
   4. dev-spec
   5. dev-plan
-  6. ref-testing、ref-implementation（ref-implementation ✅ 2026-10-26；ref-testing 待建）
+   6. ref-testing、ref-implementation（均 ✅：ref-implementation 2026-10-26；ref-testing 2026-10-27，六类测试参考与场景路由随 v1.4 定稿）
   7. dev-implement
   8. ref-review ✅ 2026-10-26
   9. dev-review ✅ 2026-10-26（依赖的 ref-review / ref-implementation 同日完成；§13.2 端到端自测待 setup-workspace 就绪后补跑）
@@ -438,6 +442,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 
 - 内容要点见 §7.1；每个 30–60 行，格式=内嵌范例 + 反例对照（好/差并列展示），比抽象规则更有约束力。
 - frontmatter description 注明内部参考身份与被谁在何时加载（§7.3）。
+- **ref-testing 两级结构（v1.4）**：SKILL.md（≤60 行）只留总标准、通则、六场景路由表、反模式表与自查口令；references/ 六文件（red-green / table-driven / integration / e2e / stress-capacity / chaos）各 30–60 行，统一骨架=首句声明加载时机 → 好用例标准 → 好/差对照 → 反模式 → 自查口令。进入具体测试场景前才 Read 对应文件，一次只载一个（按需加载先例：sdlc 的 next-mode.md、setup-workspace 的 references/ 声明）。
 
 ### 11.4 dev-spec
 
