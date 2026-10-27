@@ -409,7 +409,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
   7. dev-implement ✅ 2026-10-27（规格即 §12 范文，随 v1.5/v1.6 同步开工装载与重入语义；§13.2 自测：拒绝/重入两项经门禁行为实测通过，触发/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物；评审 0004 两轴阻断 0、建议 1 项采纳核销，approved，并核销 review 0003 遗留装载验证项）
   8. ref-review ✅ 2026-10-26
   9. dev-review ✅ 2026-10-26（依赖的 ref-review / ref-implementation 同日完成；§13.2 端到端自测待 setup-workspace 就绪后补跑）
-  10. dev-ship
+  10. dev-ship ✅ 2026-10-27（规格即 §11.8，PR 三节模板内嵌正文，PR 落点跟 config.sh 的 TRACKER 走不预设平台；§13.2 自测：pre-push 复用、重入判定 merge-base --is-ancestor、commit-msg [trivial] 豁免三项经门禁行为实测通过，触发/拒绝/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物）
   11. dev-accept
   12. ref-git-commit（规范提交与合并信息；2026-10-27 经 spec 0001 增补）✅ 2026-10-27
 - **批 2（4 个）**：dev-clarify、dev-design、dev-fix、dev-retro
