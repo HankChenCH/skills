@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.6 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.7 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -20,6 +20,8 @@
 > **v1.5 修订记录（dev-implement 实现前定稿）**：§12 范文同步 §7.2 引用矩阵——§2 装载上下文补"再用 Skill 工具装载 ref-implementation、ref-testing、ref-git-commit；写测试前重读 ref-testing，细则按 ref-testing 场景路由表按需读取、一次只载一个"（v1.2 增补引用矩阵时范文漏同步；治理规则：先改文档再改技能）。
 >
 > **v1.6 修订记录（dev-implement 评审 0004，2026-10-27）**：§12 范文 §1.2 首条校验项补 in-progress 重入语义——原文只写"status: ready"，与 §5.4 门禁契约"ready（或 in-progress 重入续接）"及范文 §5 中断交接的续接前提矛盾（评审 0004 标准轴建议采纳；先改文档再同步技能）。
+>
+> **v1.7 修订记录（dev-retro 实现，2026-10-27）**：§11 改题"技能规格"并新增 §11.10 dev-retro——复盘报告定为 `docs/retros/` 轻产物（§5.2 目录树与所有权表随之调整；frontmatter 仅 `id`/`status`/`created`，不进 check.sh 门禁）；§10.2 批 2 要点补 dev-retro 条目。
 >
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
@@ -108,6 +110,7 @@
 │   ├── tickets/                # 工单（feature 与 fix 同池编号）
 │   ├── reviews/                # 评审报告     NNNN-slug.md
 │   ├── acceptance/             # 验收报告     NNNN-slug.md
+│   ├── retros/                 # 复盘报告     NNNN-slug.md（轻产物，不进 check.sh 门禁）
 │   ├── standards/              # 用户自有/团队编码标准（setup 增量导入，可多份）
 │   └── adr/                    # 架构决策记录 NNNN-slug.md
 ├── AGENTS.md                   # 追加 sdlc 哨兵块
@@ -120,6 +123,8 @@
 
 **目录懒创建**：setup 只建 `.sdlc/` 和 `docs/`，其余产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
 
+`docs/retros/` 是唯一的非门禁产物目录：复盘报告由 dev-retro 落盘，`validate` / `phase` / `publish` 不受理（§11.10），符合 §5.7"门禁只管有真实代价的事"；审计链价值靠版本库留痕，不靠门禁。
+
 | 路径 | 首次创建 | 日常写入者 | setup-workspace 重跑时 |
 |---|---|---|---|
 | `.sdlc/check.sh` | setup | 仅 setup | **可整体覆盖**（纯逻辑） |
@@ -131,7 +136,7 @@
 | CODING_STANDARDS.md | setup（索引 + 兜底基线） | 用户与 dev-review | 已有内容不动 |
 | docs/standards/* | setup 导入（§11.1 决策 3：标准来源） | 用户 | 同名文件不覆盖，只增不删 |
 | CHANGELOG.md | 首个产物时 | 对应技能与用户 | 只补缺失骨架 |
-| `docs/` 八个产物目录 | 首个产物时 | 对应技能 | 不触碰已有文件 |
+| `docs/` 产物目录 | 首个产物时 | 对应技能 | 不触碰已有文件 |
 | `.git/hooks/*` | setup | — | 幂等重装 |
 | `src/` 及一切其他文件 | — | — | **永不触碰** |
 
@@ -412,17 +417,17 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
   10. dev-ship ✅ 2026-10-27（规格即 §11.8，PR 三节模板内嵌正文，PR 落点跟 config.sh 的 TRACKER 走不预设平台；§13.2 自测：pre-push 复用、重入判定 merge-base --is-ancestor、commit-msg [trivial] 豁免三项经门禁行为实测通过，触发/拒绝/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物）
   11. dev-accept ✅ 2026-10-27（规格即 §11.9，§6.5 模板内嵌正文；passed/rejected 判定机械化，fulfilled 前残余风险须逐条经用户显式接受；§13.2 自测：产物校验经 validate 正反往返实测通过——正例 draft/passed/rejected 三态过 validate，缺节、缺 spec、缺 round、非法状态、悬空 spec 引用五类反例全拦；拒绝依据经 phase 行为实测——工单含 implemented 时无"approved 且全 done"候选；publish 跳过路径实测 exit 0；触发/重入/衔接静态核验通过、行为验证待新会话）
   12. ref-git-commit（规范提交与合并信息；2026-10-27 经 spec 0001 增补）✅ 2026-10-27
-- **批 2（4 个）**：dev-clarify、dev-design、dev-fix、dev-retro
+- **批 2（4 个）**：dev-clarify、dev-design、dev-fix、dev-retro（✅ 2026-10-27，规格即 §11.10，报告落 docs/retros/ 轻产物不进门禁；§13.2 自测：豁免审计命令链在本仓库 12 条 [trivial] 史上行为实测通过——grep 圈范围、逐条 git show 取证、绕过信号扫描三段均可机械执行，0692119 整树入库 2026 行为滥用判定阳性样本、b42d410 三文件纯文档为合规样本；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话，产物校验不适用——复盘报告非门禁产物）
 - **批 3**：dev-research、dev-release、dev-docs、trackers 的 github/gitlab/codeup 适配器、L4 hooks
 
-批 2/3 技能要点：dev-design（spec→模块划分/数据流/seam/ADR；ADR 三条件：难逆转、无上下文会困惑、真实权衡）；dev-fix（先分诊定级，修复前必须先有失败测试）；dev-research（后台代理、只信一手来源、每条结论带引用）；dev-release（语义化版本 + CHANGELOG + 发布检查单）；dev-docs（面向人的文档，与实际行为一致性优先）。
+批 2/3 技能要点：dev-design（spec→模块划分/数据流/seam/ADR；ADR 三条件：难逆转、无上下文会困惑、真实权衡）；dev-fix（先分诊定级，修复前必须先有失败测试）；dev-research（后台代理、只信一手来源、每条结论带引用）；dev-release（语义化版本 + CHANGELOG + 发布检查单）；dev-docs（面向人的文档，与实际行为一致性优先）；dev-retro（复盘 = 豁免审计 + 改动清单沉淀；结论三态合规/滥用/存疑、只认 diff 证据；报告落 docs/retros/ 轻产物，不进 check.sh 门禁）。
 
 ### 10.3 与 Matt Pocock 套件共存与归档
 
 - `dev-` / `ref-` / `sdlc` / `setup-workspace` 命名不冲突，可平滑共存。
 - 风险：Matt 的 tdd / code-review / research / domain-modeling 等允许模型自动调用，agent 可能自动选中它们绕开门禁链。批 1 建完试用确认后，把 Matt 的生命周期类技能（to-spec、to-tickets、to-questionnaire、implement、implement-spec、code-review、tdd、research、domain-modeling、prototype、triage、handoff、retro、diagnosing-bugs）移入归档目录；写作类（writing-* 等）不冲突，保留。
 
-## 11. 批 1 技能规格
+## 11. 技能规格
 
 ### 11.1 setup-workspace
 
@@ -485,6 +490,15 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 - **做什么**：在集成后的代码上逐条运行 spec 的集成级验收场景；逐 FR 核销；运行 `check.sh all`；写验收报告（§6.5：场景结果/假设验证/残余风险/下一轮建议）。
 - **出口**：passed → spec → done；若为末轮且成功标准核销、无未接受风险 → need → fulfilled。rejected → 缺陷开 fix 工单（dev-fix）、范围问题进下一轮建议。
 - **决策点**：开不开下一轮（带默认建议）。
+- 落盘前加载 ref-writing。
+
+### 11.10 dev-retro
+
+- **触发**：用户手动（复盘、回顾、审计豁免请求）；无上游状态前置，不进自动串联链——复盘是反馈回路的终点。
+- **输入**：复盘范围内的 git 历史（默认自上次复盘报告以来，无则自仓库首次提交）、评审报告"留档供 retro 参考"条目、验收报告残余风险与下一轮建议、用户口述主题。
+- **审计规则**：[trivial] 提交逐条对 diff 判定，结论三态合规 / 滥用 / 存疑（基准 = GLOSSARY"限 typo 与纯文档改动"；滥用信号 = 正文无豁免理由、涉及非文档文件、规模明显超出小修）；subject 既无 `[#NNNN]` 又无 `[trivial]` 的提交 = `--no-verify` 嫌疑信号（§3 诚实边界的兜底审计）；审计结论必须引用 diff 证据，只凭 commit message 不下结论。
+- **出口**：改动清单三分类——标准修订（CODING_STANDARDS.md / docs/standards/ 增量条目）、检查增补（蓝图 + assets/check.sh 双写）、技能修订（先蓝图规格节后技能文件）——经用户逐条采纳后落实；复盘报告落盘 `docs/retros/NNNN-slug.md`（frontmatter 仅 `id`/`status`/`created`，draft → done，不进 check.sh 门禁）。无下游自动串联。
+- **决策点**：复盘范围（带默认建议）；采纳哪些（逐条带默认建议，沉默不算确认，不采纳的记录理由）。
 - 落盘前加载 ref-writing。
 
 ## 12. dev-implement 范文（文风与浓度基准，全文照此实现）

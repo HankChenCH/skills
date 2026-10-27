@@ -16,6 +16,7 @@
 | acceptance | 验收报告：集成后逐条运行集成级场景、逐 FR 核销、风险复审的结果。 |
 | adr | 架构决策记录：难逆转、无上下文会困惑、真实权衡的决策，accepted → superseded。 |
 | research | 调研报告：带来源引用的参考资料，无状态机。 |
+| retro | 复盘报告：dev-retro 落盘 docs/retros/ 的复盘记录——豁免审计结论、改动清单与采纳记录。轻产物，不进 check.sh 门禁。 |
 
 ### 状态与推进者
 
@@ -35,6 +36,7 @@
 | review.draft / approved | 评审中 / 两轴阻断清零 | dev-review |
 | acceptance.draft / passed / rejected | 验收中 / 通过 / 不通过 | dev-accept |
 | adr.accepted / superseded | 生效中 / 被新 ADR 取代 | dev-design |
+| retro.draft / done | 复盘中 / 复盘定稿（终态） | dev-retro |
 
 ### 关键机制
 
