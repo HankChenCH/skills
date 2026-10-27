@@ -693,6 +693,43 @@ t "github：gh 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh
 t "github：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
+echo "== tracker 适配器 gitlab =="
+GITLAB_ADAPTER="$HERE/../assets/trackers/gitlab.sh"
+cp "$GITLAB_ADAPTER" "$TMP/.sdlc/trackers/gitlab.sh" && chmod +x "$TMP/.sdlc/trackers/gitlab.sh"
+sed -i.bak 's/^TRACKER=.*/TRACKER=gitlab/; s/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+fake_cmd glab <<'EOF'
+#!/bin/sh
+[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_LOG"
+if [ "$1" = "auth" ]; then exit "${FAKE_AUTH:-0}"; fi
+if [ "$1" = "issue" ]; then
+  case "$2" in
+    create|update) ;;
+    *) exit 0 ;;
+  esac
+  prev=""
+  for a in "$@"; do
+    if { [ "$prev" = "-d" ] || [ "$prev" = "--description" ]; } && [ -n "$a" ]; then printf '%s\n' "$a" >> "$FAKE_LOG"; fi
+    prev="$a"
+  done
+  if [ "$2" = "create" ]; then printf '%s\n' "${FAKE_OUT:-https://gitlab.com/acme/widget/-/issues/12}"; fi
+fi
+exit 0
+EOF
+t "gitlab 投影放行并说明" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/gl1.log\" check.sh publish docs/adr/0001-local-tracker.md" "投影"
+tn "gitlab 投影消息不含重复 docs/ 前缀" 0 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "docs/docs/"
+t "gitlab 投影收到一次 issue create" 0 "grep -q 'issue create' \"$TMP/gl1.log\"" ""
+t "gitlab 投影正文首行带盘上指针" 0 "grep -q '盘上产物：docs/adr/0001-local-tracker.md' \"$TMP/gl1.log\"" ""
+t "gitlab 映射落行（路径与编号与URL）" 0 "grep -q 'docs/adr/0001-local-tracker.md' \"$TMP/.sdlc/trackers/gitlab.map\" && grep -q 'issues/12' \"$TMP/.sdlc/trackers/gitlab.map\"" ""
+t "gitlab 幂等：二次 publish 走 issue update" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/gl2.log\" check.sh publish docs/adr/0001-local-tracker.md" "投影"
+t "gitlab 幂等：update 存在" 0 "grep -q 'issue update' \"$TMP/gl2.log\"" ""
+t "gitlab 幂等：无第二次 create" 0 "! grep -q 'issue create' \"$TMP/gl2.log\"" ""
+t "gitlab 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/gitlab.map\")\" -eq 1 ]" ""
+t "gitlab：glab 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_AUTH=1 FAKE_LOG=\"$TMP/gl3.log\" check.sh publish docs/adr/0001-local-tracker.md" "未认证"
+t "gitlab：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gl3.log\"" ""
+t "gitlab：glab 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "glab 未安装"
+t "gitlab：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+
 echo "== git hook 转发端到端 =="
 printf '#!/bin/sh\n# sdlc-managed: forward\nexec "$(git rev-parse --show-toplevel)/.sdlc/check.sh" commit-msg "$@"\n' > "$TMP/.git/hooks/commit-msg"
 chmod +x "$TMP/.git/hooks/commit-msg"
