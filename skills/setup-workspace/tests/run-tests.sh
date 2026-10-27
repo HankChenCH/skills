@@ -730,6 +730,35 @@ t "gitlab：glab 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.
 t "gitlab：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
+echo "== tracker 适配器 codeup =="
+CODEUP_ADAPTER="$HERE/../assets/trackers/codeup.sh"
+cp "$CODEUP_ADAPTER" "$TMP/.sdlc/trackers/codeup.sh" && chmod +x "$TMP/.sdlc/trackers/codeup.sh"
+sed -i.bak 's/^TRACKER=.*/TRACKER=codeup/; s/^TRACKER_REPO=.*/TRACKER_REPO="org123\/space456"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+fake_cmd curl <<'EOF'
+#!/bin/sh
+[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_LOG"
+for a in "$@"; do
+  case "$a" in
+    */workitems/comment) printf '%s\n%s\n' '{"success":true,"errorCode":""}' "200" ;;
+    */workitem)          printf '%s\n%s\n' '{"workitemIdentifier":"e8b26abc123","success":true}' "200" ;;
+  esac
+done
+exit 0
+EOF
+CU_ENV="CODEUP_TOKEN=pt-test CODEUP_ASSIGNEE=user123 CODEUP_WORKITEM_TYPE=task-type-1"
+t "codeup：缺 CODEUP_TOKEN 警告" 0 "CODEUP_TOKEN= CODEUP_ASSIGNEE=u CODEUP_WORKITEM_TYPE=t PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "CODEUP_TOKEN"
+t "codeup：缺 CODEUP_ASSIGNEE 警告" 0 "CODEUP_TOKEN=t CODEUP_ASSIGNEE= CODEUP_WORKITEM_TYPE=t PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "CODEUP_ASSIGNEE"
+t "codeup：缺 CODEUP_WORKITEM_TYPE 警告" 0 "CODEUP_TOKEN=t CODEUP_ASSIGNEE=u CODEUP_WORKITEM_TYPE= PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "CODEUP_WORKITEM_TYPE"
+t "codeup 投影放行并说明" 0 "$CU_ENV PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/cu1.log\" check.sh publish docs/adr/0001-local-tracker.md" "投影"
+t "codeup 依序调用创建与评论两端点" 0 "awk '\$0 ~ /workitems\\/comment/ {c=NR} \$0 ~ /workitem -H/ {w=NR} END { exit (w>0 && c>w) ? 0 : 1 }' \"$TMP/cu1.log\"" ""
+t "codeup 投影正文带盘上指针" 0 "grep -q '盘上产物：docs/adr/0001-local-tracker.md' \"$TMP/cu1.log\"" ""
+t "codeup 映射落 workitemIdentifier" 0 "grep -q 'docs/adr/0001-local-tracker.md' \"$TMP/.sdlc/trackers/codeup.map\" && grep -q 'e8b26abc123' \"$TMP/.sdlc/trackers/codeup.map\"" ""
+t "codeup 幂等：二次 publish 仅追加评论" 0 "$CU_ENV PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/cu2.log\" check.sh publish docs/adr/0001-local-tracker.md" "投影"
+t "codeup 幂等：评论端点被调用" 0 "grep -q 'workitems/comment' \"$TMP/cu2.log\"" ""
+t "codeup 幂等：无第二次创建调用" 0 "! grep -q 'workitem -H' \"$TMP/cu2.log\"" ""
+t "codeup 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/codeup.map\")\" -eq 1 ]" ""
+sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+
 echo "== git hook 转发端到端 =="
 printf '#!/bin/sh\n# sdlc-managed: forward\nexec "$(git rev-parse --show-toplevel)/.sdlc/check.sh" commit-msg "$@"\n' > "$TMP/.git/hooks/commit-msg"
 chmod +x "$TMP/.git/hooks/commit-msg"
