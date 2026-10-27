@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.5 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.6 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -18,6 +18,8 @@
 > **v1.4 修订记录（ref-testing 实现，2026-10-27，spec 0003）**：ref-testing 规格化——测试细则从"红绿循环 + 集成两层"扩为六类测试参考（red-green 红绿循环 / table-driven 表格驱动 / integration 集成 / e2e / stress-capacity 压力与容量 / chaos 混沌），采用 SKILL.md（通则 + 场景路由）+ references/（六类细则）两级结构（§7.1/§7.2/§11.3）；通则新增"可重复确定"；§7.2 明确"固定时机装载技能本体、场景内按需加载细则"。
 >
 > **v1.5 修订记录（dev-implement 实现前定稿）**：§12 范文同步 §7.2 引用矩阵——§2 装载上下文补"再用 Skill 工具装载 ref-implementation、ref-testing、ref-git-commit；写测试前重读 ref-testing，细则按 ref-testing 场景路由表按需读取、一次只载一个"（v1.2 增补引用矩阵时范文漏同步；治理规则：先改文档再改技能）。
+>
+> **v1.6 修订记录（dev-implement 评审 0004，2026-10-27）**：§12 范文 §1.2 首条校验项补 in-progress 重入语义——原文只写"status: ready"，与 §5.4 门禁契约"ready（或 in-progress 重入续接）"及范文 §5 中断交接的续接前提矛盾（评审 0004 标准轴建议采纳；先改文档再同步技能）。
 >
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
@@ -404,7 +406,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
   4. dev-spec
   5. dev-plan
    6. ref-testing、ref-implementation（均 ✅：ref-implementation 2026-10-26；ref-testing 2026-10-27，六类测试参考与场景路由随 v1.4 定稿）
-  7. dev-implement ✅ 2026-10-27（规格即 §12 范文，随 v1.5 同步开工装载条款；§13.2 自测：拒绝/重入两项经门禁行为实测通过，触发/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物）
+  7. dev-implement ✅ 2026-10-27（规格即 §12 范文，随 v1.5/v1.6 同步开工装载与重入语义；§13.2 自测：拒绝/重入两项经门禁行为实测通过，触发/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物；评审 0004 两轴阻断 0、建议 1 项采纳核销，approved，并核销 review 0003 遗留装载验证项）
   8. ref-review ✅ 2026-10-26
   9. dev-review ✅ 2026-10-26（依赖的 ref-review / ref-implementation 同日完成；§13.2 端到端自测待 setup-workspace 就绪后补跑）
   10. dev-ship
@@ -511,7 +513,7 @@ description: 按 docs/tickets/ 中的工单实现功能。入口校验工单状�
    `.sdlc/check.sh frontier`，列出"阻塞已全部完成、可以开工"的工单供用户选择。
    禁止猜测或自行挑一张没被点名的工单。
 2. 运行 `.sdlc/check.sh ticket <NNNN>`，它校验并输出：
-   - 工单存在且 `status: ready`
+   - 工单存在且 `status: ready`（或 `in-progress` 重入，见 §5）
    - Blocked by 的所有工单 `status: implemented 或 done`
    - 关联 spec 存在且 `status: approved`
 3. 任一不满足 → **停止**，转述缺什么、下一步该跑哪个技能

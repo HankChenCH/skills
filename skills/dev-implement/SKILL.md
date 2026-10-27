@@ -21,7 +21,7 @@ description: 按 docs/tickets/ 中的工单实现功能。入口校验工单状�
    `.sdlc/check.sh frontier`，列出"阻塞已全部完成、可以开工"的工单供用户选择。
    禁止猜测或自行挑一张没被点名的工单。
 2. 运行 `.sdlc/check.sh ticket <NNNN>`，它校验并输出：
-   - 工单存在且 `status: ready`
+   - 工单存在且 `status: ready`（或 `in-progress` 重入，见 §5）
    - Blocked by 的所有工单 `status: implemented 或 done`
    - 关联 spec 存在且 `status: approved`
 3. 任一不满足 → **停止**，转述缺什么、下一步该跑哪个技能
