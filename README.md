@@ -13,8 +13,8 @@
 
 ## 下一步
 
-按蓝图 §10.2 的批次计划，在新会话中逐个实现技能。批 1 已完成 setup-workspace（2026-10-26，含 check.sh 门禁脚本与 60 项脚本化测试）、sdlc 总控（2026-10-27，含 next 模式路由表与上下文 token 水位线）以及 ref-implementation、ref-review、dev-review、ref-git-commit，下一个是 ref-writing。开工话术：
+按蓝图 §10.2 的批次计划，在新会话中逐个实现技能。批 1 已完成 setup-workspace（2026-10-26，含 check.sh 门禁脚本与 60 项脚本化测试）、sdlc 总控（2026-10-27，含 next 模式路由表与上下文 token 水位线）、ref-implementation、ref-review、dev-review（2026-10-26）以及 ref-writing、ref-git-commit、ref-testing、dev-implement（2026-10-27），批 1 余下 dev-spec、dev-plan、dev-ship、dev-accept，下一个是 dev-spec。开工话术：
 
-> 读 docs/sdlc-skills-blueprint.md 的 §2–§8、§7.1 和 §11.3，按 §12 的文风基准实现 ref-writing 技能，装到 `~/.zcode/skills/`，建完跑 §13.2 的自测清单。
+> 读 docs/sdlc-skills-blueprint.md 的 §2–§8、§11.4 和 §12，实现 dev-spec 技能，装到 `~/.zcode/skills/`，建完跑 §13.2 的自测清单。
 
 每建完一个技能，在蓝图 §10.2 对应条目标注完成日期（蓝图兼作进度台账）。改动技能行为前先改蓝图（治理规则：先文档后技能）。
