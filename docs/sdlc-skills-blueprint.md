@@ -319,7 +319,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 | dev-fix | ref-testing | 先写失败测试之前 |
 | dev-accept / dev-retro | ref-writing | 报告落盘前 |
 
-ref-testing 按 §7.2 的固定时机装载**技能本体**（通则 + 路由）；写哪类测试，再按其场景路由表读取对应 references/ 细则，一次只载一个——装载时机固定，细则加载随场景。
+dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通则 + 路由）；写哪类测试，再按其场景路由表读取对应 references/ 细则，一次只载一个——装载时机固定，细则加载随场景。
 
 ### 7.3 参考技能的调用规则
 
