@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.8 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.9 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -24,6 +24,8 @@
 > **v1.7 修订记录（dev-retro 实现，2026-10-27）**：§11 改题"技能规格"并新增 §11.10 dev-retro——复盘报告定为 `docs/retros/` 轻产物（§5.2 目录树与所有权表随之调整；frontmatter 仅 `id`/`status`/`created`，不进 check.sh 门禁）；§10.2 批 2 要点补 dev-retro 条目。
 >
 > **v1.8 修订记录（dev-fix 实现，2026-10-27）**：新增 §11.11 dev-fix——dev-fix 定位为"分诊定级 + 开 fix 票 + 转入实现链"，实现复用 dev-implement 的红绿纪律（失败测试先行即复现），不自带实现循环；§8 决策点全表 dev-fix 出口相应改为"自动调 dev-implement（经其出口到达 dev-review）"，§7.2 注明 ref-testing 经 dev-implement 链装载，§6.4 工单模板产出者补 dev-fix。
+>
+> **v1.9 修订记录（dev-design 实现，2026-10-27）**：新增 §11.12 dev-design——design 定位为**可选产物**（ADR 三条件命中或结构非显而易见才做，入口亮牌可拒绝；spec approved 才进），不是必经门禁；design 与 adr 模板要点补入 §6.5（validate 对两者保持轻校验——仅 frontmatter 与状态，节同构靠模板内嵌保证）；§7.2 补 ref-writing 装载行，§8 决策点表补 dev-design 行。
 >
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
@@ -294,10 +296,12 @@ created: <date>
 （实现过程中追加：做到哪步 / 下一个动作 / 卡在哪，三行以内）
 ```
 
-### 6.5 review / acceptance 模板要点
+### 6.5 review / acceptance / design / adr 模板要点
 
 - review：frontmatter 见 6.1；正文固定 `## 标准轴 findings`、`## Spec 轴 findings`（每条：文件:行 + 怎么改 + 为什么 + 阻断/建议分级）、`## 汇总`（各轴阻断数）。双轴独立报告，不合并重排。
 - acceptance：正文固定 `## 场景结果`（逐条：场景/FR/证据/结论）、`## 假设验证`、`## 残余风险`、`## 下一轮建议`。
+- design：正文固定 `## 模块划分`（每模块：职责 / 对外接口 / 依赖方向，依赖单向不成环）、`## 数据流`（一条典型路径从入口到存储，写清状态与所有权）、`## seam 清单`（每条：在哪测、测什么；是 spec 测试决策的细化）、`## ADR 索引`（本方案产生的 ADR 与一句话结论；无则写"无"）。不含具体文件路径与代码。
+- adr：正文固定 `## 背景`（为什么现在决策）、`## 决策`（选了什么、放弃什么）、`## 后果`（正向 / 负向 / 后续约束）；只在 ADR 三条件命中时写。superseded 时追加日期、不删除。
 
 ### 6.6 文档一致性的三道机械保证
 
@@ -323,7 +327,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 
 | 流程技能 | 加载哪个参考 | 时机 |
 |---|---|---|
-| dev-clarify / dev-spec / dev-research / dev-docs | ref-writing | 落盘前 |
+| dev-clarify / dev-spec / dev-design / dev-research / dev-docs | ref-writing | 落盘前 |
 | dev-implement | ref-implementation + ref-testing + ref-git-commit | 开工装载；写测试前重读 ref-testing |
 | dev-review | ref-review + ref-implementation | 评审前 |
 | dev-ship | ref-git-commit | PR 描述与合并信息落盘前 |
@@ -353,6 +357,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 |---|---|---|
 | dev-clarify | 建议进 dev-spec | 方法论亮牌确认；need 定稿 |
 | dev-spec | publish → 进 dev-plan | **spec 批准**；MVP 分轮范围 |
+| dev-design | publish design + ADR → 建议进 dev-plan | **方案批准**；ADR 级取舍 |
 | dev-plan | publish 工单 → 提示 frontier | 拆分粒度确认 |
 | dev-implement | **自动调 dev-review** | 无（spec 缺口时停下报告，属门禁回路） |
 | dev-review | 通过 → 自动准备 PR（dev-ship 前半） | 阻断项修复策略：机械问题自动修再审，设计级问题问人 |
@@ -419,7 +424,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
   10. dev-ship ✅ 2026-10-27（规格即 §11.8，PR 三节模板内嵌正文，PR 落点跟 config.sh 的 TRACKER 走不预设平台；§13.2 自测：pre-push 复用、重入判定 merge-base --is-ancestor、commit-msg [trivial] 豁免三项经门禁行为实测通过，触发/拒绝/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物）
   11. dev-accept ✅ 2026-10-27（规格即 §11.9，§6.5 模板内嵌正文；passed/rejected 判定机械化，fulfilled 前残余风险须逐条经用户显式接受；§13.2 自测：产物校验经 validate 正反往返实测通过——正例 draft/passed/rejected 三态过 validate，缺节、缺 spec、缺 round、非法状态、悬空 spec 引用五类反例全拦；拒绝依据经 phase 行为实测——工单含 implemented 时无"approved 且全 done"候选；publish 跳过路径实测 exit 0；触发/重入/衔接静态核验通过、行为验证待新会话）
   12. ref-git-commit（规范提交与合并信息；2026-10-27 经 spec 0001 增补）✅ 2026-10-27
-- **批 2（4 个）**：dev-clarify、dev-design、dev-fix（✅ 2026-10-27，规格即 §11.11，分诊定级 + 开 fix 票 + 自动调 dev-implement，不自带实现循环；§13.2 自测：产物校验经 validate/ticket/frontier 行为实测通过——合规 fix 票过三关，缺 spec、缺验收标准、缺 Progress、多行 blocked-by 四类反例全拦，done 状态 spec 的开票路径经 ticket 命令实测放行；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话）、dev-retro（✅ 2026-10-27，规格即 §11.10，报告落 docs/retros/ 轻产物不进门禁；§13.2 自测：豁免审计命令链在本仓库 12 条 [trivial] 史上行为实测通过——grep 圈范围、逐条 git show 取证、绕过信号扫描三段均可机械执行，0692119 整树入库 2026 行为滥用判定阳性样本、b42d410 三文件纯文档为合规样本；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话，产物校验不适用——复盘报告非门禁产物）
+- **批 2（4 个）**：dev-clarify、dev-design（✅ 2026-10-27，规格即 §11.12，design 为可选产物——三条件命中才做、入口亮牌可拒绝；§13.2 自测：产物校验经 validate 行为实测通过——design draft/approved 两态与 adr accepted/superseded 两态过、非法状态拦截；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话；产物节校验不适用——validate 对 design/adr 轻校验，节同构靠模板内嵌）、dev-fix（✅ 2026-10-27，规格即 §11.11，分诊定级 + 开 fix 票 + 自动调 dev-implement，不自带实现循环；§13.2 自测：产物校验经 validate/ticket/frontier 行为实测通过——合规 fix 票过三关，缺 spec、缺验收标准、缺 Progress、多行 blocked-by 四类反例全拦，done 状态 spec 的开票路径经 ticket 命令实测放行；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话）、dev-retro（✅ 2026-10-27，规格即 §11.10，报告落 docs/retros/ 轻产物不进门禁；§13.2 自测：豁免审计命令链在本仓库 12 条 [trivial] 史上行为实测通过——grep 圈范围、逐条 git show 取证、绕过信号扫描三段均可机械执行，0692119 整树入库 2026 行为滥用判定阳性样本、b42d410 三文件纯文档为合规样本；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话，产物校验不适用——复盘报告非门禁产物）
 - **批 3**：dev-research、dev-release、dev-docs、trackers 的 github/gitlab/codeup 适配器、L4 hooks
 
 批 2/3 技能要点：dev-design（spec→模块划分/数据流/seam/ADR；ADR 三条件：难逆转、无上下文会困惑、真实权衡）；dev-fix（先分诊定级，修复前必须先有失败测试）；dev-research（后台代理、只信一手来源、每条结论带引用）；dev-release（语义化版本 + CHANGELOG + 发布检查单）；dev-docs（面向人的文档，与实际行为一致性优先）；dev-retro（复盘 = 豁免审计 + 改动清单沉淀；结论三态合规/滥用/存疑、只认 diff 证据；报告落 docs/retros/ 轻产物，不进 check.sh 门禁）。
@@ -510,6 +515,16 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 - **流程**：确定归属 spec（approved 或 done 均可，check.sh ticket 已受理；无法归属任何 spec = 需求缺口，指路 dev-clarify / dev-spec）→ 分诊定级（阻断 / 重要 / 一般 / 轻微四档，操作定义写进票；轻微且纯文档走 [trivial] 不开票，源码缺陷一律开票）→ 处置决策（现在修 / 排期——票保持 ready 进 frontier / 不修——记录理由）→ 开 `type: fix` 票（做什么 = 期望 vs 实际 + 复现路径；验收标准 = 失败测试转绿 + `check.sh all` 全绿）→ validate 通过 + publish → 处置为现在修则**自动调 dev-implement**。
 - **决策点**：定级与修复时机（带默认建议，沉默不算确认）。
 - **重入**：盘上已有 `ready` 的 fix 票 = 分诊已完成，列出让用户点名续接（禁止代挑）；`in-progress` 的 fix 票属 dev-implement 的重入域，dev-fix 指路不抢。
+
+### 11.12 dev-design
+
+- **触发**：用户手动（技术设计、方案、架构决策请求）；不进自动串联链的必经路径——design 是可选产物。
+- **输入**：approved 的 spec（重点实现决策、测试决策、验收场景）；docs/adr/ 既有 ADR（新决策不得与之无声冲突）。
+- **值得做的判据（入口亮牌）**：ADR 三条件（难逆转、无上下文会困惑、真实权衡）命中任一，或模块划分 / 数据流非显而易见。都不命中 → 亮牌"这张 spec 没有设计级问题，直接 dev-plan 更省"，用户坚持才做。
+- **做什么**：起草 design（§6.5 要点：模块划分 / 数据流 / seam 清单 / ADR 索引）→ 命中三条件的决策逐条落 ADR（背景 / 决策 / 后果，status: accepted；被取代的旧 ADR 置 superseded 并追加日期）→ 用户批准（决策点）→ design status: approved。
+- **出口**：publish design + ADR → spec 名下无工单则建议进 dev-plan；已有工单 → 提醒实现遵守 seam 清单。管线门禁不含 design（§11.5 dev-plan 输入只有 spec），design 的约束力靠评审与实现纪律，不靠硬门禁。
+- **门禁**：出口 = validate 通过 + 用户批准记录。validate 对 design / adr 只查 frontmatter 与状态，节同构靠模板内嵌保证（§6.6 ①）——与 adr 同款轻校验。
+- 落盘前加载 ref-writing。
 
 ## 12. dev-implement 范文（文风与浓度基准，全文照此实现）
 

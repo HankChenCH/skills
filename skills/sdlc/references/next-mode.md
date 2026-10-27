@@ -14,7 +14,7 @@
 | 4 | frontier 非空（存在 ready 工单） | dev-implement；多张时先问用户（默认最小编号） | 单张无决策点；多张在总控问 |
 | 5 | 存在 spec approved 且它名下还没有任何工单 | dev-plan | 拆分粒度确认 |
 | 6 | 存在 spec draft（开放问题未清或未获批准） | dev-spec | **spec 批准**、MVP 分轮范围 |
-| 7 | 存在 design draft | dev-design（批 2，常未安装） | 方案定稿 |
+| 7 | 存在 design draft | dev-design（批 2） | 方案定稿 |
 | 8 | 存在 need draft（开放问题未清零），或全库无产物 | dev-clarify（批 2，常未安装） | need 定稿 |
 | 9 | 某张 spec 名下工单全部 done 且无对应 acceptance | dev-accept | 开不开下一轮 |
 | 10 | 验收 passed 且有残余风险，或 need 尚未 fulfilled | 总控直接问：是否开下一轮（默认建议：开 round N+1，进 dev-spec） | 循环回转点 |
