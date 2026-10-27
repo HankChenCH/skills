@@ -30,6 +30,7 @@
 > **v1.10 修订记录（dev-clarify 实现，2026-10-27）**：新增 §11.13 dev-clarify——管线入口，想法 → need，need → confirmed 的推进者。① 开放问题"清零"操作定义 = **三路归置**（有答案→正文对应节；答不了→过查证过滤闸转显式假设进「假设与风险」；明确不做→「范围与非目标」；节内允许留拍板记录，实盘 need 0001 先例），§6.2 模板与 check.sh 零改动，dev-spec 入口措辞同步为"仍有未拍板的问题"（拍板记录不算未决）；② 方法细则 references/ 化（五文件 viewpoint / use-case / risk-mvp / prototype / research，亮牌确认后一次载一个；§9 表保留为选择路由，首个带 references/ 的流程技能，先例 sdlc / ref-testing 两级结构）；③ 采集走**校准阶梯**（①查证→②陈述句确认→③决策卡→④可点 HTML 原型→⑤转假设）与**查证过滤闸**（转假设前必问"5 分钟能查证吗"，假设表里只剩真未知）；④ **决策卡**（呈现层，不落盘为独立产物）：来源/堵着什么/具体选项+长什么样/选错代价/默认建议引用用户原话/合法出口"说不清→转假设"，原则"概念归 AI，图例归用户"；⑤ 阶梯④ = **可点 HTML 原型**（单文件内联零依赖 ≤200 行、落临时目录不进仓库、三态切换、主流程可点通、用完即弃、走查转写场景节；ASCII 线框降为兜底）；⑥ §11.2 sdlc 新增 **RUP 阶段判读层**（LCO/LCA/IOC/PR 锚定现有状态机 + 工作流强度表，纯语义零新状态零新门禁；§2–§6 不动故 METHOD.md 零同步）；⑦ RUP 副接入：§9 用例驱动行补完整用例骨架（Actor→前置→主成功场景→扩展/异常流→后置），五部件各喂 need 一节；⑧ 经典产物映射注记入 §11.13 产物边界（SRS 即 spec 每轮一张，need ≈ Vision 稳定意图贯穿多轮——反 BRUF 有意设计；用例模型/DFD/分析模型/数据字典的"实"已被 need 场景节 / design 数据流节 / spec 实现决策内嵌 / GLOSSARY 吸收，不立 docs/analyses/——产物必须有下游消费者；模板固定骨架不固定深度）。明确不接：RUP 文档仪式（SAD、迭代计划全套）、九工作流映射成技能、阶段评审式门禁。
 > **v1.11 修订记录（dev-research 实现，2026-10-27）**：新增 §11.14 dev-research——技术调研 → 带一手来源引用的报告（§10.1 批 3）。定位：脊柱上有位置（§4.1）但**不进自动串联链**——sdlc next-mode 路由表不加行，调研是按需服务不是必经门禁，用户手动或 dev-clarify 调研驱动联动触发；研究问题三要素（答什么/为什么重要/影响哪个 FR 或假设）承 §11.13 调研驱动细则的接口，入口亮牌"内联查证 vs 系统调研"分流，决策点 = 问题清单确认（防答非所问）；调研纪律：后台代理并行检索、只信一手来源（二手只能作线索须回溯）、每条结论带引用与检索日期、事实与判断分离，配防编造三招（关键结论回原文核验/一般抽验、禁止训练记忆冒充检索结果、检索不可用停手如实相告）；research 产物维持无状态轻校验（§6.1），节同构靠模板内嵌保证，报告是落盘时点的快照、过期重开新张不原地改写；出口指路（结论作 spec 实现决策依据 / 回决策卡拍板）不自动串联、不代拍板。docs/research/0001（tracker 三平台调研）为格式先例。另同步 dev-clarify 细则 research.md 两处过时"（批 3）"标注。
 >
+> **v1.12 修订记录（批 3 tracker 适配器实现前定稿，2026-10-27）**：适配器契约定稿——`publish <file>` 之外的投影失败（CLI 缺失/未认证/API 报错/坐标配置缺失）一律明确警告并跳过（exit 0），不阻断技能出口链（§5.4 措辞由"适配器未实现（批 3 的 github/gitlab/codeup）"改为"适配器未安装"，警告语义对自定义/未安装适配器长期成立）；投影形态 = github/gitlab 走官方 CLI（gh/glab）投到平台 issue，codeup 走 OpenAPI 直连（个人访问令牌 `x-yunxiao-token`）投到 Projex 工作项，正文首行带盘上产物指针、本地 `.map` 文件记"盘上路径 ↔ 平台对象"对照（盘上是真相源，不回读）；Codeup 坐标定稿 `TRACKER_REPO=<organizationId>/<spaceIdentifier>`，工作项类型标识不做运行时探测（类型列表端点未能在官方文档核验，"无来源不结论"），由配置项显式提供；§11.1 决策①与 §14 待定项同步（适配器随技能分发、Codeup MCP 指引以"适配器直连优先、MCP 可选"形态补入 decisions.md）。
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
 ## 1. 背景与目标
@@ -173,7 +174,7 @@
 | `validate <file>` | 模板完整性校验：必填节齐全、frontmatter 合法、FR 编号规范、验收场景可追溯（无孤儿 FR）、工单依赖无环 | 各产物技能的出口门禁 |
 | `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单状态合法（in-progress/implemented），或带 `[trivial]`；挂载于 git commit-msg hook | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖（review 的 `tickets: []` 声明覆盖面） | git hook |
-| `publish <file>` | 按 config.sh 的 TRACKER 把产物发布/镜像到对应平台；适配器未实现（批 3 的 github/gitlab/codeup）时明确警告并跳过（exit 0），不阻断技能出口链 | 各技能落盘后 |
+| `publish <file>` | 按 config.sh 的 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh` 发布/镜像产物到对应平台；适配器未安装（缺对应文件）时明确警告并跳过（exit 0）；适配器自身的投影失败（CLI 缺失/未认证/API 报错/坐标配置缺失）同样警告跳过（exit 0），均不阻断技能出口链——产物在盘上已是真相源 | 各技能落盘后 |
 
 ### 5.5 config.sh
 
@@ -445,7 +446,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 - **流程**：
   1. 前置校验：必须在 git 仓库内；assets/ 与 references/ 完整。**识别智能体**（环境变量 → 配置目录 → 技能安装路径），命中 `references/agent-adapters/<name>.md` 则全程应用其接入差异（如 Claude Code 需 CLAUDE.md 加 `@AGENTS.md` 转发行），未命中走通用流程——AGENTS.md 是跨智能体契约。
   2. 扫描（只读，先扫后问）：**仓库类型**（根级 workspace 标志 → monorepo 逐包扫描，否则整仓）；语言与框架（按包读 manifest）；检查命令（monorepo 优先聚合命令 turbo/nx/pnpm -r/go work）；环境已述项（Dockerfile/compose、版本管理文件、lockfile）；已有接入物（.sdlc/check.sh 存在 → 升级模式，全程按 §5.2 所有权表执行并逐项报告覆盖/保留/补缺）。
-  3. 决策点（必须问、带默认建议，扫描已答的只复述不重问）：① 产物与 issue 出口 local（默认）/ GitHub / GitLab / 云效 Codeup——选 GitHub 验证 `gh auth status`，选 GitLab 验证 `glab auth status`，选 Codeup 引导添加 Codeup MCP；凭据/MCP 不通过回落 local 并明确告知，不静默降级；github/gitlab/codeup 的 publish 适配器属批 3，如实相告。② 执行环境缺口——每语言三问（跑在哪/版本管理/包管理器），仓库已描述的直接复述，结果写 config.sh 的 RUN_ENV/RUN_PREFIX/PKG_MGR/CODE_DIRS。③ 编码标准来源——内置 starter 只是兜底：问用户自有/团队标准及其来源（本地路径 / URL，可多个），导入 docs/standards/（增量、同名不覆盖），CODING_STANDARDS.md 写成"索引 + 兜底基线"；没有则引入匹配语言的 starter；可两者都要或跳过。
+  3. 决策点（必须问、带默认建议，扫描已答的只复述不重问）：① 产物与 issue 出口 local（默认）/ GitHub / GitLab / 云效 Codeup——选 GitHub 验证 `gh auth status`，选 GitLab 验证 `glab auth status`，选 Codeup 引导添加 Codeup MCP；凭据/MCP 不通过回落 local 并明确告知，不静默降级；github/gitlab/codeup 的 publish 适配器随技能分发（assets/trackers/），setup 按所选出口安装对应文件并告知投影失败时的警告跳过语义（不阻断技能出口链）。② 执行环境缺口——每语言三问（跑在哪/版本管理/包管理器），仓库已描述的直接复述，结果写 config.sh 的 RUN_ENV/RUN_PREFIX/PKG_MGR/CODE_DIRS。③ 编码标准来源——内置 starter 只是兜底：问用户自有/团队标准及其来源（本地路径 / URL，可多个），导入 docs/standards/（增量、同名不覆盖），CODING_STANDARDS.md 写成"索引 + 兜底基线"；没有则引入匹配语言的 starter；可两者都要或跳过。
   4. 生成/升级：按 §5.2 所有权表逐项执行。config.sh 预填探测结果，绝不覆盖；GLOSSARY.md 首建"流程术语与状态"章（项目术语不动）；AGENTS.md **最后收口**（不存在则连带创建；无标记文末追加；有标记只替换标记之间内容），智能体额外动作在此一并执行；git hooks 幂等重装，外来 hook 不覆盖只报告；docs/ 八个产物目录懒创建；源码与一切用户文件永不触碰。
   5. 自检与收尾报告：跑 `check.sh phase` 与 `frontier` 确认可执行；报告四段——做了什么（含覆盖/保留决策、识别到的智能体与仓库类型）/ 探测画像（语言、包清单、版本管理、包管理器、聚合命令）/ config 待补项（TRACKER_REPO、留空的检查命令、未完成的 MCP/凭据）/ 建议跑 /sdlc（未安装则说明）。出口形态 = 报告 + 指路，无下游自动串联。
 - **注意**：实现时先检查 `~/.zcode/skills` 与 `~/.agents/skills` 的镜像关系，确认技能实际生效路径。
@@ -675,10 +676,10 @@ ADR → GLOSSARY.md → CODING_STANDARDS.md。
 
 ## 14. 待定与未来扩展
 
-- Codeup 适配器细节（API endpoint、token 权限）在批 3 实现时调研；GitHub/GitLab/Codeup 三平台的 issue 与 PR/MR 模型参考已落盘 docs/research/0001（2026-10-27），实现适配器前先读。tracker 扩展只需新增 `.sdlc/trackers/xxx.sh` + config 枚举，流程技能零改动。
+- tracker 适配器（github/gitlab/codeup）已随批 3 落地（2026-10-27）：github/gitlab 走官方 CLI（gh/glab）投到平台 issue，codeup 走 OpenAPI 直连（个人访问令牌 `x-yunxiao-token`）投到 Projex 工作项；CreateWorkitemV2 与 CreateWorkitemComment 端点已于 2026-10-27 对照官方文档核验（`POST /organization/{organizationId}/workitem`、`POST /organization/{organizationId}/workitems/comment`），工作项类型列表端点未能在官方文档核验，类型标识由配置项显式提供、不做运行时探测。tracker 扩展只需新增 `.sdlc/trackers/xxx.sh` + config 枚举，流程技能零改动；平台模型参考 docs/research/0001（2026-10-27 快照，实现时已复核）。
 - L4 PreToolUse hook 的具体拦截规则（--no-verify、无工单时的 src/ 编辑）批 3 设计。
 - 团队规范 starter（TS / Python / Go / Java）定稿于 skills/setup-workspace/assets/standards/（2026-10-26，随 setup-workspace 实现定稿）。
 - monorepo 按包门禁（逐包 check、逐包编号）批 1 不做：基础设施全库一份（.sdlc/ 与 docs/ 在根、产物编号全库唯一），setup 只做逐包扫描与聚合检查命令预填；按包门禁未来按需扩展。
 - 智能体接入参考（setup-workspace 的 references/agent-adapters/）首批仅 zcode 与 claude-code；未识别的智能体走通用流程（AGENTS.md 为跨智能体契约），新增智能体加参考文件即可，技能正文零改动。
-- Codeup MCP 的具体配置指引在批 3 适配器实现时补入 references/decisions.md。
+- Codeup MCP 配置指引已于 2026-10-27 补入 setup-workspace references/decisions.md，形态为"适配器直连优先（个人访问令牌 + OpenAPI，零 MCP 依赖），MCP 为对话内操作工作项的可选增强"。
 - 若未来需要团队协作场景（多人分支策略、评审分派），作为新技能扩展，不动现有门禁结构。

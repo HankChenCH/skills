@@ -106,7 +106,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | `validate <file>` | 模板完整性：必填节、frontmatter、id 与文件名、FR 追溯（孤儿报错）、依赖无环 | 各产物技能的出口门禁 |
 | `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单 in-progress/implemented，或带 `[trivial]`（挂 git commit-msg hook） | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖 | git hook |
-| `publish <file>` | 按 TRACKER 发布产物；适配器未实现时明确警告并跳过 | 各技能落盘后 |
+| `publish <file>` | 按 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh` 发布产物；适配器未安装或投影失败（CLI 缺失/未认证/API 报错）时明确警告并跳过，不阻断 | 各技能落盘后 |
 
 ## 8. config.sh 字段参考
 
