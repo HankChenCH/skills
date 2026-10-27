@@ -24,6 +24,12 @@ description: SDLC 开发流程总控（只读调度）：盘点全库流程产�
      （如"ticket 0007 的 spec 0003 还是 draft → /dev-spec"）。
    - **循环状态**：逐 need 报轮次进度——当前 round 是否已验收、验收报告里残余风险
      几条、是否建议开下一轮（读 docs/acceptance/ 的"残余风险/下一轮建议"节）。
+   - **项目阶段（RUP 判读）**：逐 need 对齐四里程碑——LCO（need confirmed，
+     "值得做"已拍板）→ LCA（round 1 验收通过，架构基线立住、最大风险消掉）→
+     IOC（每轮验收通过，可运行增量检查点）→ PR（need fulfilled，发布退出）。
+     按所处阶段给一句建议措辞：初始期重心 clarify、细化期 spec+design、
+     构造期 implement/review（design 默认跳过，除非新 ADR 级决策）、
+     交付期 ship/accept。纯判读层，不新增状态、不设阶段门禁。
 3. 全程只读，报告完即停，等用户指令。
 
 ## 2. next 模式：自动推进

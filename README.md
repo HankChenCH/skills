@@ -13,8 +13,6 @@
 
 ## 下一步
 
-按蓝图 §10.2 的批次计划，在新会话中逐个实现技能。批 1 已全部完成（12/12）：setup-workspace（2026-10-26，含 check.sh 门禁脚本与 60 项脚本化测试）、sdlc 总控（2026-10-27，含 next 模式路由表与上下文 token 水位线）、ref-implementation、ref-review、dev-review（2026-10-26）以及 ref-writing、ref-git-commit、ref-testing、dev-implement、dev-spec、dev-plan、dev-ship、dev-accept（2026-10-27）——最小闭环 need → spec → plan → implement → review → ship → accept 已可全程走通。批 2 已完成三例：dev-retro（2026-10-27，规格即蓝图 §11.10，复盘报告落 docs/retros/ 轻产物、不进 check.sh 门禁）、dev-fix（2026-10-27，规格即蓝图 §11.11，分诊定级 + 开 fix 票 + 自动转入 dev-implement 实现链，不自带实现循环）、dev-design（2026-10-27，规格即蓝图 §11.12，可选产物——ADR 三条件命中或结构非显而易见才做）。批 2 仅剩 dev-clarify，其规格尚未写入蓝图 §11，按治理规则先在蓝图补规格再实现。开工话术：
-
-> 读 docs/sdlc-skills-blueprint.md 的 §2–§8 与 §10.2 批 2 要点，先为 dev-clarify 在 §11 补写规格（need 采集与开放问题清零，need → confirmed 的推进者），再按规格实现技能，装到 `~/.zcode/skills/`，建完跑 §13.2 的自测清单。
+按蓝图 §10.2 的批次计划，在新会话中逐个实现技能。批 1 已全部完成（12/12）：setup-workspace（2026-10-26，含 check.sh 门禁脚本与 60 项脚本化测试）、sdlc 总控（2026-10-27，含 next 模式路由表与上下文 token 水位线）、ref-implementation、ref-review、dev-review（2026-10-26）以及 ref-writing、ref-git-commit、ref-testing、dev-implement、dev-spec、dev-plan、dev-ship、dev-accept（2026-10-27）——最小闭环 need → spec → plan → implement → review → ship → accept 已可全程走通。批 2 已全部完成（4/4，2026-10-27）：dev-retro（规格即蓝图 §11.10，复盘报告落 docs/retros/ 轻产物、不进 check.sh 门禁）、dev-fix（规格即蓝图 §11.11，分诊定级 + 开 fix 票 + 自动转入 dev-implement 实现链，不自带实现循环）、dev-design（规格即蓝图 §11.12，可选产物——ADR 三条件命中或结构非显而易见才做）、dev-clarify（规格即蓝图 §11.13，管线入口想法 → need——方法论亮牌五法路由 + references/ 五细则、校准阶梯（查证→陈述句确认→决策卡→可点 HTML 原型→转假设）、开放问题三路归置清零；RUP 阶段判读层随批落 sdlc §11.2）。下一步批 3：dev-research、dev-release、dev-docs、trackers 的 github/gitlab/codeup 适配器、L4 hooks。
 
 每建完一个技能，在蓝图 §10.2 对应条目标注完成日期（蓝图兼作进度台账）。改动技能行为前先改蓝图（治理规则：先文档后技能）。
