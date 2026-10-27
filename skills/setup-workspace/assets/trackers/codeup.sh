@@ -45,6 +45,7 @@ command -v curl >/dev/null 2>&1 || warn_skip "curl 未安装"
 
 # json_escape：stdin → stdout，产出 JSON 字符串体（无外层引号）：转义 \ " 换行 制表 回车
 json_escape() {
+  # RS="\001"（输入中不存在的字节）让 awk 把整个输入读成一条记录，gsub 才能跨行替换换行符
   awk 'BEGIN { RS = "\001" }
     { gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r"); gsub(/\n/, "\\n"); printf "%s", $0 }'
 }

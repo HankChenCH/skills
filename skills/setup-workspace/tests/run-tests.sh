@@ -692,7 +692,7 @@ t "github：gh 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PATH\
 t "github：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gh3.log\"" ""
 t "github：gh 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "gh 未安装"
 t "github：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
-sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== tracker 适配器 gitlab =="
 GITLAB_ADAPTER="$HERE/../assets/trackers/gitlab.sh"
