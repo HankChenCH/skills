@@ -68,6 +68,13 @@ setfm() {
   sed -i.bak "s/^$2: .*/$2: $3/" "$TMP/$1" && rm -f "$TMP/$1.bak"
 }
 
+# fakebin 建替身命令（从 stdin 读内容并加可执行位）；用例内以 PATH="$TMP/fakebin:$PATH" 前置
+fake_cmd() {
+  mkdir -p "$TMP/fakebin"
+  cat > "$TMP/fakebin/$1"
+  chmod +x "$TMP/fakebin/$1"
+}
+
 new_repo() {
   TMP="$(mktemp -d)"
   git -C "$TMP" init -q -b main
@@ -648,6 +655,43 @@ sed -i.bak 's/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/
 mv "$TMP/.sdlc/trackers/local.sh" "$TMP/.sdlc/trackers/local.sh.bak"
 t "local 适配器缺失报安装损坏" 1 "check.sh publish docs/adr/0001-local-tracker.md" "安装损坏"
 mv "$TMP/.sdlc/trackers/local.sh.bak" "$TMP/.sdlc/trackers/local.sh"
+
+echo "== tracker 适配器 github =="
+GITHUB_ADAPTER="$HERE/../assets/trackers/github.sh"
+cp "$GITHUB_ADAPTER" "$TMP/.sdlc/trackers/github.sh" && chmod +x "$TMP/.sdlc/trackers/github.sh"
+sed -i.bak 's/^TRACKER=.*/TRACKER=github/; s/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+fake_cmd gh <<'EOF'
+#!/bin/sh
+[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_LOG"
+if [ "$1" = "auth" ]; then exit "${FAKE_AUTH:-0}"; fi
+if [ "$1" = "issue" ]; then
+  case "$2" in
+    create|edit) ;;
+    *) exit 0 ;;
+  esac
+  prev=""
+  for a in "$@"; do
+    if { [ "$prev" = "-F" ] || [ "$prev" = "--body-file" ]; } && [ -f "$a" ]; then cat "$a" >> "$FAKE_LOG"; fi
+    prev="$a"
+  done
+  if [ "$2" = "create" ]; then printf '%s\n' "${FAKE_URL:-https://github.com/acme/widget/issues/41}"; fi
+fi
+exit 0
+EOF
+t "github 投影放行并说明" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/gh1.log\" check.sh publish docs/adr/0001-local-tracker.md" "投影"
+tn "github 投影消息不含重复 docs/ 前缀" 0 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "docs/docs/"
+t "github 投影收到一次 issue create" 0 "grep -q 'issue create' \"$TMP/gh1.log\"" ""
+t "github 投影正文首行带盘上指针" 0 "grep -q '盘上产物：docs/adr/0001-local-tracker.md' \"$TMP/gh1.log\"" ""
+t "github 映射落行（路径与编号与URL）" 0 "grep -q 'docs/adr/0001-local-tracker.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/41' \"$TMP/.sdlc/trackers/github.map\"" ""
+t "github 幂等：二次 publish 走 issue edit" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/gh2.log\" check.sh publish docs/adr/0001-local-tracker.md" "投影"
+t "github 幂等：edit 存在" 0 "grep -q 'issue edit' \"$TMP/gh2.log\"" ""
+t "github 幂等：无第二次 create" 0 "! grep -q 'issue create' \"$TMP/gh2.log\"" ""
+t "github 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/github.map\")\" -eq 1 ]" ""
+t "github：gh 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_AUTH=1 FAKE_LOG=\"$TMP/gh3.log\" check.sh publish docs/adr/0001-local-tracker.md" "未认证"
+t "github：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gh3.log\"" ""
+t "github：gh 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "gh 未安装"
+t "github：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== git hook 转发端到端 =="
 printf '#!/bin/sh\n# sdlc-managed: forward\nexec "$(git rev-parse --show-toplevel)/.sdlc/check.sh" commit-msg "$@"\n' > "$TMP/.git/hooks/commit-msg"
