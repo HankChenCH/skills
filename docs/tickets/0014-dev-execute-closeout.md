@@ -2,7 +2,7 @@
 id: 0014
 type: feature
 spec: 0006
-status: implemented
+status: done
 blocked-by: [0013]
 created: 2026-10-28
 ---
@@ -19,3 +19,4 @@ created: 2026-10-28
 
 ## Progress
 SKILL §6 收口节 + run-mechanics §8 收口章（§8.1–8.6）与 §5 收口断点推导已落，全链在临时仓库演练实证（/tmp/devx-drill/records/closeout-1…8）。演练抓到并修订一处缺口：合并信息不带 [#NNNN] 被 commit-msg hook 拦（§8.3 写死要求）。尾巴：pre-push hook 壳在本仓库存在、演练仓库手动补装；评审时值得注意 run-mechanics §5 末条三段断点判据。
+done: 2026-10-28
