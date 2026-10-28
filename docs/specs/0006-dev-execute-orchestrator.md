@@ -2,7 +2,7 @@
 id: 0006
 status: approved
 need: 0004
-round: 1
+round: 2
 created: 2026-10-28
 approved: 2026-10-28
 ---
@@ -38,7 +38,7 @@ FR 承接 need 0004（全文见该 need）：FR-1 依赖序图与开工确认；
 - **合回与预演**：票 approved 后按依赖序机械合回运行分支（不设人工门）；每次合回后在运行分支跑 `check.sh all` 加 spec 验收场景中已有自动化承载的集成级测试；红灯停下问人，不自动重试。
 - **收口**：按 dev-ship 前半三节模板生成一次 PR → `check.sh pre-push` → 合并确认一次问清（方式 + 是否 tag）→ 合并后全部票 done（[trivial] 状态提交，dev-ship 同款语义）→ 清理全部运行 worktree → 出口报告指路 /dev-accept，不自动串联。
 - **状态与续接**：零新产物、check.sh 零改动（need 拍板）——票状态机 + 各 worktree 分支即运行状态；中断续接从 `git worktree list` + 票 frontmatter 与 ## Progress 推导，无运行级新状态。
-- **worktree 约定**：运行与票 worktree 置于仓库同级约定目录，checkout 目录不入版本库（git 元数据自管理）；分支命名 `run/<spec-id>` 与 `run/<spec-id>/<ticket-id>`，供 `git worktree list` 机械发现。
+- **worktree 约定**：运行与票 worktree 置于仓库同级约定目录，checkout 目录不入版本库（git 元数据自管理）；分支命名：运行分支 `run/<spec-id>`、票分支 `run/<spec-id>-t<ticket-id>`（如 `run/0006-t0012`）。约束：git ref 名空间同段互斥——`refs/heads/run/0006` 存在时不能建 `refs/heads/run/0006/*`（D/F 冲突），票分支因此用扁平 `-t` 后缀与运行分支共存；`run/` 单前缀机械发现面不变。
 - **跨会话总览**：sdlc 默认模式报告增加"运行中 worktree"段——`git worktree list` 发现 run/ 前缀分支，逐分支读票状态；sdlc 零写入铁律不变。
 - **路由接线**：sdlc references/next-mode.md 加行——frontier 多张可开工票同属一张 approved spec 时问询"整 spec 编排（默认）/ 单票"，单票保留原语义。
 - **治理顺序**：先改蓝图再写技能——新增 §11.17 dev-execute 规格、§8 决策点表补行、§7.2 引用矩阵补行（dev-execute 开工装载 ref-implementation / ref-testing / ref-git-commit）、§10.1 清单计数、修订记录。
@@ -54,6 +54,7 @@ FR 承接 need 0004（全文见该 need）：FR-1 依赖序图与开工确认；
 - [FR-1 | 工单级] Given approved spec 名下票含阻塞边与并行机会，When dev-execute 点名该 spec，Then 展示分层依赖序图（同层无依赖、层间 blocked-by 串行、标注关键路径）并请求开工确认；未确认不创建任何 worktree。
 - [FR-1 | 工单级] Given spec 未 approved 或用户点名单张票，When 进入技能，Then 拒绝并分别指路 /dev-spec 或 /dev-implement，零写入。
 - [FR-2 | 工单级] Given 开工确认通过，When 运行建立，Then `git worktree list` 可见运行 worktree 与 `run/<spec-id>` 分支，主工作区仍停留主分支且干净。
+- [FR-2 | 工单级] Given 运行分支 `run/<spec-id>` 已存在，When 逐票建立票分支 `run/<spec-id>-t<ticket-id>`，Then 建支成功无 ref 锁定错误，运行内全部分支仍以 `run/` 单前缀被 `git worktree list` 机械发现。
 - [FR-3 | 工单级] Given 某层含至少 2 张无依赖票，When 层调度，Then 各票在各自票 worktree 并行实现（执行时间重叠），每票走完 dev-implement 红绿纪律；blocked-by 未满足的票未开工。
 - [FR-4 | 工单级] Given 某票评审 approved，When 机械合回运行分支，Then 合回后运行分支自动跑 `check.sh all`，绿灯才调度后续；红灯停下问人。
 - [FR-5 | 集成级] Given 两个会话各对一张 approved spec 发起运行，When 并行推进，Then 两运行各自 worktree 与分支独立、互不阻塞；先后合并时后者冲突即停在合并门问人。
@@ -77,3 +78,4 @@ FR 承接 need 0004（全文见该 need）：FR-1 依赖序图与开工确认；
 - 分轮拍板（2026-10-28）：round 1 全量覆盖 9 FR——validate 孤儿 FR 规则要求单张 spec 场景覆盖 need 全部 FR，FR-3/FR-4（风险靶心）本就必含，FR-8 改动面小顺带完成；round 2 留给验收后残余风险。
 - 术语"运行（run）""运行依赖顺序图"已在 GLOSSARY 项目术语章登记（need 0004 定稿时）。
 - 本 spec 的蓝图同步面：§11.17（新规格节）、§8（决策点补行）、§7.2（引用矩阵补行）、§10.1（清单 20 → 21）、修订记录、sdlc references/next-mode.md（路由加行）——全部随实现工票落，先文档后技能。
+- round 2 修订（2026-10-28，触发：票 0013 演练停机，need 0004 E2 门禁回路）：round 1 票分支命名 `run/<spec-id>/<ticket-id>` 与运行分支 `run/<spec-id>` 在 git ref 名空间 D/F 冲突——临时仓库一手复现 `fatal: cannot lock ref 'refs/heads/run/0006/0012': 'refs/heads/run/0006' exists`，FR-2 票侧 / FR-3 / FR-4 / FR-9 合回无法按 round 1 命名实现。修订为票分支 `run/<spec-id>-t<ticket-id>`，临时仓库实测与运行分支共存无冲突。否决备选：`run/<spec-id>-<ticket-id>`（无 `t` 标记，票分支与运行分支的数字后缀难以区分）；票分支迁出 `run/` 前缀（D/F 安全但破坏 FR-8 sdlc 总览与续接推导依赖的 `run/` 单前缀机械发现）。round 2 改动面仅：实现决策 worktree 约定一条、验收场景新增 FR-2 共存场景一条、本备注；同步面随票 0013 重入落（蓝图 §11.17 分支命名行、run-mechanics §1/§4/§7 受阻待补节）。
