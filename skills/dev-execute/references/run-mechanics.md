@@ -145,7 +145,7 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
 
 1. `.sdlc/check.sh all`——必须退出码 0。exit 0 但输出
    "⚠️ config.sh 未定义任何检查命令" → **视为红灯**（发现，不是跳过）：停下按
-   SKILL.md §7 预演失败流报告。
+   SKILL.md §8 预演失败流报告。
 2. spec 验收场景中标 [FR-N | 集成级] 且仓库已有自动化承载的测试（`CHECK_TEST`
    已覆盖的不再重复跑；无承载的集成场景留给 /dev-accept，运行不代跑）。
 3. 预演记录进运行摘要：哪次合回、哪条命令、什么输出。
@@ -164,7 +164,7 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
   提交，不绕门禁（两个方向均已演练实证）。
 - **预演衔接**：合回后立即跑 §6；绿灯才合回下一票或调度下一层。
 - **冲突停机**：merge 退出码 1 且 `git diff --name-only --diff-filter=U` 非空 →
-  SKILL.md §7 异常流：停下问人；标准停机动作是 `git merge --abort` 还原运行
+  SKILL.md §8 异常流：停下问人；标准停机动作是 `git merge --abort` 还原运行
   worktree（票分支无损，重放 merge 即可复现冲突再按人的决策处理）。绝不自动解
   冲突（演练：先合回者过、后合回者 CONFLICT 停、abort 后工作树干净）。
 - **合回信息**：`[#NNNN] 合回票 NNNN（评审 approved）`，正文可附评审报告编号；
@@ -207,8 +207,11 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
   执行，沉默或"都行"不算；拒绝 → 停，运行停在收口（§5.6 断点续接）。**
 - 本地路径（TRACKER=local 或平台 PR 未建/回落）：在**主工作区**（已在 BASE_REF）
   执行——运行 worktree 占着运行分支，不切走它：
-  `git merge --no-ff "run/<spec-id>"`，merge commit 首行讲清合入整张 spec，
-  正文列全部票号 → `git push`。fast-forward 若被仓库约定允许，历史即提交本身。
+  `git merge --no-ff "run/<spec-id>"`，merge commit 首行讲清合入整张 spec 并带
+  全部票的 `[#NNNN]` 引用（commit-msg 按 [#NNNN] 校验状态——演练实锤：合并信息
+  不带票号引用被 hook 拦"既无 [#NNNN] 也无 [trivial]"，合并停在待完成态），
+  正文列覆盖票与评审编号 → `git push`。fast-forward 若被仓库约定允许，历史即
+  提交本身。
 - 平台 PR 路径：按确认方式在平台合并，本地 `git pull` 同步 BASE_REF。
 - 合并冲突（BASE_REF 在运行期间前进了）→ SKILL.md §8 合回冲突同款：停下问人，
   标准动作 `git merge --abort`。
@@ -218,7 +221,7 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
 合并后在**主工作区**（BASE_REF 已含运行内容）：
 
 1. 本 spec 名下全部工票逐张 `status` 改 `done`、追加 `done: <今日>`，逐张跑
-   `.sdlc/check.sh validate`。
+   `.sdlc/check.sh validate <file>`。
 2. 状态变更**一次** [trivial] 提交落 BASE_REF：首行写明"spec <NNNN> 全部工票
    → done"，正文留豁免理由（流程状态落盘，非绕门禁，dev-retro 审计基准内；
    dev-ship §4.3 同款语义）。
