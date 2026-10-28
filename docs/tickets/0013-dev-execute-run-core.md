@@ -2,9 +2,10 @@
 id: 0013
 type: feature
 spec: 0006
-status: implemented
+status: done
 blocked-by: [0012]
 created: 2026-10-28
+done: 2026-10-28
 ---
 # 0013: dev-execute 运行主体（建图 / worktree / 并行 / 合回 / 预演）
 
