@@ -7,15 +7,15 @@ SKILL.md 只留控制流；本文件是它引用的操作细则，按引用章�
 ## 1. 约定总览
 
 - **运行分支**：`run/<spec-id>`（如 `run/0006`）。
+- **票分支**：`run/<spec-id>-t<ticket-id>`（如 `run/0006-t0012`；spec 0006 round 2）。
+  约束：git ref 名空间同段互斥——`refs/heads/run/0006` 存在时不能建
+  `refs/heads/run/0006/*`（D/F 冲突），票分支因此用扁平 `-t` 后缀与运行分支共存；
+  `run/` 单前缀机械发现面不变（临时仓库实测共存无冲突）。
 - **worktree 放置**：仓库同级约定目录 `<repo>-runs/`（与仓库目录平级，不入版本库，
   git 元数据自管理）。运行 worktree：`<repo>-runs/<spec-id>-run/`；票 worktree：
   `<repo>-runs/<spec-id>-t<NNNN>/`。
 - **机械发现**：`git worktree list` 中分支以 `run/` 开头的条目即运行；主工作区条目
   （第一项）不计。
-- **票分支命名**：**受阻待补**——spec 0006 现行约定 `run/<spec-id>/<ticket-id>` 与
-  运行分支在 git ref 名空间冲突（D/F：`cannot lock ref … 'refs/heads/run/0006'
-  exists`），不可实现；证据与推荐方案见工单 0013 Progress，经 /dev-spec round 2
-  修订后本文件 §4、§7 补写。
 
 ## 2. 建运行依赖顺序图
 
@@ -96,16 +96,32 @@ git worktree add "<repo>-runs/<spec-id>-run" -b "run/<spec-id>"
 
 ## 4. 票 worktree 与并行派发
 
-**受阻待补**（同 §1 票分支命名；修订后落：切出命令、每票一 worktree 核对、
-子代理并行派发的批量与超批处理、blocked-by 未满足不派发的机械判据）。
+当前层每票，从运行分支切出票分支与票 worktree：
+
+```sh
+git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run/<spec-id>"
+```
+
+- **派发判据**：票 frontmatter `blocked-by` 中 spec 内依赖全部已合回（§5.3 判据）
+  或 done；blocked-by 未满足的票不建 worktree、不派发（演练：无票 worktree 条目）。
+- **并行派发**：同层每票一个子代理，子代理执行 dev-implement 纪律全文，全部工作在
+  该票 worktree 内完成；并行度默认上限 4（SKILL.md 调用参数可覆盖），超出分批。
+- **交接语义**：实现提交与 `status: implemented` 翻转一并落在票分支（dev-implement
+  出口门禁）——这是 §7 合回被 commit-msg 放行的前提。
+- **隔离自证**：票 worktree 只见自己分支的改动（演练：两票 worktree 互不可见）；
+  运行分支在合回前无该票内容。
 
 ## 5. 中断续接推导
 
 1. `git worktree list`：有无 `run/<spec-id>` 条目 → 运行是否存在。
-2. 逐票读 frontmatter status：done=完成；implemented=评审 approved（是否已合回看
-   下一步）；in-progress=在办（读其 `## Progress` 拿断点）；ready=未开工。
-3. 已合回判定：运行分支 `git log --format=%s` 含该票 `[#NNNN]` 合回提交（或
-   `git merge-base --is-ancestor <票分支> run/<spec-id>`）→ implemented 且已合回。
+2. 逐票读 frontmatter status。**读取顺序**：运行 worktree 最新（合回票的状态随
+   合回落地）；在办票读其票 worktree；主工作区在运行合回主干前是旧态，不作为
+   运行进度依据（演练实锤：同一票文件主仓 ready、运行 worktree implemented）。
+   done=完成；implemented=评审 approved（是否已合回看下一步）；in-progress=在办
+   （读其 `## Progress` 拿断点）；ready=未开工。
+3. 已合回判定：`git merge-base --is-ancestor "run/<spec-id>-t<NNNN>" "run/<spec-id>"`
+   （或运行分支 `git log --format=%s` 含该票 `[#NNNN]` 合回提交）→ implemented 且
+   已合回。
 4. 断点 = 首个"未合回"的票所在层：在办票续接其 Progress，未开工票照图派发；
    已合回票与其所在层不重做。
 5. 票集变化（fix 票插入、spec 修订增删票）→ 回 SKILL.md §3 重算图，已完成票仍列
@@ -124,5 +140,20 @@ git worktree add "<repo>-runs/<spec-id>-run" -b "run/<spec-id>"
 
 ## 7. 机械合回
 
-**受阻待补**（同 §1 票分支命名；修订后落：按依赖序的合回命令与信息格式
-（ref-git-commit 合并规则 + [#NNNN]）、冲突判据与停机动作、合回后预演的衔接）。
+票评审 approved 后，在**运行 worktree** 内按依赖序（分层序，同层任一序）执行：
+
+```sh
+git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 approved）"
+```
+
+- **放行前提**：状态翻转已随票分支提交（§4 交接语义）。git 在 commit-msg hook
+  触发前已把合并结果写进工作树，hook 读到的运行 worktree 票文件是 implemented →
+  校验放行；票分支缺翻转提交 → hook 拦（"还是 ready"）——停下让票子代理补出口
+  提交，不绕门禁（两个方向均已演练实证）。
+- **预演衔接**：合回后立即跑 §6；绿灯才合回下一票或调度下一层。
+- **冲突停机**：merge 退出码 1 且 `git diff --name-only --diff-filter=U` 非空 →
+  SKILL.md §7 异常流：停下问人；标准停机动作是 `git merge --abort` 还原运行
+  worktree（票分支无损，重放 merge 即可复现冲突再按人的决策处理）。绝不自动解
+  冲突（演练：先合回者过、后合回者 CONFLICT 停、abort 后工作树干净）。
+- **合回信息**：`[#NNNN] 合回票 NNNN（评审 approved）`，正文可附评审报告编号；
+  规范依据 ref-git-commit 合并规则。

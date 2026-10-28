@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.15 · 2026-10-28（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.17 · 2026-10-28（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -35,6 +35,7 @@
 > **v1.14 修订记录（批 3 L4 hooks 实现，2026-10-28，need 0003 / spec 0005）**：L4 平台层拦截落地——判定脚本 `.sdlc/hooks/l4-guard.sh`（§5.2 目录树与所有权表新增 `.sdlc/hooks/` 行，setup 可整体覆盖；check.sh 零改动，保持纯 git 门禁），拦截两规则：**A** Bash 命令含 `--no-verify`（或 `git commit -n` 短形式）→ deny；**B** Edit/Write 落在 CODE_DIRS 下且无 `in-progress` 工单 → deny 指路 /dev-implement（"无工单"判据 = 无在办工单；CODE_DIRS 留空则规则 B 不生效，docs/ 与 .sdlc/ 不属规则 B 作用域）。载体：ZCode 工作区 `<repo>/.zcode/config.json` 顶层 `hooks` 块（`enabled: true` 必需、PreToolUse 单 matcher `Bash|Edit|Write`、process 型经 bash 调 guard）——setup 仅在命中 ZCode 适配器时合并该块（hooks 块归 setup，文件其余内容归用户；与 .git/hooks 同类，机器侧接线不进版本库）；deny 经 stdout JSON `permissionDecision`（带理由）回平台，**失效安全**：非 sdlc 工作区、stdin 异常、配置缺失一律放行（fail-open，门禁故障不锁死工作，L1/L3 兜底）。Claude Code 为同构候选载体，本批只接 ZCode。§3 L4 行、§5.5 CODE_DIRS 注记、§14 待定项随之现状化。
 > **v1.15 修订记录（dev-docs 实现，2026-10-28）**：新增 §11.16 dev-docs——面向人的文档（README/API/用户文档）维护（§10.1 批 3 末项，批 3 至此全清）。定位仿 dev-research / dev-release：脊柱上有位置（§4.1 反馈沉淀 fix / retro / docs）但**不进自动串联链**——sdlc next-mode 路由表不加行，文档维护是按需服务不是必经门禁，用户手动触发。核心纪律 = **先核验后落笔**：写进文档的每条行为断言（命令/参数/输出/路径/限制）按三档核验留档——实跑 / 读实现 / 测试为证，三档都够不着如实标注"未核验"，禁止"应该如此"式措辞；文档与实现冲突以实际行为为准是默认建议，但**改哪边必须问人**（用户认定代码错 → 转 dev-fix 开票，修完再对齐——文档不将就错误行为）。维护范围限定"面向人的文档"（GLOSSARY 新词条）：流程产物归各自技能、METHOD.md 归 setup、CHANGELOG 归 dev-release、源码内注释与 docstring 属源码走工单——四条边界全是拒绝路径。§7.2 引用矩阵 dev-docs → ref-writing 行 v1.9 已有，零改动；§8 决策点全表补 dev-docs 行；不开新产物目录、无 frontmatter、不进 validate（README 等人文物非八类产物，与 CHANGELOG 同理），check.sh 零改动。
 > **v1.16 修订记录（dev-execute 规划定稿，2026-10-28，need 0004 / spec 0006）**：新增 §11.17 dev-execute——V 模型整 spec 编排运行技能（§10.1 清单 20 → 21）。定位：输入点名 approved spec，构建运行依赖顺序图（blocked-by 拓扑分层，会话内视图不落盘、check.sh 零改动），在运行分支 + 运行 worktree 中按依赖序推进整 spec：同层无依赖票每票独立 worktree 经子代理并行实现（dev-implement 纪律原文复用零改动，并行度默认上限 4、参数可覆盖）→ 逐票 dev-review 编排模式评审（显式工单范围 + diff 基线 = 运行分支，出口止于 approved，单票路径零改动，§11.7 随之补契约）→ approved 票机械合回（不设人工门）+ 每次合回后预演（`check.sh all`，V 模型右臂上行）→ 全绿一次 PR（dev-ship 前半三节模板）+ pre-push + 合并确认（单向门）→ 全部票 done → 清理 worktree → 指路手动 /dev-accept 不自动串联。人交互恰两次（开工确认 + 合并确认）；异常流（设计级阻断 / spec 缺口 / 预演失败 / 合回冲突）一律停下问人带连坐阻塞面与指路。多会话可各跑各的 spec（worktree 隔离互不阻塞）；sdlc 默认报告增"运行中 worktree"段、next-mode 路由表加行（多票同 approved spec → 问询编排默认 / 单票，§11.2 随之同步）。工票 0012–0015。
+> **v1.17 修订记录（spec 0006 round 2 命名修订同步，2026-10-28，票 0013 重入）**：§11.17 分支命名行改为——运行分支 `run/<spec-id>`、票分支 `run/<spec-id>-t<ticket-id>`。起因：round 1 命名 `run/<spec-id>[/<ticket-id>]` 在 git ref 名空间不可实现（`run/0006` 存在时 `run/0006/0012` 被 D/F 冲突拒绝，票 0013 首轮演练临时仓库一手复现），spec 0006 round 2 修订为扁平 `-t` 后缀（实测共存无冲突），本行随票 0013 同步；§11.17 续接行补"frontmatter 以运行/票 worktree 为准，主工作区在运行合回主干前是旧态"（演练实锤）。版本行补正：v1.16 时漏更，本版一并更至 1.17。
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
 ## 1. 背景与目标
@@ -611,7 +612,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 
 - **触发**：sdlc next 路由（frontier 多张可开工票同属一张 approved spec，问询默认编排）或用户手动（"把 spec NNNN 整个跑完""编排执行这张 spec"）。脊柱上有位置（§4.1 实现层），**进** next-mode 路由表（与 dev-research / dev-release 的按需服务定位相反：多票编排是多票场景的默认干道）。
 - **定位**：把"实现整个 spec"收缩为恰两次人交互（开工确认 + 合并确认）。输入点名 approved spec，构建运行依赖顺序图（blocked-by 拓扑分层，会话内视图不落盘，check.sh 零改动），在运行分支 + 运行 worktree 中按依赖序推进：同层无依赖票每票独立 worktree 经子代理并行实现（dev-implement 纪律原文复用零改动，并行度默认上限 4、调用参数可覆盖）→ 逐票 dev-review 编排模式（§11.7）评审 → approved 票按依赖序机械合回（不设人工门）+ 每次合回后预演（`check.sh all` + 已有自动化承载的集成级测试，V 模型右臂上行）→ 全绿一次 PR（dev-ship 前半三节模板）+ pre-push → 合并确认（单向门，方式与是否 tag 一次问清）→ 全部票 done（[trivial] 状态提交，dev-ship 同款语义）→ 清理全部运行/票 worktree → 出口报告指路手动 /dev-accept，不自动串联。
-- **状态与续接**：零新产物——票状态机 + 各 worktree 分支即运行状态；worktree 置仓库同级约定目录（checkout 不入版本库，git 元数据自管理），分支命名 `run/<spec-id>[/<ticket-id>]` 供机械发现；中断续接从 `git worktree list` + 票 frontmatter 与 ## Progress 推导。多会话可各跑各的 spec（worktree 隔离互不阻塞）；后合并者冲突停在合并门问人。
+- **状态与续接**：零新产物——票状态机 + 各 worktree 分支即运行状态；worktree 置仓库同级约定目录（checkout 不入版本库，git 元数据自管理），分支命名：运行分支 `run/<spec-id>`、票分支 `run/<spec-id>-t<ticket-id>`（v1.17 round 2 修订：git ref 名空间同段互斥——`run/0006` 存在时不能建 `run/0006/*`（D/F 冲突），票分支用扁平 `-t` 后缀与运行分支共存），供 `git worktree list` 机械发现；中断续接从 `git worktree list` + 票 frontmatter 与 ## Progress 推导（frontmatter 以运行/票 worktree 为准，主工作区在运行合回主干前是旧态）。多会话可各跑各的 spec（worktree 隔离互不阻塞）；后合并者冲突停在合并门问人。
 - **异常流（一律停下问人，报告连坐阻塞面与指路）**：评审设计级阻断（机械问题仍自动修自动重审）；spec 缺口 → 指路 /dev-spec（门禁回路）；预演失败 → 指路 /dev-fix 开 fix 票、票并入图重算后续跑；合回冲突 → 问人怎么解，可指路 expand–contract 拆票回 /dev-plan。不自动重试、不自动解冲突。
 - **决策点**：开工确认（依赖序图展示后）；合并确认（单向门）；异常流处置。
 - **边界**：编排不拆票（拆分归 dev-plan）；一次运行只处理点名 spec 名下的票，fix 票插入也只重算本 spec 的图；术语"运行 / 运行依赖顺序图"见 GLOSSARY 项目术语章。
