@@ -16,18 +16,26 @@ description: 对当前分支上已实现的工单做双轴代码评审——标�
 
 ## 1. 入口门禁（全部通过才继续）
 
-1. 运行 `.sdlc/check.sh phase`，取**当前分支**上 `status: implemented` 的工单清单。
-   - 清单为空 → 拒绝并指路：改动还在进行中就回 /dev-implement；没有分支改动就没有
-     评审对象。
-2. 读取各工单 frontmatter `spec` 字段指向的 spec。任一缺失或仍是 draft → 停止并
+1. **确定模式**。调用入参显式给出工单编号清单与基线分支（dev-execute 编排调用，
+   形如"编排评审：工单 NNNN、NNNN，基线 <运行分支>"）→ **编排模式**：评审范围 =
+   入参工单，diff 基线 = 入参分支。没有编排入参 → **单票模式**（默认，行为见下）。
+2. 确定评审范围工单清单：
+   - 单票模式：运行 `.sdlc/check.sh phase`，取**当前分支**上 `status: implemented`
+     的工单。清单为空 → 拒绝并指路：改动还在进行中就回 /dev-implement；没有分支
+     改动就没有评审对象。
+   - 编排模式：入参工单在当前 checkout 逐一核对，须全部 `status: implemented`；
+     任一不是 → 停下转述哪张没就绪，不评审（前层已合回的 implemented 票不在
+     入参里，不重审）。
+3. 读取各工单 frontmatter `spec` 字段指向的 spec。任一缺失或仍是 draft → 停止并
    转述缺什么："ticket 0007 的 spec 0003 还是 draft，先 /dev-spec 完成批准"。
-3. 全部通过后，**用 Skill 工具装载 ref-review 与 ref-implementation**：评审行为与
+4. 全部通过后，**用 Skill 工具装载 ref-review 与 ref-implementation**：评审行为与
    标准轴的判断依据以它们为准。
 
 ## 2. 装载评审上下文
 
-按顺序读：CODING_STANDARDS.md → 每张工单全文及其 spec 对应章节 → 当前分支对主干的
-完整 diff（`git diff <主干>...HEAD`）。
+按顺序读：CODING_STANDARDS.md → 每张工单全文及其 spec 对应章节 → 当前分支对基线
+的完整 diff（`git diff <基线>...HEAD`；单票模式基线 = 主干 BASE_REF，编排模式基线 =
+入参运行分支）。
 
 然后向用户复述三五句：评审范围是哪几张工单、大致动了什么、两条轴各看什么。
 有偏差，用户此刻纠正的成本最低。
@@ -46,9 +54,12 @@ description: 对当前分支上已实现的工单做双轴代码评审——标�
 
 1. 写评审报告 `docs/reviews/NNNN-slug.md`（编号取 reviews 内最大号 +1，模板见下），
    运行 `.sdlc/check.sh validate` 必须通过。
-2. **两轴阻断均为零** → 报告 `status: approved`，然后**立即用 Skill 工具调用
-   dev-ship** 准备 PR——评审通过不需要用户批准，合并才需要。dev-ship 未安装 →
-   停下说明，建议先完成 setup-workspace 与 dev-ship 的实现。
+2. **两轴阻断均为零** → 报告 `status: approved`，然后按模式分岔：
+   - **单票模式**：**立即用 Skill 工具调用 dev-ship** 准备 PR——评审通过不需要
+     用户批准，合并才需要。dev-ship 未安装 → 停下说明，建议先完成 setup-workspace
+     与 dev-ship 的实现。
+   - **编排模式**：到此为止，**不调 dev-ship**——PR 由 dev-execute 在运行末统一
+     准备（蓝图 §11.7）；向编排方声明"approved，可合回"。
 3. **有阻断项** → 抛出决策问题（带默认建议）：机械问题（命名、重复、死代码）建议
    自动修复后复审；设计级问题（接口、模块边界）建议与工单作者定方案。用户选定后
    执行修复 → 回到 §3 只复审被阻断条目，逐条核销，直到两轴阻断清零。
@@ -89,4 +100,5 @@ created: <date>
 - 用个人品味阻断；写不出依据（标准或坏味道基线）的降为建议。
 - 跳过任一轴，或在没有落盘报告的情况下宣布"评审通过"。
 - 直接合并——合并是 dev-ship 的单向门，必须用户确认。
+- 编排模式下准备 PR 或调用 dev-ship——那是编排方运行末的事（蓝图 §11.7）。
 - 为了让评审通过而弱化定级、删 finding。
