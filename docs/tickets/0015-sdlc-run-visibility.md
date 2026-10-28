@@ -2,9 +2,10 @@
 id: 0015
 type: feature
 spec: 0006
-status: implemented
+status: done
 blocked-by: [0013, 0014]
 created: 2026-10-28
+done: 2026-10-28
 ---
 # 0015: sdlc 总控接线（运行中 worktree 段 + next-mode 路由行）
 
