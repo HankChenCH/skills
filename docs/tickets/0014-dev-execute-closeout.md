@@ -2,7 +2,7 @@
 id: 0014
 type: feature
 spec: 0006
-status: ready
+status: in-progress
 blocked-by: [0013]
 created: 2026-10-28
 ---

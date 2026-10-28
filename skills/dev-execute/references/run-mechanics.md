@@ -1,7 +1,9 @@
 # run-mechanics：dev-execute 操作细则
 
 SKILL.md 只留控制流；本文件是它引用的操作细则，按引用章节加载。所有命令均在
-2026-10-28 于临时 git 仓库演练实证（工单 0013，记录目录 /tmp/devx-drill/records/）。
+2026-10-28 于临时 git 仓库演练实证（工单 0013：§1–§7，记录目录
+/tmp/devx-drill/records/；工单 0014：§8 收口链，记录目录
+/tmp/devx-drill/records/closeout-*.txt）。
 判断以 `.sdlc/check.sh` 输出与 `git` 实际行为为准，不凭记忆。
 
 ## 1. 约定总览
@@ -126,6 +128,16 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
    已合回票与其所在层不重做。
 5. 票集变化（fix 票插入、spec 修订增删票）→ 回 SKILL.md §3 重算图，已完成票仍列
    图外，不重做。
+6. 断点落在收口链内（全部票已合回、预演绿，SKILL.md §6 未走完）→ 按序判定续接点：
+   - PR 未建或停在合并确认前（运行分支领先 BASE_REF、票全 implemented）→ 从
+     §8.1 起走收口；确认前中断的不补问已答过的问题，重新一次问清（单向门每轮
+     都要显式确认）。
+   - 合并已执行、票未 done（`git merge-base --is-ancestor run/<spec-id>
+     <BASE_REF>` 为真、票仍 implemented）→ 从 §8.4 补 done。
+   - 票已 done、worktree 未清（`git worktree list` 仍有 run/ 前缀条目）→ 从
+     §8.5 清理续起。
+   已合回票的评审不重做：评审报告随票分支在盘上（docs/reviews/），pre-push 按
+   覆盖面机械核对，缺了才补（SKILL.md §8 收口 pre-push 异常）。
 
 ## 6. 预演（每次合回后）
 
@@ -157,3 +169,84 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
   冲突（演练：先合回者过、后合回者 CONFLICT 停、abort 后工作树干净）。
 - **合回信息**：`[#NNNN] 合回票 NNNN（评审 approved）`，正文可附评审报告编号；
   规范依据 ref-git-commit 合并规则。
+
+## 8. 收口链（运行全绿后，SKILL.md §6）
+
+### 8.1 收口起点核对
+
+在**运行 worktree** 内逐项核对（任一不满足不进 PR）：
+
+1. 全部票已合回：`git branch --list "run/<spec-id>-t*"` 逐支
+   `git merge-base --is-ancestor <票分支> run/<spec-id>` 为真。
+2. 运行 worktree 干净：`git status --porcelain` 为空——票内容有残留 → 先处置
+   （该修进修、该弃进 §7 异常流），不带病收口。
+3. 重跑 `.sdlc/check.sh all` 作**收口门禁**：运行全绿（§5.5）到收口之间隔了
+   中断/续接也无需重新核验票状态，但检查证据必须新鲜——出口报告 Evidence 引
+   本次输出。红灯 → SKILL.md §8 预演失败流。
+
+### 8.2 PR 与 pre-push
+
+- PR 正文三节（dev-ship 前半模板，一篇讲整张 spec）：
+  - `## Summary`：运行视图——几层几票 + 逐票一句话（票号 + 交付什么），
+    最小可表达视图讲清改动。
+  - `## Evidence`：§8.1 收口门禁输出 + 逐票评审报告编号（docs/reviews/）。
+  - `## Merge Danger`：单向门判定（合入 BASE_REF 后运行分支与票分支即清理，
+    不可逆）+ 影响半径（spec 名下全部票 + BASE_REF 消费方）。
+- 落点跟 TRACKER（dev-ship §3 同款）：github / gitlab → push 运行分支，`gh pr
+  create` / `glab mr create`，CLI 未认证 → 抛决策问题，默认建议回落本地合并，
+  不静默降级；local / codeup → 正文作为合并清单在会话中完整呈现。
+- push 只推运行分支；票分支不推（随清理删本地）。
+- `.sdlc/check.sh pre-push` 在运行 worktree 执行：它取运行分支领先 BASE_REF
+  的提交，逐个 [#NNNN] 校验 implemented 票有 approved 评审覆盖（评审报告
+  `branch` 记票分支、`tickets` 记该票，契约见蓝图 §11.7）→ 通过才进合并确认。
+
+### 8.3 合并确认与执行
+
+- 确认一次问清（单向门）：① 方式 merge commit / squash / fast-forward，跟仓库
+  历史约定给建议；② 是否打 tag（默认不打，发布归 dev-release）。**显式确认才
+  执行，沉默或"都行"不算；拒绝 → 停，运行停在收口（§5.6 断点续接）。**
+- 本地路径（TRACKER=local 或平台 PR 未建/回落）：在**主工作区**（已在 BASE_REF）
+  执行——运行 worktree 占着运行分支，不切走它：
+  `git merge --no-ff "run/<spec-id>"`，merge commit 首行讲清合入整张 spec，
+  正文列全部票号 → `git push`。fast-forward 若被仓库约定允许，历史即提交本身。
+- 平台 PR 路径：按确认方式在平台合并，本地 `git pull` 同步 BASE_REF。
+- 合并冲突（BASE_REF 在运行期间前进了）→ SKILL.md §8 合回冲突同款：停下问人，
+  标准动作 `git merge --abort`。
+
+### 8.4 票 → done
+
+合并后在**主工作区**（BASE_REF 已含运行内容）：
+
+1. 本 spec 名下全部工票逐张 `status` 改 `done`、追加 `done: <今日>`，逐张跑
+   `.sdlc/check.sh validate`。
+2. 状态变更**一次** [trivial] 提交落 BASE_REF：首行写明"spec <NNNN> 全部工票
+   → done"，正文留豁免理由（流程状态落盘，非绕门禁，dev-retro 审计基准内；
+   dev-ship §4.3 同款语义）。
+3. TRACKER 指向平台 → 逐张 `publish` 投影（投影失败警告跳过不阻断，
+   GLOSSARY"投影"语义）。
+
+### 8.5 清理
+
+顺序固定——分支被 worktree 占用时 `git branch -d` 拒绝执行：
+
+```sh
+git worktree remove "<repo>-runs/<spec-id>-t<NNNN>"   # 逐票 worktree
+git worktree remove "<repo>-runs/<spec-id>-run"       # 运行 worktree（最后）
+git branch -d run/<spec-id>-t<NNNN> …                 # 票分支：已随 --no-ff 合回，-d 放行
+git branch -d run/<spec-id>                           # 运行分支：已合回 BASE_REF，-d 放行
+git worktree prune
+```
+
+- **合并未执行不清理**：单向门未过，盘上证据即运行状态。
+- 核对：`git worktree list` 无 run/ 前缀条目、`git branch --list "run/*"` 为空。
+  任一残留 → 报告，不静默。
+
+### 8.6 出口报告
+
+三件齐了收口才算完成；全部是会话内陈述，不新增产物类型：
+
+1. **逐票终态清单**：票号 | 评审报告 | 终态（全部 done）。
+2. **运行摘要**：几层几票、关键路径、预演记录（哪次合回、哪条命令、什么输出）、
+   异常与处置（无则写"无"）。
+3. **指路**：手动 /dev-accept（集成级场景清单见 spec 验收场景节）。dev-execute
+   不自动调用 dev-accept——验收是人的门，不是收口的尾巴。
