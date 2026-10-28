@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.13 · 2026-10-28（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.14 · 2026-10-28（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -32,6 +32,7 @@
 >
 > **v1.12 修订记录（批 3 tracker 适配器实现前定稿，2026-10-27）**：适配器契约定稿——`publish <file>` 之外的投影失败（CLI 缺失/未认证/API 报错/坐标配置缺失）一律明确警告并跳过（exit 0），不阻断技能出口链（§5.4 措辞由"适配器未实现（批 3 的 github/gitlab/codeup）"改为"适配器未安装"，警告语义对自定义/未安装适配器长期成立）；投影形态 = github/gitlab 走官方 CLI（gh/glab）投到平台 issue，codeup 走 OpenAPI 直连（个人访问令牌 `x-yunxiao-token`）投到 Projex 工作项，正文首行带盘上产物指针、本地 `.map` 文件记"盘上路径 ↔ 平台对象"对照（盘上是真相源，不回读）；Codeup 坐标定稿 `TRACKER_REPO=<organizationId>/<spaceIdentifier>`，工作项类型标识不做运行时探测（类型列表端点未能在官方文档核验，"无来源不结论"），由配置项显式提供；§11.1 决策①与 §14 待定项同步（适配器随技能分发、Codeup MCP 指引以"适配器直连优先、MCP 可选"形态补入 decisions.md）。
 > **v1.13 修订记录（dev-release 实现，2026-10-28）**：新增 §11.15 dev-release——版本 / CHANGELOG / 发布检查单 / 部署验证（§10.1 批 3）。定位仿 dev-research：脊柱上有位置（§4.1 交付 ship / release）但**不进自动串联链**——sdlc next-mode 路由表不加行，发布时机是人的决策不是必经门禁，用户手动触发；dev-ship 出口契约不变（合并后仍自动调 dev-accept）。发布点 tag 与推送是单向门必须问人；版本号按语义化版本映射逐条带来源确认（破坏性→major，0.x 期按 semver 惯例→minor；新用户可见能力→minor；缺陷修复→patch）；CHANGELOG.md 懒创建沿用 §5.2 所有权表既有约定（只补缺失骨架，Keep a Changelog 分类），**不开新 docs/ 产物目录、check.sh 零改动**——CHANGELOG 与 tag 不进 validate（与 retro 轻产物同理，门禁只管有真实代价的事）；§7.2 引用矩阵补 dev-release → ref-writing（CHANGELOG 条目落盘前），§8 决策点全表补 dev-release 行；§10.1 dev-ship 行漂移修正（"PR + 合并 + tag"→"PR + 合并；工单 → done"，tag 语义归 dev-release，与 §11.8 及 dev-ship 技能正文一致）。
+> **v1.14 修订记录（批 3 L4 hooks 实现，2026-10-28，need 0003 / spec 0005）**：L4 平台层拦截落地——判定脚本 `.sdlc/hooks/l4-guard.sh`（§5.2 目录树与所有权表新增 `.sdlc/hooks/` 行，setup 可整体覆盖；check.sh 零改动，保持纯 git 门禁），拦截两规则：**A** Bash 命令含 `--no-verify`（或 `git commit -n` 短形式）→ deny；**B** Edit/Write 落在 CODE_DIRS 下且无 `in-progress` 工单 → deny 指路 /dev-implement（"无工单"判据 = 无在办工单；CODE_DIRS 留空则规则 B 不生效，docs/ 与 .sdlc/ 不属规则 B 作用域）。载体：ZCode 工作区 `<repo>/.zcode/config.json` 顶层 `hooks` 块（`enabled: true` 必需、PreToolUse 单 matcher `Bash|Edit|Write`、process 型经 bash 调 guard）——setup 仅在命中 ZCode 适配器时合并该块（hooks 块归 setup，文件其余内容归用户；与 .git/hooks 同类，机器侧接线不进版本库）；deny 经 stdout JSON `permissionDecision`（带理由）回平台，**失效安全**：非 sdlc 工作区、stdin 异常、配置缺失一律放行（fail-open，门禁故障不锁死工作，L1/L3 兜底）。Claude Code 为同构候选载体，本批只接 ZCode。§3 L4 行、§5.5 CODE_DIRS 注记、§14 待定项随之现状化。
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
 ## 1. 背景与目标
@@ -59,7 +60,7 @@
 | L1 常驻指令 | AGENTS.md 哨兵块（§5.3），任何会话一进仓库就可见 | 忘了调技能的 agent 会话 |
 | L2 技能入口 | 每个流程技能开头调 check.sh 校验上游产物，不满足即拒绝并指路 | 想跳步的调用 |
 | L3 机械层 | git hooks（commit-msg / pre-push）跑 check.sh | 一切入库提交，含人在终端手敲 |
-| L4 可选增强 | ZCode PreToolUse hook：拦截含 `--no-verify` 的命令、无工单时的 src/ 编辑 | 明知故犯的绕过（批 3） |
+| L4 可选增强 | ZCode PreToolUse hook（`.sdlc/hooks/l4-guard.sh`）：拦截含 `--no-verify` 的命令、无在办工单时的源码编辑 | 明知故犯的绕过（批 3 已落地 2026-10-28，契约见 §14） |
 
 配套设计：
 
@@ -108,7 +109,8 @@
 <repo>/
 ├── .sdlc/                      # 流程基础设施
 │   ├── check.sh                # 门禁脚本（子命令见 5.4）
-│   ├── config.sh               # 本仓库配置（tracker、检查命令）
+│   ├── config.sh               # 本仓库配置（tracker、检查命令、CODE_DIRS）
+│   ├── hooks/                  # 平台层拦截 hook（l4-guard.sh，L4 载体判定脚本）
 │   └── trackers/               # tracker 适配器（local/github/gitlab/codeup.sh，可扩展）
 ├── docs/
 │   ├── METHOD.md               # 方法论全文（setup 生成与升级）
@@ -128,7 +130,7 @@
 └── CHANGELOG.md                # 懒创建，仅需要发布流程的项目
 ```
 
-`.git/hooks/commit-msg`、`pre-push`：setup 安装的一行转发脚本（`.sdlc/check.sh commit-msg` 等），不进版本库；换机器克隆后重跑 `/setup-workspace` 即恢复。轻门禁挂 commit-msg 而非 pre-commit——git 在 commit-msg 时点才写入 commit message，pre-commit 时消息尚不存在，机械校验无从谈起。
+`.git/hooks/commit-msg`、`pre-push`：setup 安装的一行转发脚本（`.sdlc/check.sh commit-msg` 等），不进版本库；换机器克隆后重跑 `/setup-workspace` 即恢复。轻门禁挂 commit-msg 而非 pre-commit——git 在 commit-msg 时点才写入 commit message，pre-commit 时消息尚不存在，机械校验无从谈起。L4 的平台侧接线与其同类：setup 在命中 ZCode 适配器时把 PreToolUse hooks 块合并进工作区 `<repo>/.zcode/config.json`（`enabled: true` 必需；hooks 块归 setup，文件其余内容归用户），机器侧接线不进版本库，判定逻辑全在版本化的 `.sdlc/hooks/l4-guard.sh` 里。
 
 **目录懒创建**：setup 只建 `.sdlc/` 和 `docs/`，其余产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
 
@@ -137,6 +139,7 @@
 | 路径 | 首次创建 | 日常写入者 | setup-workspace 重跑时 |
 |---|---|---|---|
 | `.sdlc/check.sh` | setup | 仅 setup | **可整体覆盖**（纯逻辑） |
+| `.sdlc/hooks/*` | setup | 仅 setup | 可整体覆盖（纯逻辑） |
 | `.sdlc/trackers/*` | setup | 仅 setup | 可整体覆盖；已有自定义适配器不删 |
 | `.sdlc/config.sh` | setup | **用户** | 仅缺失时生成模板，**绝不覆盖** |
 | `docs/METHOD.md` | setup | 仅 setup | 可整体覆盖 |
@@ -191,7 +194,7 @@ BASE_REF=main        # pre-push 计算 merge-base 的基准分支
 RUN_ENV=local        # local | docker
 RUN_PREFIX=""        # 例：docker "docker compose run --rm app"；版本管理 "mise exec --"
 PKG_MGR=""           # npm | pnpm | yarn | pip | poetry | uv | cargo | go | maven …
-CODE_DIRS=""         # 源码目录探测结果（批 3 L4 hook 消费），按仓库实际布局填，不做 src/ 假定
+CODE_DIRS=""         # 源码目录探测结果，空格分隔（L4 hook 规则 B 的作用域：留空则"无在办工单不得改源码"不生效；docs/ 与 .sdlc/ 永不列入），按仓库实际布局填，不做 src/ 假定
 
 # 检查命令（包装仓库自己的命令）
 CHECK_LINT="npm run lint"
@@ -698,7 +701,7 @@ ADR → GLOSSARY.md → CODING_STANDARDS.md。
 ## 14. 待定与未来扩展
 
 - tracker 适配器（github/gitlab/codeup）已随批 3 落地（2026-10-27）：github/gitlab 走官方 CLI（gh/glab）投到平台 issue，codeup 走 OpenAPI 直连（个人访问令牌 `x-yunxiao-token`）投到 Projex 工作项；CreateWorkitemV2 与 CreateWorkitemComment 端点已于 2026-10-27 对照官方文档核验（`POST /organization/{organizationId}/workitem`、`POST /organization/{organizationId}/workitems/comment`），工作项类型列表端点未能在官方文档核验，类型标识由配置项显式提供、不做运行时探测。tracker 扩展只需新增 `.sdlc/trackers/xxx.sh` + config 枚举，流程技能零改动；平台模型参考 docs/research/0001（2026-10-27 快照，实现时已复核）。
-- L4 PreToolUse hook 的具体拦截规则（--no-verify、无工单时的 src/ 编辑）批 3 设计。
+- L4 PreToolUse hook 已随批 3 落地（2026-10-28，need 0003 / spec 0005）：判定脚本 `.sdlc/hooks/l4-guard.sh` 自包含（自带 frontmatter 解析，读 config.sh），规则 A = Bash 命令含 `--no-verify` 字面量或 `git commit -n` 短形式 → deny；规则 B = Edit/Write 的 `file_path` 归一化后落在 CODE_DIRS 某目录下且 docs/tickets/ 无 `in-progress` 工单 → deny 并指路 /dev-implement。deny 经 stdout JSON `{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":…}`（ZCode 严格 schema，extra key 即废）回平台，stderr 同步一行供日志；其余一切（含 stdin 异常、非 sdlc 工作区、配置缺失）exit 0 放行——失效安全为 fail-open。载体接线：`.zcode/config.json` 顶层 `hooks` 块，单 matcher `Bash|Edit|Write`，`type: "process"` 经 bash 调 guard（可执行位无关、无 shell 引号陷阱），`${ZCODE_PROJECT_DIR}` 定位仓库。已知边界（如实不装绿）：规则 A 的 `--no-verify` 为子串匹配，讨论性命令会误拦（安全方向误报，理由文本引导改写）；经 Bash 间接改源码（sed -i 等）不在规则 B 作用域，靠 L1/L3 兜底；ZCode hooks 配置是否热加载未核验，改动后建议重开会话验证（集成级场景）。Claude Code 的 PreToolUse 与此同构（snake_case stdin + exit 语义），脚本保持载体无关，settings.json 接线留未来扩展。
 - 团队规范 starter（TS / Python / Go / Java）定稿于 skills/setup-workspace/assets/standards/（2026-10-26，随 setup-workspace 实现定稿）。
 - monorepo 按包门禁（逐包 check、逐包编号）批 1 不做：基础设施全库一份（.sdlc/ 与 docs/ 在根、产物编号全库唯一），setup 只做逐包扫描与聚合检查命令预填；按包门禁未来按需扩展。
 - 智能体接入参考（setup-workspace 的 references/agent-adapters/）首批仅 zcode 与 claude-code；未识别的智能体走通用流程（AGENTS.md 为跨智能体契约），新增智能体加参考文件即可，技能正文零改动。

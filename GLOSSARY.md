@@ -48,6 +48,7 @@
 - **哨兵块**：AGENTS.md 中 `<!-- sdlc:begin/end -->` 之间的内容，由 setup-workspace 管理，勿手改。
 - **盘上主本 / tracker 投影**：docs/ 是唯一真相源，tracker（GitHub/GitLab/Codeup）只单向接收发布，不回读。
 - **门禁分级**：commit-msg 查轻量项（[#NNNN] 状态合法或 [trivial]）；pre-push 查重项（implemented 工单须有 approved 评审覆盖）。
+- **L4 hook**：平台层拦截（`.sdlc/hooks/l4-guard.sh`，经 ZCode PreToolUse 触发）：拦含 `--no-verify` 的命令与无在办（in-progress）工单的 CODE_DIRS 源码编辑；失效安全为放行（fail-open），自身故障不锁死工作。
 - **红绿循环**：每个行为先写一个失败的测试（红），再写刚好让它通过的实现（绿）的实现节奏；标准细则见 ref-testing 技能。
 - **分诊定级**：dev-fix 对缺陷的定级（阻断：主流程不可用/数据错误或丢失/安全漏洞；重要：功能受损有绕行、影响面大；一般：影响面小；轻微：文案样式纯文档）与处置决策（现在修/排期/不修），落进 fix 票正文。
 - **seam**：测试边界——测试只写在预先约定的接口处，不穿实现内部。design 的 seam 清单是 spec 测试决策的细化，dev-implement 在其上落测试（细则见 ref-testing）。

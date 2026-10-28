@@ -22,10 +22,11 @@
 | L1 常驻指令 | AGENTS.md 哨兵块，任何会话一进仓库就可见 | 忘了调技能的 agent 会话 |
 | L2 技能入口 | 每个流程技能开头调 check.sh 校验上游产物，不满足即拒绝并指路 | 想跳步的调用 |
 | L3 机械层 | git hooks（commit-msg / pre-push）跑 check.sh | 一切入库提交，含人在终端手敲 |
+| L4 可选增强 | 平台 PreToolUse hook（`.sdlc/hooks/l4-guard.sh`）：拦含 `--no-verify` 的命令、无在办工单时的源码编辑 | 明知故犯的绕过 |
 
 - **豁免通道**：typo、纯文档改动走 `[trivial]` 标记，每次豁免留痕于 commit message，dev-retro 审计是否滥用。
 - **门禁分级**：commit 时只查轻量项（message 带 `[#NNNN]` 且工单状态合法，或带 `[trivial]`）；push 前才查重项（分支上所有 implemented 工单都有 approved 评审覆盖）。
-- **诚实的边界**：`--no-verify` 是 git 的后门，靠平台层拦截与 retro 审计兜底，不假装它不存在。
+- **诚实的边界**：`--no-verify` 是 git 的后门，L4 在平台层拦截（仅 ZCode 会话内生效，人在终端手敲仍靠 retro 审计兜底），不假装它不存在。L4 失效安全为放行（fail-open）：门禁自身故障不锁死工作。
 
 ## 4. 工作区规范
 
@@ -36,6 +37,7 @@
 ├── .sdlc/                      # 流程基础设施（机器物）
 │   ├── check.sh                # 门禁脚本（仅 setup 可写，重跑可整体覆盖）
 │   ├── config.sh               # 本仓库配置（用户所有，setup 绝不覆盖）
+│   ├── hooks/                  # 平台层拦截 hook（l4-guard.sh，L4 判定脚本）
 │   └── trackers/               # tracker 适配器（local/github/gitlab/codeup.sh，可扩展）
 ├── docs/                       # 流程产物（人文物）
 │   ├── METHOD.md               # 本文档
@@ -51,7 +53,7 @@
 
 **目录懒创建**：setup 只建 `.sdlc/` 与 `docs/`，八个产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
 
-`.git/hooks/commit-msg`、`pre-push` 是 setup 安装的一行转发脚本（指向 `.sdlc/check.sh`），本身不进版本库；换机器克隆后重跑 setup-workspace 即恢复。轻门禁挂 commit-msg 而非 pre-commit：git 在 commit-msg 时点才写入 commit message。
+`.git/hooks/commit-msg`、`pre-push` 是 setup 安装的一行转发脚本（指向 `.sdlc/check.sh`），本身不进版本库；换机器克隆后重跑 setup-workspace 即恢复。轻门禁挂 commit-msg 而非 pre-commit：git 在 commit-msg 时点才写入 commit message。L4 的平台侧接线同类：setup 在 ZCode 会话中把 PreToolUse hooks 块合并进 `<repo>/.zcode/config.json`（`enabled: true` 必需，hooks 块归 setup、文件其余内容归用户），不进版本库，判定逻辑全在版本化的 `.sdlc/hooks/l4-guard.sh`。
 
 ### 4.2 命名与杂项
 
@@ -117,7 +119,7 @@ BASE_REF=main        # pre-push 计算 merge-base 的基准分支
 RUN_ENV=local        # local | docker
 RUN_PREFIX=""        # 例：docker "docker compose run --rm app"；版本管理 "mise exec --"
 PKG_MGR=""           # npm | pnpm | yarn | pip | poetry | uv | cargo | go | maven …
-CODE_DIRS=""         # 源码目录（按仓库实际布局填，无假定）
+CODE_DIRS=""         # 源码目录，空格分隔（L4 hook 规则 B 作用域；留空则该规则不生效；docs/ 与 .sdlc/ 永不列入）
 CHECK_LINT=""        # 例：npm run lint
 CHECK_TYPE=""        # 例：npm run typecheck
 CHECK_TEST=""        # 例：npm run test
