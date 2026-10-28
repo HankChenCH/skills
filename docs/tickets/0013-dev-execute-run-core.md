@@ -2,7 +2,7 @@
 id: 0013
 type: feature
 spec: 0006
-status: ready
+status: in-progress
 blocked-by: [0012]
 created: 2026-10-28
 ---
@@ -22,4 +22,7 @@ created: 2026-10-28
 **Blocked by：** 0012
 
 ## Progress
-（实现过程中追加：做到哪步 / 下一个动作 / 卡在哪，三行以内）
+- 已做：FR-1 全链演练通过（分层图/关键路径/done 票图外/两路拒绝零写入）；SKILL.md 控制流全文 + run-mechanics §1–3/§5–6（均实跑证实）落盘。演练记录 /tmp/devx-drill/records/（fr1-graph / fr1-reject / fr1-done-variant / fr2-run-side / fr4-rehearsal-probe / mechanics-verify）。
+- 卡点（spec 0006 缺口，停机待修订）：票分支命名 `run/<spec-id>/<ticket-id>` 与运行分支 `run/<spec-id>` 在 git ref 名空间 D/F 冲突不可共存（`fatal: cannot lock ref 'refs/heads/run/0006/0012': 'refs/heads/run/0006' exists`），FR-2 票侧 / FR-3 / FR-4 / FR-9 合回冲突无法按 spec 实现。
+- 下一步：/dev-spec round 2 修订命名（推荐 `run/<spec-id>-t<NNNN>`，已实测与 `run/<spec-id>` 共存）→ 重入 0013 补 run-mechanics §4/§7 并完成余下演练（并行派发/合回/冲突/预演红绿）。
+- 状态保持 in-progress；未到出口，未调 dev-review。
