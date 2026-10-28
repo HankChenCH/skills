@@ -1,10 +1,11 @@
 ---
 id: 0006
-status: approved
+status: done
 need: 0004
 round: 2
 created: 2026-10-28
 approved: 2026-10-28
+done: 2026-10-28
 ---
 # dev-execute：V 模型整 spec 编排运行技能
 
