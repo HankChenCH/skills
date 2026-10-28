@@ -19,6 +19,13 @@ description: SDLC 开发流程总控（只读调度）：盘点全库流程产�
 1. 运行 `.sdlc/check.sh phase` 与 `.sdlc/check.sh frontier`，一切判断以输出为准。
 2. 按固定结构报告：
    - **当前阶段**：脊柱走到哪——need/spec/工单各处于什么状态。
+   - **运行中 worktree**：`git worktree list` 中分支以 `run/` 开头的条目（主工作区
+     条目不计）即进行中的运行。逐运行分支列一小段：spec 编号取自分支名
+     `run/<spec-id>`，票状态读**运行 worktree**内的票 frontmatter——合回票的最新
+     状态随合回落在运行 worktree，主工作区是旧态；在办票（in-progress）以
+     **票 worktree**（`run/<spec-id>-t<NNNN>`）为准。无 `run/` 条目 → 一行空态
+     说明或省略本段，不报错。本段纯只读：发现运行不等于介入运行——续接与处置
+     归 /dev-execute 重入（其入口自会判定运行已在进行），总控不代劳。
    - **可做的事**：frontier 工单清单；等待用户决策的点（待批准的 spec、待合并的分支…）。
    - **被挡在哪**：最近一处不满足的门禁——缺什么、该跑哪个技能
      （如"ticket 0007 的 spec 0003 还是 draft → /dev-spec"）。
