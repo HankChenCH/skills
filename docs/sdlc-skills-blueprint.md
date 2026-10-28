@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.11 · 2026-10-27（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.13 · 2026-10-28（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -31,6 +31,7 @@
 > **v1.11 修订记录（dev-research 实现，2026-10-27）**：新增 §11.14 dev-research——技术调研 → 带一手来源引用的报告（§10.1 批 3）。定位：脊柱上有位置（§4.1）但**不进自动串联链**——sdlc next-mode 路由表不加行，调研是按需服务不是必经门禁，用户手动或 dev-clarify 调研驱动联动触发；研究问题三要素（答什么/为什么重要/影响哪个 FR 或假设）承 §11.13 调研驱动细则的接口，入口亮牌"内联查证 vs 系统调研"分流，决策点 = 问题清单确认（防答非所问）；调研纪律：后台代理并行检索、只信一手来源（二手只能作线索须回溯）、每条结论带引用与检索日期、事实与判断分离，配防编造三招（关键结论回原文核验/一般抽验、禁止训练记忆冒充检索结果、检索不可用停手如实相告）；research 产物维持无状态轻校验（§6.1），节同构靠模板内嵌保证，报告是落盘时点的快照、过期重开新张不原地改写；出口指路（结论作 spec 实现决策依据 / 回决策卡拍板）不自动串联、不代拍板。docs/research/0001（tracker 三平台调研）为格式先例。另同步 dev-clarify 细则 research.md 两处过时"（批 3）"标注。
 >
 > **v1.12 修订记录（批 3 tracker 适配器实现前定稿，2026-10-27）**：适配器契约定稿——`publish <file>` 之外的投影失败（CLI 缺失/未认证/API 报错/坐标配置缺失）一律明确警告并跳过（exit 0），不阻断技能出口链（§5.4 措辞由"适配器未实现（批 3 的 github/gitlab/codeup）"改为"适配器未安装"，警告语义对自定义/未安装适配器长期成立）；投影形态 = github/gitlab 走官方 CLI（gh/glab）投到平台 issue，codeup 走 OpenAPI 直连（个人访问令牌 `x-yunxiao-token`）投到 Projex 工作项，正文首行带盘上产物指针、本地 `.map` 文件记"盘上路径 ↔ 平台对象"对照（盘上是真相源，不回读）；Codeup 坐标定稿 `TRACKER_REPO=<organizationId>/<spaceIdentifier>`，工作项类型标识不做运行时探测（类型列表端点未能在官方文档核验，"无来源不结论"），由配置项显式提供；§11.1 决策①与 §14 待定项同步（适配器随技能分发、Codeup MCP 指引以"适配器直连优先、MCP 可选"形态补入 decisions.md）。
+> **v1.13 修订记录（dev-release 实现，2026-10-28）**：新增 §11.15 dev-release——版本 / CHANGELOG / 发布检查单 / 部署验证（§10.1 批 3）。定位仿 dev-research：脊柱上有位置（§4.1 交付 ship / release）但**不进自动串联链**——sdlc next-mode 路由表不加行，发布时机是人的决策不是必经门禁，用户手动触发；dev-ship 出口契约不变（合并后仍自动调 dev-accept）。发布点 tag 与推送是单向门必须问人；版本号按语义化版本映射逐条带来源确认（破坏性→major，0.x 期按 semver 惯例→minor；新用户可见能力→minor；缺陷修复→patch）；CHANGELOG.md 懒创建沿用 §5.2 所有权表既有约定（只补缺失骨架，Keep a Changelog 分类），**不开新 docs/ 产物目录、check.sh 零改动**——CHANGELOG 与 tag 不进 validate（与 retro 轻产物同理，门禁只管有真实代价的事）；§7.2 引用矩阵补 dev-release → ref-writing（CHANGELOG 条目落盘前），§8 决策点全表补 dev-release 行；§10.1 dev-ship 行漂移修正（"PR + 合并 + tag"→"PR + 合并；工单 → done"，tag 语义归 dev-release，与 §11.8 及 dev-ship 技能正文一致）。
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
 ## 1. 背景与目标
@@ -335,6 +336,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 | dev-implement | ref-implementation + ref-testing + ref-git-commit | 开工装载；写测试前重读 ref-testing |
 | dev-review | ref-review + ref-implementation | 评审前 |
 | dev-ship | ref-git-commit | PR 描述与合并信息落盘前 |
+| dev-release | ref-writing | CHANGELOG 条目落盘前 |
 | dev-fix | ref-testing（经 dev-implement 链装载，dev-fix 正文不重复装载） | 先写失败测试之前 |
 | dev-accept / dev-retro | ref-writing | 报告落盘前 |
 
@@ -366,6 +368,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 | dev-implement | **自动调 dev-review** | 无（spec 缺口时停下报告，属门禁回路） |
 | dev-review | 通过 → 自动准备 PR（dev-ship 前半） | 阻断项修复策略：机械问题自动修再审，设计级问题问人 |
 | dev-ship | 全部工单 done → 自动调 dev-accept | **合并确认**（单向门） |
+| dev-release | 无自动串联（指路 dev-retro） | **版本号确认**；**tag 与推送**（单向门）；部署验证判据 |
 | dev-accept | 通过 → spec 标 done（末轮则 need 标 fulfilled） | 开不开下一轮（循环回转点） |
 | dev-fix | 自动调 dev-implement（fix 票进实现链，经其出口到达 dev-review） | 定级与修复时机 |
 | dev-retro | 产出改动清单 | 采纳哪些 |
@@ -402,7 +405,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 | dev-implement | 流程 | 工单 → 实现（红绿循环、Progress 交接） |
 | dev-review | 流程 | 双轴评审（标准轴 + Spec 轴）→ 评审报告 |
 | dev-accept | 流程 | 集成验收：跑集成级场景、核销 FR、风险复审 |
-| dev-ship | 流程 | PR + 合并 + tag；工单 → done |
+| dev-ship | 流程 | PR + 合并；工单 → done |
 | dev-release | 流程 | 版本 / CHANGELOG / 发布检查单 / 部署验证 |
 | dev-fix | 流程 | 分诊定级 → 复现（失败测试先行）→ 修复 → 回归 |
 | dev-retro | 流程 | 复盘 → 结论沉淀为可执行改动（标准/检查/技能修订）；审计 [trivial] 豁免 |
@@ -429,7 +432,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
   11. dev-accept ✅ 2026-10-27（规格即 §11.9，§6.5 模板内嵌正文；passed/rejected 判定机械化，fulfilled 前残余风险须逐条经用户显式接受；§13.2 自测：产物校验经 validate 正反往返实测通过——正例 draft/passed/rejected 三态过 validate，缺节、缺 spec、缺 round、非法状态、悬空 spec 引用五类反例全拦；拒绝依据经 phase 行为实测——工单含 implemented 时无"approved 且全 done"候选；publish 跳过路径实测 exit 0；触发/重入/衔接静态核验通过、行为验证待新会话）
   12. ref-git-commit（规范提交与合并信息；2026-10-27 经 spec 0001 增补）✅ 2026-10-27
 - **批 2（4 个）**：dev-clarify（✅ 2026-10-27，规格即 §11.13，首个带 references/ 的流程技能——方法论亮牌五法路由 + 五细则文件，校准阶梯（查证→陈述句确认→决策卡→可点 HTML 原型→转假设）配查证过滤闸，开放问题三路归置清零 + 拍板记录；§13.2 自测：产物校验经 validate 正反往返实测通过——七节正例 draft/confirmed 两态过 validate、publish 缺省跳过 exit 0，缺节、非法状态、id 与文件名前缀不一致、slug 非法四类反例全拦；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话；sdlc RUP 阶段判读层随本批落 §11.2）、dev-design（✅ 2026-10-27，规格即 §11.12，design 为可选产物——三条件命中才做、入口亮牌可拒绝；§13.2 自测：产物校验经 validate 行为实测通过——design draft/approved 两态与 adr accepted/superseded 两态过、非法状态拦截；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话；产物节校验不适用——validate 对 design/adr 轻校验，节同构靠模板内嵌）、dev-fix（✅ 2026-10-27，规格即 §11.11，分诊定级 + 开 fix 票 + 自动调 dev-implement，不自带实现循环；§13.2 自测：产物校验经 validate/ticket/frontier 行为实测通过——合规 fix 票过三关，缺 spec、缺验收标准、缺 Progress、多行 blocked-by 四类反例全拦，done 状态 spec 的开票路径经 ticket 命令实测放行；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话）、dev-retro（✅ 2026-10-27，规格即 §11.10，报告落 docs/retros/ 轻产物不进门禁；§13.2 自测：豁免审计命令链在本仓库 12 条 [trivial] 史上行为实测通过——grep 圈范围、逐条 git show 取证、绕过信号扫描三段均可机械执行，0692119 整树入库 2026 行为滥用判定阳性样本、b42d410 三文件纯文档为合规样本；触发/拒绝/重入/衔接静态核验通过、行为验证待新会话，产物校验不适用——复盘报告非门禁产物）
-- **批 3**：dev-research（✅ 2026-10-27，规格即 §11.14，后台代理并行 + 只信一手来源 + 每条结论带引用与检索日期，出口指路不自动串联；§13.2 自测：产物校验经 validate 行为实测通过——正例无 status 无必填节照过，缺 frontmatter、id 与文件名前缀不一致、slug 非法三类反例全拦，publish 适配器缺失跳过路径实测 exit 0；触发/拒绝/重入/衔接静态核验通过，检索类行为（后台代理、一手来源核验）待首次实战验证）、dev-release、dev-docs、trackers 的 github/gitlab/codeup 适配器（✅ 2026-10-27，need 0002 + spec 0004，契约随 v1.12 定稿——投影=平台 issue / Codeup 工作项+MARKDOWN 评论，正文首行盘上指针，.map 三字段幂等，投影失败一律警告跳过 exit 0；codeup 仅用 2026-10-27 一手核验的 CreateWorkitemV2/CreateWorkitemComment 两端点，类型标识走 CODEUP_WORKITEM_TYPE 配置不做运行时探测；§13.2 自测：run-tests.sh 99 用例全绿——三平台以 PATH 替身断言调用面，红绿循环中修掉 bash 3.2 三陷阱（变量邻接全角括号报 unbound、pwd 未加 -P 致物理路径失配、适配器目录层级少上一级）；github 经本机真实凭据实证投影与幂等（HankChenCH/skills issue #1），gitlab/codeup 真实凭据路径留验收集成级场景）、L4 hooks
+- **批 3**：dev-research（✅ 2026-10-27，规格即 §11.14，后台代理并行 + 只信一手来源 + 每条结论带引用与检索日期，出口指路不自动串联；§13.2 自测：产物校验经 validate 行为实测通过——正例无 status 无必填节照过，缺 frontmatter、id 与文件名前缀不一致、slug 非法三类反例全拦，publish 适配器缺失跳过路径实测 exit 0；触发/拒绝/重入/衔接静态核验通过，检索类行为（后台代理、一手来源核验）待首次实战验证）、dev-release（✅ 2026-10-28，规格即 §11.15，语义化版本映射 + CHANGELOG 懒创建 + 发布检查单——tag 与推送是单向门必须问人，出口指路不自动串联；§13.2 自测：触发/拒绝/重入/衔接静态核验通过、行为验证待新会话，产物校验不适用——CHANGELOG 非 validate 受理产物，版本映射与部署验证行为待首次实战验证）、dev-docs、trackers 的 github/gitlab/codeup 适配器（✅ 2026-10-27，need 0002 + spec 0004，契约随 v1.12 定稿——投影=平台 issue / Codeup 工作项+MARKDOWN 评论，正文首行盘上指针，.map 三字段幂等，投影失败一律警告跳过 exit 0；codeup 仅用 2026-10-27 一手核验的 CreateWorkitemV2/CreateWorkitemComment 两端点，类型标识走 CODEUP_WORKITEM_TYPE 配置不做运行时探测；§13.2 自测：run-tests.sh 99 用例全绿——三平台以 PATH 替身断言调用面，红绿循环中修掉 bash 3.2 三陷阱（变量邻接全角括号报 unbound、pwd 未加 -P 致物理路径失配、适配器目录层级少上一级）；github 经本机真实凭据实证投影与幂等（HankChenCH/skills issue #1），gitlab/codeup 真实凭据路径留验收集成级场景）、L4 hooks
 
 批 2/3 技能要点：dev-clarify（想法→need；方法论亮牌五法路由 + references/ 细则；校准阶梯：查证→确认→决策卡→可点 HTML 原型→转假设，配查证过滤闸；开放问题三路归置清零；RUP 双接入——sdlc 里程碑判读层 + 用例骨架）；dev-design（spec→模块划分/数据流/seam/ADR；ADR 三条件：难逆转、无上下文会困惑、真实权衡）；dev-fix（先分诊定级，修复前必须先有失败测试）；dev-research（后台代理、只信一手来源、每条结论带引用）；dev-release（语义化版本 + CHANGELOG + 发布检查单）；dev-docs（面向人的文档，与实际行为一致性优先）；dev-retro（复盘 = 豁免审计 + 改动清单沉淀；结论三态合规/滥用/存疑、只认 diff 证据；报告落 docs/retros/ 轻产物，不进 check.sh 门禁）。
 
@@ -562,6 +565,24 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 - **出口**：念结论速览 → 抛决策问题指路——结论作 dev-spec 实现决策依据、方向取舍回 dev-clarify 决策卡、否掉的方案进「范围与非目标」；无自动串联、不代拍板。落盘前加载 ref-writing；出口三件套 = validate + publish + 提交留痕 `[trivial]`。
 - **重入/中断**：无盘上中间态——问题确认前被打断直接重开（对话态成本低）；确认后被打断重跑检索（幂等）；未落盘即未发生。
 - **禁止事项**：无来源下结论；训练记忆冒充检索；替用户拍板选型；报告里写实现方案；改动 need/spec 等其他产物；原地改写过期报告。
+
+### 11.15 dev-release
+
+- **触发**：用户手动（"发版""打个 tag""更新 CHANGELOG""升个版本号""release 一下"）；脊柱上有位置（§4.1 交付 ship / release）但**不进自动串联链**——sdlc next-mode 路由表不加行，发布时机是人的决策不是必经门禁；dev-ship 合并收尾后不自动调它（其决策点②文案只让渡："发布点 tag 的语义化版本与 CHANGELOG 归 dev-release"）。
+- **定位**：把**一段已合入主干的历史**变成**一个有版本号、有 CHANGELOG 条目、过了检查单与部署验证的发布**。输入不是单张工单而是发布区间：上个版本 tag（无 tag 则自首次提交）到 HEAD。
+- **重入判定先行**：CHANGELOG.md 存在且顶部最新版本节无对应 git tag → 发布做了一半，从检查单对应断点续接（§5 中断交接）；顶部版本节已有 tag 且已推送 → 报告"v<版本> 已发布"，无可续接。
+- **入口门禁（全部通过才继续）**：① 当前分支 = config.sh 的 BASE_REF，工作树干净（`git status --porcelain` 为空），与远端同步（ahead/behind 均为零）——发布只从主干打，不同步说明有未落网的内容；② 发布区间非空——`git log <last-tag>..HEAD` 无提交 → 停止"无可发布内容"，不空发版本。区间内有 ready/in-progress 工单 → 如实列出（它们在分支上，不影响主干发布），用户裁决继续与否，不硬拦。
+- **装载上下文**：config.sh（BASE_REF、TRACKER）→ `git log --oneline <last-tag>..HEAD` 与 diff 摘要 → 区间内 done 工单及其 spec（变更分类的盘上依据）→ 既有 CHANGELOG.md（沿用其格式；不存在则本次懒创建）。CHANGELOG 条目落盘前用 Skill 工具装载 ref-writing。
+- **决策点① 版本号确认（开工前必问）**：按语义化版本给映射建议——破坏性变更（接口/schema/行为不兼容，依据 spec 实现决策或提交明示）→ major（0.x 期按 semver 惯例 → minor）；新用户可见能力（新 FR）→ minor；缺陷修复 → patch。完整念一遍区间变更清单（逐条带工单/spec/提交来源）+ 建议版本号 + 理由，请求确认。沉默不算确认。
+- **发布检查单（顺序执行，逐项留证）**：
+  1. `.sdlc/check.sh all` 全绿。仓库没定义任何检查命令 → 这本身就是发现：如实报告，不静默跳过。
+  2. CHANGELOG.md 懒创建骨架 + 新版本条目：Keep a Changelog 分类（Added / Changed / Deprecated / Removed / Fixed / Security），无变化的分类不写；**每条指得回工单/spec/提交**。项目清单带版本字段（package.json / pyproject 等）→ 一并同步。
+  3. 发布记账提交：`[trivial]` 并写明豁免理由（版本记账，无逻辑变更）——同 dev-ship §4.3 逻辑：这是发布状态落盘，不是绕门禁（dev-retro 可审计）。
+  4. **决策点② tag 与推送（单向门，必须问人）**：建 annotated tag `v<版本>`（message = 本版一句话摘要）并推送（BASE_REF 与 tag 一起推）。TRACKER=github 且 gh 可用 → 附带问是否 `gh release create`（正文取 CHANGELOG 该版本节）。**用户显式确认才执行；沉默或"都行"不算确认。**
+  5. **部署验证**：问清部署方式与验证判据（一条可判定的检查，如冒烟命令/健康检查）；有部署 → 部署后按判据验证并报告结果；库类产物（无部署面）→ 记"不适用"；验证执行不了 → 如实报告，不装绿。结果只在会话中报告，不回写 CHANGELOG。
+- **出口**：报告四件——版本号、tag、CHANGELOG 位置、部署验证结果——然后指路："要沉淀这一周期，/dev-retro。"无自动串联、不代拍板。
+- **中断交接**：状态在盘上——CHANGELOG 新版本节已写未提交 / 已提交未打 tag / 已打 tag 未推送 / 未部署验证，四处断点各自可续接；tag 已推送即发布完成，不可回撤。
+- **禁止事项**：未经用户显式确认打 tag 或推送；检查有红灯仍发布；CHANGELOG 条目编造（每条必须指得回提交/工单/spec）；替用户定版本号；顺手修缺陷或动源码（回 dev-fix 开票）；改写已发布版本的条目（已发布不可变，纠错走下一个版本）。
 
 ## 12. dev-implement 范文（文风与浓度基准，全文照此实现）
 
