@@ -179,10 +179,10 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
 1. 全部票已合回：`git branch --list "run/<spec-id>-t*"` 逐支
    `git merge-base --is-ancestor <票分支> run/<spec-id>` 为真。
 2. 运行 worktree 干净：`git status --porcelain` 为空——票内容有残留 → 先处置
-   （该修进修、该弃进 §7 异常流），不带病收口。
-3. 重跑 `.sdlc/check.sh all` 作**收口门禁**：运行全绿（§5.5）到收口之间隔了
-   中断/续接也无需重新核验票状态，但检查证据必须新鲜——出口报告 Evidence 引
-   本次输出。红灯 → SKILL.md §8 预演失败流。
+   （该修进修、该弃进 §8 异常流），不带病收口。
+3. 重跑 `.sdlc/check.sh all` 作**收口门禁**：运行全绿（SKILL.md §5.5）到收口
+   之间隔了中断/续接也无需重新核验票状态，但检查证据必须新鲜——出口报告
+   Evidence 引本次输出。红灯 → SKILL.md §8 预演失败流。
 
 ### 8.2 PR 与 pre-push
 
@@ -203,8 +203,9 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
 ### 8.3 合并确认与执行
 
 - 确认一次问清（单向门）：① 方式 merge commit / squash / fast-forward，跟仓库
-  历史约定给建议；② 是否打 tag（默认不打，发布归 dev-release）。**显式确认才
-  执行，沉默或"都行"不算；拒绝 → 停，运行停在收口（§5.6 断点续接）。**
+   历史约定给建议；② 是否打 tag（默认不打，发布归 dev-release）。**显式确认才
+   执行，沉默或"都行"不算；未执行合并的确认不作数——重入后重新一次问清
+   （单向门）。拒绝 → 停，运行停在收口（§5 末条断点续接）。**
 - 本地路径（TRACKER=local 或平台 PR 未建/回落）：在**主工作区**（已在 BASE_REF）
   执行——运行 worktree 占着运行分支，不切走它：
   `git merge --no-ff "run/<spec-id>"`，merge commit 首行讲清合入整张 spec 并带
