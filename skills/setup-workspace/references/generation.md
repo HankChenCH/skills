@@ -10,6 +10,12 @@
 - 重跑整体覆盖（纯逻辑，无用户数据）。
 - `.sdlc/`、`.sdlc/trackers/` 目录随写随建。
 
+### .sdlc/hooks/l4-guard.sh
+
+- 拷贝 `assets/hooks/l4-guard.sh` → `<repo>/.sdlc/hooks/l4-guard.sh`，`chmod +x`，重跑整体覆盖（纯逻辑）。
+- `.sdlc/hooks/` 目录随写随建。脚本自包含（stdin JSON 判定，读 config.sh 的 CODE_DIRS），不依赖 check.sh；deny/放行语义见蓝图 §14 与 spec 0005。
+- 平台接线（hooks 配置块）属智能体额外动作，见 §2——仅命中 ZCode 适配器时执行。
+
 ### .sdlc/trackers/{local,github,gitlab,codeup}.sh
 
 - 拷贝 `assets/trackers/local.sh` → `<repo>/.sdlc/trackers/local.sh`，`chmod +x`，可整体覆盖。
@@ -88,7 +94,7 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 2. 存在但无 `<!-- sdlc:begin` → 原内容不动，文末空一行后追加哨兵块。
 3. 已有标记 → 只替换 `<!-- sdlc:begin …` 到 `<!-- sdlc:end -->` 之间的内容，块外一字不动。
 
-智能体额外动作（命中 references/agent-adapters/ 时）在此一并执行——如 Claude Code：CLAUDE.md 不存在则创建一行 `@AGENTS.md`；已存在则在文末追加该行（已有则跳过）。
+智能体额外动作（命中 references/agent-adapters/ 时）在此一并执行——如 Claude Code：CLAUDE.md 不存在则创建一行 `@AGENTS.md`；已存在则在文末追加该行（已有则跳过）。ZCode：把 L4 的 PreToolUse hooks 块合并进工作区 `<repo>/.zcode/config.json`（模板与幂等语义见 references/agent-adapters/zcode.md）——文件不存在则创建；已存在则只替换/新增 `hooks` 键，其余内容（如 mcp 配置）一字不动；`hooks.enabled` 必须为 `true`（配置文件 hooks 缺省禁用），用户已有其他 hooks 一并保留，收尾报告说明置 true 的连带影响（原本禁用的配置 hooks 将一并生效）；合并后确认全文仍是可解析的 JSON，不可解析即回滚本次合并并报告。
 
 ## 3. 自检（§5 第 1 步）
 
@@ -109,7 +115,7 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 **本次动作**（覆盖/保留逐项）：
 - 覆盖 .sdlc/check.sh；生成 .sdlc/config.sh（模板）；生成 .sdlc/trackers/local.sh
 - 覆盖 docs/METHOD.md；GLOSSARY.md 补"流程术语与状态"章
-- AGENTS.md <创建|追加哨兵块|替换块内内容>；hooks <安装 commit-msg/pre-push|发现外来 hook：说明>
+- AGENTS.md <创建|追加哨兵块|替换块内内容>；hooks <安装 commit-msg/pre-push|发现外来 hook：说明>；L4 hook <已装（guard 脚本 + .zcode/config.json hooks 块，ZCode 会话）|未识别 ZCode 会话，未装平台接线，guard 脚本仍就位>
 - 编码标准：<导入 N 份到 docs/standards/ | 引入 <lang> starter | 跳过>
 - 识别智能体：<name|未识别，走通用流程>；仓库类型：<单仓库|monorepo（N 包）>
 

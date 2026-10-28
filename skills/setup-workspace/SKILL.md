@@ -18,7 +18,7 @@ assets/ 是逐字拷贝进目标仓库的模板，不得凭记忆手写替代。
 - `git rev-parse --show-toplevel` 必须成功；失败 → 停止："这里不是 git 仓库，
   SDLC 工作区只初始化在 git 仓库内。"
 - 校验 assets/ 与 references/ 完整（check.sh、METHOD.md、GLOSSARY.md、
-  trackers/、standards/、scan-signals.md、decisions.md、generation.md、
+  trackers/、hooks/、standards/、scan-signals.md、decisions.md、generation.md、
   tracker-platforms.md、agent-adapters/）；缺失 → 停止报告安装损坏。
 - 识别智能体（信号与差异见 references/agent-adapters/）：命中 → 加载对应参考
   全程应用；未命中 → 通用流程（AGENTS.md 是跨智能体契约，无需特例）。
@@ -48,6 +48,7 @@ CODING_STANDARDS.md、docs/standards/）。存在 .sdlc/check.sh → 升级模�
 | 目标 | 行为 |
 |---|---|
 | `.sdlc/check.sh` | 拷贝 assets/check.sh，chmod +x；可整体覆盖 |
+| `.sdlc/hooks/l4-guard.sh` | 拷贝 assets/hooks/l4-guard.sh，chmod +x；可整体覆盖；命中 ZCode 适配器时另按适配器参考合并 `.zcode/config.json` hooks 块（L4 接线） |
 | `.sdlc/trackers/` | 写 local.sh；决策 1 非 local 时加装所选适配器（github/gitlab/codeup）；用户自定义适配器不删 |
 | `.sdlc/config.sh` | 仅缺失时按扫描与决策预填；**绝不覆盖** |
 | `docs/METHOD.md` | 拷贝 assets/METHOD.md；可整体覆盖 |

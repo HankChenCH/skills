@@ -17,4 +17,4 @@
    CLAUDE.md 不存在则创建（内容仅此一行）；已存在则文末追加（已有 `@AGENTS.md` 则跳过）；已有实质内容时追加前告知用户"加了一行引用，原内容不动"。
 
 2. **技能路径**：若本技能经 `~/.zcode/skills/` 符号链接加载而会话是 Claude Code，assets/ 与 references/ 仍按 SKILL.md 同目录定位，符号链接可正常解析。
-3. **hooks 位点**（批 3 L4）：Claude Code 的 PreToolUse hooks 是 L4 的候选载体；本批只装 git hooks。
+3. **hooks 位点（L4，候选载体，本版未接线）**：判定脚本 `.sdlc/hooks/l4-guard.sh` 与平台无关——snake_case stdin 载荷与 exit/JSON 语义同 Claude Code 的 PreToolUse hooks 同构。setup 会安装脚本本体（`.sdlc/hooks/`），但本版只接 ZCode 工作区，不写 `.claude/settings.json`；收尾报告不预告 L4（未接线的东西不预告为已有）。
