@@ -2,9 +2,10 @@
 id: 0009
 type: feature
 spec: 0004
-status: implemented
+status: done
 blocked-by: [0006, 0007, 0008]
 created: 2026-10-27
+done: 2026-10-28
 ---
 # 0009: setup 接线与批 3 话术清理
 

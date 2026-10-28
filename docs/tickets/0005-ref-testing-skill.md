@@ -2,9 +2,10 @@
 id: 0005
 type: feature
 spec: 0003
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-27
+done: 2026-10-28
 ---
 # 0005: 新增 ref-testing 参考技能（六类测试参考 + 场景路由）
 

@@ -2,9 +2,10 @@
 id: 0003
 type: fix
 spec: 0001
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-27
+done: 2026-10-28
 ---
 # 0003: 平台模型参考随技能分发（修复跨机器路径失效）
 
