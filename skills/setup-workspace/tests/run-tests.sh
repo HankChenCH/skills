@@ -760,7 +760,77 @@ t "codeup 幂等：无第二次创建调用" 0 "! grep -q 'workitem -H' \"$TMP/c
 t "codeup 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/codeup.map\")\" -eq 1 ]" ""
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
+echo "== L4 guard（PreToolUse 判定脚本）=="
+GUARD="$HERE/../assets/hooks/l4-guard.sh"
+# gj <json>：把工具调用载荷喂给 L4 guard（guard 以 cwd 定位仓库，t/tn 已 cd 到夹具仓库）
+gj() { printf '%s' "$1" | bash "$GUARD"; }
+
+new_repo
+mkdir -p "$TMP/lib" "$TMP/app"
+echo x > "$TMP/lib/a.py"; echo x > "$TMP/app/main.py"
+wfile docs/tickets/0001-ready-ticket.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-10-28
+---
+# 0001: ready 工单
+
+## Progress
+- （未开工）
+EOF
+sed -i.bak 's/^CODE_DIRS=.*/CODE_DIRS="lib app"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+
+t "规则A：--no-verify 长形式拦截" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit --no-verify -m x\"}}'" "permissionDecision\":\"deny"
+t "规则A：deny 理由说明绕过对象" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit --no-verify -m x\"}}'" "commit-msg"
+t "规则A：git commit -n 短形式拦截" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -n -m x\"}}'" "permissionDecision\":\"deny"
+t "规则A：尾部独立 -n 拦截" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -n\"}}'" "permissionDecision\":\"deny"
+t "规则A：多段命令拦截" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"cd /tmp && git commit --no-verify -m x\"}}'" "permissionDecision\":\"deny"
+t "规则A：git push --no-verify 拦截" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git push --no-verify origin main\"}}'" "permissionDecision\":\"deny"
+t "规则A：正常 commit 放行" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -m \\\"[#0010] ok\\\"\"}}'" ""
+tn "规则A：正常 commit 无拦截输出" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -m ok\"}}'" "permissionDecision"
+tn "规则A：-m 非短形式放行" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit -m x\"}}'" "permissionDecision"
+
+t "规则B：CODE_DIRS 命中且仅 ready 票拦截" 0 "gj '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TMP/lib/a.py\"}}'" "dev-implement"
+t "规则B：Write 同样拦截" 0 "gj '{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$TMP/app/main.py\"}}'" "permissionDecision\":\"deny"
+t "规则B：相对路径按仓库根锚定拦截" 0 "gj '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"lib/a.py\"}}'" "permissionDecision\":\"deny"
+setfm docs/tickets/0001-ready-ticket.md status in-progress
+tn "规则B：有 in-progress 票放行" 0 "gj '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TMP/lib/a.py\"}}'" "permissionDecision"
+setfm docs/tickets/0001-ready-ticket.md status ready
+tn "规则B：docs/ 编辑不受规则B约束" 0 "gj '{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$TMP/docs/notes.md\"}}'" "permissionDecision"
+tn "规则B：仓库外路径放行" 0 "gj '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"/tmp/elsewhere/x.py\"}}'" "permissionDecision"
+tn "规则B：CODE_DIRS 外目录放行" 0 "gj '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TMP/other/b.py\"}}'" "permissionDecision"
+sed -i.bak 's/^CODE_DIRS=.*/CODE_DIRS=""/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+tn "规则B：CODE_DIRS 留空整体不生效" 0 "gj '{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TMP/lib/a.py\"}}'" "permissionDecision"
+sed -i.bak 's/^CODE_DIRS=.*/CODE_DIRS="lib app"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+
+tn "失效安全：非法 JSON 放行" 0 "gj 'not-json{{{'" "permissionDecision"
+tn "失效安全：空 stdin 放行" 0 "printf '' | bash \"$GUARD\"" "permissionDecision"
+tn "失效安全：缺 tool_name 字段放行" 0 "gj '{\"foo\":1}'" "permissionDecision"
+mv "$TMP/.sdlc/config.sh" "$TMP/.sdlc/config.sh.off"
+tn "失效安全：缺 config.sh 放行" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit --no-verify\"}}'" "permissionDecision"
+mv "$TMP/.sdlc/config.sh.off" "$TMP/.sdlc/config.sh"
+t "失效安全恢复：config.sh 复位后规则A恢复" 0 "gj '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git commit --no-verify\"}}'" "permissionDecision\":\"deny"
+
 echo "== git hook 转发端到端 =="
+new_repo
+wfile docs/tickets/0002-hook-ticket.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-10-28
+---
+# 0002: hook 端到端工单
+
+## Progress
+- 测试夹具。
+EOF
 printf '#!/bin/sh\n# sdlc-managed: forward\nexec "$(git rev-parse --show-toplevel)/.sdlc/check.sh" commit-msg "$@"\n' > "$TMP/.git/hooks/commit-msg"
 chmod +x "$TMP/.git/hooks/commit-msg"
 printf 'y\n' > "$TMP/f.txt"
