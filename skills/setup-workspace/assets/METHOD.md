@@ -49,7 +49,7 @@
 └── CHANGELOG.md                # 懒创建，仅需要发布流程的项目
 ```
 
-三条总原则：机器物与人文物分家（`.sdlc/` vs `docs/`）；一切流程产物进版本库，不往 `.gitignore` 加任何东西（审计链是门禁的一部分）；可升级不覆盖（setup 幂等重跑，按所有权表决定覆盖/保留/补缺）。`src/` 或其他源码目录——无论仓库实际布局如何——setup 永不触碰。
+三条总原则：机器物与人文物分家（`.sdlc/` vs `docs/`）；流程产物按价值是否越过终态分档进版本库——知识档（need、spec、design、adr、research、standards）永久留存，过程档（ticket、review、acceptance）过程中照常进库、验收通过后随蒸馏清扫删除、以 git 历史为归档——归置手段是终态删除而非 gitignore，因此不往 `.gitignore` 加任何东西（审计链是门禁的一部分）；可升级不覆盖（setup 幂等重跑，按所有权表决定覆盖/保留/补缺）。`src/` 或其他源码目录——无论仓库实际布局如何——setup 永不触碰。
 
 **目录懒创建**：setup 只建 `.sdlc/` 与 `docs/`，八个产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
 
@@ -66,7 +66,7 @@
 ### 4.3 明确的"不做"
 
 - 不设 `.scratch/` 草稿区：草稿就是 `status: draft` 的正式产物，杜绝第二真相源。
-- 不 gitignore 任何流程产物：评审报告和工单是审计链本身。
+- 不 gitignore 任何流程产物：归置靠终态删除（验收后蒸馏清扫），不靠过程忽略——评审报告和工单是审计链本身。
 - METHOD.md 不放产物模板：模板内嵌在写产物的技能里。
 - 门禁只管有真实代价的事：分支名等约定不进 check.sh。
 
@@ -77,7 +77,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | 产物 | frontmatter 字段 | 状态机（箭头上是推进者） |
 |---|---|---|
 | need | `id` `status` | draft →confirmed（dev-clarify）→fulfilled（dev-accept，末轮通过且成功标准核销、无未接受风险） |
-| spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过） |
+| spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫） |
 | design | `id` `spec` `status` | draft →approved（dev-design） |
 | ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
 | review | `id` `tickets: []` `branch` `status` | draft →approved（dev-review，两轴阻断项清零） |
@@ -105,7 +105,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | `frontier` | 列出阻塞已清、可开工的工单 | dev-implement 入口 |
 | `ticket NNNN` | 入口校验：工单 ready（或 in-progress 重入）、阻塞已清、spec approved | dev-implement 入口 |
 | `all` | 全量 lint / typecheck / test（按 config.sh，经 RUN_PREFIX 包裹）；未定义任何检查命令时响亮警告并视为发现（不静默跳过） | dev-implement 出口、dev-ship、dev-accept |
-| `validate <file>` | 模板完整性：必填节、frontmatter、id 与文件名、FR 追溯（孤儿报错）、依赖无环 | 各产物技能的出口门禁 |
+| `validate <file>` | 模板完整性：必填节、frontmatter、id 与文件名、FR 追溯（孤儿报错）、依赖无环、done spec 名下过程档残留扫描（未清扫即报错并逐个列出文件） | 各产物技能的出口门禁 |
 | `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单 in-progress/implemented，或带 `[trivial]`（挂 git commit-msg hook） | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖 | git hook |
 | `publish <file>` | 按 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh` 发布产物；适配器未安装或投影失败（CLI 缺失/未认证/API 报错）时明确警告并跳过，不阻断 | 各技能落盘后 |
