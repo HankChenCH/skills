@@ -2,9 +2,10 @@
 id: 0004
 type: feature
 spec: 0002
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-27
+done: 2026-10-29
 ---
 # 0004: 新增 sdlc 总控技能（next 路由 + 上下文 token 水位线）
 

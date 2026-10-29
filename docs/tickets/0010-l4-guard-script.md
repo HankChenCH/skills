@@ -2,9 +2,10 @@
 id: 0010
 type: feature
 spec: 0005
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-28
+done: 2026-10-29
 ---
 # 0010: l4-guard 判定脚本与测试用例组
 

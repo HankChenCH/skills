@@ -2,9 +2,10 @@
 id: 0011
 type: feature
 spec: 0005
-status: implemented
+status: done
 blocked-by: [0010]
 created: 2026-10-28
+done: 2026-10-29
 ---
 # 0011: setup L4 接线、话术现状化与本仓安装
 
