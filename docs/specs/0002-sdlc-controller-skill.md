@@ -1,9 +1,10 @@
 ---
 id: 0002
-status: approved
+status: done
 round: 1
 created: 2026-10-27
 approved: 2026-10-27
+done: 2026-10-29
 ---
 # sdlc 总控技能（只读调度 + next 模式 + 上下文水位线）
 
