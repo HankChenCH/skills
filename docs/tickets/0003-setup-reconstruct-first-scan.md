@@ -2,9 +2,10 @@
 id: 0003
 type: feature
 spec: 0008
-status: implemented
+status: done
 blocked-by: [0001, 0002]
 created: 2026-10-29
+done: 2026-10-29
 ---
 # 0003: setup-reconstruct 技能首扫闭环（主文档 + 扫描协议 + 产物模板）
 

@@ -2,9 +2,10 @@
 id: 0001
 type: feature
 spec: 0008
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-29
+done: 2026-10-29
 ---
 # 0001: check.sh 状态机表扩 reconstructed + 双份同步断言
 
