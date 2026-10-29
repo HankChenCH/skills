@@ -39,10 +39,10 @@ created: 2026-10-28
 
 ## 假设与风险
 
-- A1（中代价 × 低不确定）：ZCode hook runner 的契约（stdin snake_case JSON、exit 语义、deny JSON 严格 schema）随版本漂移。缓解：只依赖随版本发布的一手文档（diagnosing-hooks 技能）与主程序 schema 实证（2026-10-28 核验：stdin 含 `tool_name`/`tool_input`/`cwd`；PreToolUse 输出分支恰为 `hookEventName`/`permissionDecision`/`permissionDecisionReason`/`additionalContext`/`updatedInput` 五键）；漂移的表现是放行或 hook 报错日志，不锁死工作（fail-open）；L1/L3 兜底仍在。
-- A2（低代价 × 中不确定）：`.zcode/config.json` 由用户手工维护其他配置，合并可能写坏。缓解：合并只动 hooks 块且以既有文件为底稿（技能用编辑工具操作，不跑 JSON 重写脚本）；合并后校验 JSON 可解析再收尾。
-- A3（低代价 × 低不确定）：规则 A 子串匹配会误拦讨论性命令（如 `echo "别用 --no-verify"`）。安全方向误报，deny 理由引导改写；已知悉接受。
-- A4（低代价 × 中不确定）：hooks 配置改动的生效时机（运行中会话是否热加载）未核验。缓解：列为集成级验收场景（新开会话验证），文档注明"改动后建议重开会话"。
+- A1（中代价 × 低不确定）：ZCode hook runner 的契约（stdin snake_case JSON、exit 语义、deny JSON 严格 schema）随版本漂移。缓解：只依赖随版本发布的一手文档（diagnosing-hooks 技能）与主程序 schema 实证（2026-10-28 核验：stdin 含 `tool_name`/`tool_input`/`cwd`；PreToolUse 输出分支恰为 `hookEventName`/`permissionDecision`/`permissionDecisionReason`/`additionalContext`/`updatedInput` 五键）；漂移的表现是放行或 hook 报错日志，不锁死工作（fail-open）；L1/L3 兜底仍在。（验证：通过——deny 三键 schema 与实证一致，本验收会话即在 hook 链下运行；来源：验收报告 0005）
+- A2（低代价 × 中不确定）：`.zcode/config.json` 由用户手工维护其他配置，合并可能写坏。缓解：合并只动 hooks 块且以既有文件为底稿（技能用编辑工具操作，不跑 JSON 重写脚本）；合并后校验 JSON 可解析再收尾。（验证：通过——本仓 hooks 块在位、JSON 可解析、其余键未动；来源：验收报告 0005）
+- A3（低代价 × 低不确定）：规则 A 子串匹配会误拦讨论性命令（如 `echo "别用 --no-verify"`）。安全方向误报，deny 理由引导改写；已知悉接受。（验证：通过——安全方向误报，deny 理由引导改写；来源：验收报告 0005）
+- A4（低代价 × 中不确定）：hooks 配置改动的生效时机（运行中会话是否热加载）未核验。缓解：列为集成级验收场景（新开会话验证），文档注明"改动后建议重开会话"。（验证：本轮未触发——热加载时机留新会话验证，转残余风险；来源：验收报告 0005）
 
 ## 范围与非目标
 
@@ -58,3 +58,8 @@ created: 2026-10-28
 - D3 deny 通道 = stdout JSON `permissionDecision`（带理由直达模型）而非 exit 2 → 理由可见性优先；schema 漂移时最坏废一次输出（fail-open）（去向 FR-1/2、假设 A1）。
 - D4 载体范围 = 本批只接 ZCode；Claude Code stdin/exit 语义同构，接线留未来（去向 FR-4）。
 - D5 本仓 CODE_DIRS 保持留空 → config.sh 归用户所有，源码编辑拦截是否激活（及把哪些目录列入）由用户拍板；机制经夹具测试验证（去向 FR-2）。
+
+### round 1 验收折回（2026-10-29，验收报告 0005）
+
+- 残余风险：新开会话中 `--no-verify` 的 deny 真实到达、hooks 配置热加载时机未验证；全新夹具仓库在 ZCode 会话的完整 setup 未跑。放行腿已获真实会话证据（本验收会话全程经 hook 链零阻断），deny 腿有机械实证（guard 实跑 + L4 用例组）。
+- 下一轮建议：新开会话发一次 `git commit --no-verify` 验证 deny 真实到达会话；跑一次全新 setup-workspace 的完整安装。
