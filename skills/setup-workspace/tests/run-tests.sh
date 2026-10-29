@@ -1160,7 +1160,7 @@ new_repo
 SKILL="$HERE/../../setup-reconstruct/SKILL.md"
 TPLDIR="$HERE/../../setup-reconstruct/references/templates"
 mkdir -p "$TMP/txt"
-t "技能自身文件齐备（主文档 + 两个参考 + 三张模板）" 0 "test -f \"$SKILL\" && test -f \"$HERE/../../setup-reconstruct/references/scan-protocol.md\" && test -f \"$HERE/../../setup-reconstruct/references/artifact-templates.md\" && test -f \"$TPLDIR/need.md\" && test -f \"$TPLDIR/spec.md\" && test -f \"$TPLDIR/adr.md\"" ""
+t "技能自身文件齐备（主文档 + 三个参考 + 三张模板）" 0 "test -f \"$SKILL\" && test -f \"$HERE/../../setup-reconstruct/references/scan-protocol.md\" && test -f \"$HERE/../../setup-reconstruct/references/artifact-templates.md\" && test -f \"$HERE/../../setup-reconstruct/references/incremental-alignment.md\" && test -f \"$TPLDIR/need.md\" && test -f \"$TPLDIR/spec.md\" && test -f \"$TPLDIR/adr.md\"" ""
 t "frontmatter description 含存量扫描与确认一句话" 0 "grep -qE '^description:.*存量.*扫描' \"$SKILL\" && grep -qE '^description:.*确认' \"$SKILL\"" ""
 t "两级结构成文：主文档按需指向两个参考文档" 0 "grep -q 'references/scan-protocol.md' \"$SKILL\" && grep -q 'references/artifact-templates.md' \"$SKILL\""
 
@@ -1192,6 +1192,16 @@ t "重跑 = 增量对齐关键词在主文档（seam 3 契约）" 0 "grep -q '�
 awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/forbidden.md"
 oseq "禁止事项：未确认不落盘、推断不成断言、扫描期零改动、同名不覆盖" "$TMP/txt/forbidden.md" "确认" "断言" "任何文件" "同名"
 t "禁止事项声明不做 git 提交、不自动重扫" 0 "grep -q 'git 提交' \"$TMP/txt/forbidden.md\" && grep -q '重扫' \"$TMP/txt/forbidden.md\"" ""
+
+RA="$HERE/../../setup-reconstruct/references/incremental-alignment.md"
+awk '/^## 增量对齐/{f=1;next} /^## /{f=0} f' "$RA" > "$TMP/txt/incr.md"
+oseq "FR-7 增量对齐协议：diff 取变更文件集、按证据引用分组涉漂移与未涉漂移、只重验涉漂移" "$TMP/txt/incr.md" "diff" "证据引用" "涉漂移" "未涉漂移" "只重验"
+oseq "FR-7 涉漂移重验三选一与增量草案：重取证、标过时、新增文件产出增量断言草案" "$TMP/txt/incr.md" "只重验" "重取证" "标过时" "增量断言草案"
+oseq "FR-7 确认门合并与收口：同一确认门合并写入、未漂移逐字不变、基线更新为新 commit" "$TMP/txt/incr.md" "确认门" "合并写入" "逐字不变" "扫描基线" "新 commit"
+t "FR-7 基线缺失回落全量扫描成文" 0 "grep -q '回落全量扫描' \"$RA\"" ""
+awk '/^## 补扫/{f=1;next} /^## /{f=0} f' "$RA" > "$TMP/txt/rescan.md"
+oseq "FR-5 补扫协议：范围参数、只产出该范围增量产物、更新基线覆盖清单、已确认存量产物不被重写" "$TMP/txt/rescan.md" "范围参数" "增量产物" "覆盖清单" "不被重写"
+t "主文档出口指向增量对齐细则（两级结构）" 0 "grep -q 'references/incremental-alignment.md' \"$SKILL\"" ""
 
 echo "== setup-reconstruct 模板喂 validate（FR-2 实测）=="
 new_repo

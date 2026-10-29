@@ -18,7 +18,8 @@ templates/ 是产物模板实体文件，落盘以它为底改编，不得凭记
 - `git rev-parse --show-toplevel` 必须成功；失败 → 停止："这里不是 git 仓库，
   逆向扫描只对 git 仓库运行。"
 - 校验技能自身文件完整（SKILL.md、references/scan-protocol.md、
-  references/artifact-templates.md、templates/ 三张模板）；缺失 → 停止报告安装损坏。
+  references/artifact-templates.md、references/incremental-alignment.md、
+  templates/ 三张模板）；缺失 → 停止报告安装损坏。
 - **不要求 `.sdlc/check.sh` 已存在**：未接入仓库照常进入扫描，扫描只依赖 git；
   check.sh 是否存在只在落盘时分路（§4 落盘两路），不构成入口前置。
 
@@ -77,8 +78,9 @@ Read references/artifact-templates.md，按五路落点产出草案，模板从 
 报告三件：落盘产物清单、未覆盖区清单、提交提示。
 按需服务定位：sdlc next-mode 路由表不加行，没有任何技能自动调用本技能，
 扫描与重扫一律用户手动触发。
-后续指路：知识过时 → 手动重跑（增量对齐——按扫描基线 commit 与 HEAD 的 diff
-只重验涉漂移断言，不推倒未漂移部分，基线缺失回落全量扫描）；
+后续指路：知识过时 → 手动重跑（Read references/incremental-alignment.md——增量对齐：
+按扫描基线 commit 与 HEAD 的 diff 只重验涉漂移断言，不推倒未漂移部分，
+基线缺失回落全量扫描；未覆盖区补扫带范围参数只动该范围）；
 接入问题 → /setup-workspace；正向开发 → /dev-clarify。
 
 ## 6. 中断与交接
