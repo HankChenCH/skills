@@ -74,6 +74,23 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 
 **不创建**。留待第一个产物落盘时由对应技能创建，不留 .gitkeep。
 
+### 多仓工作区模式（仅 SKILL §0 判定进入该模式时执行）
+
+- **工作区仓库**：根目录 `git init -b main`（分支 2 前提即根非仓库，无需防重）。随后按本节以上各目标在根落全套：check.sh、l4-guard、trackers、config.sh（仅缺失时生成）、METHOD.md、GLOSSARY、CODING_STANDARDS、AGENTS.md 哨兵（§2）、根 commit-msg/pre-push 转发，语义与单仓完全一致；docs/ 八个产物目录照旧懒创建。根不装成员源码：CODE_DIRS 与 CHECK_* 探测不到即留空；fresh init 无 origin/HEAD，BASE_REF 落 `main` 默认值。
+- **成员清单 `.sdlc/members.list`**：决策 4 确认后落盘，逐行一个成员目录名（相对根、无斜杠、按扫描顺序）；归 setup 所有权，重跑按新确认结果**整体重写**。被排除的候选不落行。`.sdlc/` 随写随建。
+- **根 .gitignore 成员标记段**：登记成员目录，防嵌套 git 仓库被误收进工作区仓库索引。段格式（标记行措辞勿改，幂等判定靠 begin/end 标记）：
+
+  ```
+  # sdlc:members begin（setup-workspace 管理，勿手改；重跑按成员清单整体重写）
+  frontend/
+  backend/
+  # sdlc:members end
+  ```
+
+  - .gitignore 不存在或无 begin 标记 → 文末追加：已有内容时先空一行再落段，新文件直接落段；段内为成员清单逐行 `<目录名>/`。
+  - 已有 begin 标记 → 只重写 begin/end 之间的行；标记行与块外内容一字不动，不重复追加段。
+  - 成员为零（用户排除全部候选）时段内留空，标记行保留。用户自有行（标记段外的任何行）任何情况下不动。
+
 ## 2. AGENTS.md 收口（§4，最后一步执行）
 
 哨兵块固定文本（措辞勿改，与 assets/METHOD.md、GLOSSARY.md 的引用关系已内置）：
@@ -117,7 +134,8 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 - 覆盖 docs/METHOD.md；GLOSSARY.md 补"流程术语与状态"章
 - AGENTS.md <创建|追加哨兵块|替换块内内容>；hooks <安装 commit-msg/pre-push|发现外来 hook：说明>；L4 hook <已装（guard 脚本 + .zcode/config.json hooks 块，ZCode 会话）|未识别 ZCode 会话，未装平台接线，guard 脚本仍就位>
 - 编码标准：<导入 N 份到 docs/standards/ | 引入 <lang> starter | 跳过>
-- 识别智能体：<name|未识别，走通用流程>；仓库类型：<单仓库|monorepo（N 包）>
+- 识别智能体：<name|未识别，走通用流程>；仓库类型：<单仓库|monorepo（N 包）|多仓工作区（N 成员）>
+- 多仓工作区：<git init 根为工作区仓库；成员清单 .sdlc/members.list 落 N 名（<目录名、…>）；用户排除：<目录名、…|无>；.gitignore 标记段 <追加|重写>；非成员目录零接触>
 
 **探测画像**：语言 <…>；版本管理 <…>；包管理器 <…>；检查命令 <…或"未发现">
 

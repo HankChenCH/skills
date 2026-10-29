@@ -19,7 +19,9 @@ assets/ 是逐字拷贝进目标仓库的模板，不得凭记忆手写替代。
   1. `git rev-parse --show-toplevel` 成功 → 单仓 / monorepo 现行流程，按 §1 继续。
   2. 失败但根下第一层存在 ≥1 个 git 仓库 → 进入**多仓工作区模式**（scan-signals §1
      第三形态）：根为工作区仓库根，第一层 git 仓库为成员子仓库候选；第一层扫描信号
-     （跳过点目录）按 references/scan-signals.md §1 执行。
+     （跳过点目录）按 references/scan-signals.md §1 执行，非成员目录零接触。§1–§5
+     照常推进，模式差异：§2 增决策 4（成员入册确认）；§3 增多仓生成行（git init 根、
+     成员清单、.gitignore 标记段）；§5 报告增多仓行。
   3. 失败且第一层无任何 git 仓库 → 停止："这里不是 git 仓库，SDLC 工作区只初始化
      在 git 仓库内。"拒绝路径**零写入**：不创建、不修改任何文件。
 - 校验 assets/ 与 references/ 完整（check.sh、METHOD.md、GLOSSARY.md、
@@ -48,11 +50,15 @@ CODING_STANDARDS.md、docs/standards/）。存在 .sdlc/check.sh → 升级模�
 3. **编码标准来源**（内置 starter 只是兜底）：自有/团队标准（本地路径或 URL，
    可多个）→ 增量导入 docs/standards/，CODING_STANDARDS.md 写成"索引+兜底"；
    没有 → starter 兜底（默认）；可两者都要；可跳过留待 dev-review 首评再补。
+4. **成员入册确认（仅多仓工作区模式）**：一次列出全部候选（目录名 + 单仓 /
+   monorepo 分类）并给默认建议（全部入册），用户只点名排除项；非成员目录零接触。
+   问法与规则见 references/decisions.md 决策 4。
 
 ## 3. 生成与升级（每步报告"覆盖/保留/补缺"；确切写法见 references/generation.md）
 
 | 目标 | 行为 |
 |---|---|
+| 根目录 git init（仅多仓工作区模式） | `git init -b main` 把根立为工作区仓库，再按本表落装；细则见 references/generation.md「多仓工作区模式」 |
 | `.sdlc/check.sh` | 拷贝 assets/check.sh，chmod +x；可整体覆盖 |
 | `.sdlc/hooks/l4-guard.sh` | 拷贝 assets/hooks/l4-guard.sh，chmod +x；可整体覆盖；命中 ZCode 适配器时另按适配器参考合并 `.zcode/config.json` hooks 块（L4 接线） |
 | `.sdlc/trackers/` | 写 local.sh；决策 1 非 local 时加装所选适配器（github/gitlab/codeup）；用户自定义适配器不删 |
@@ -63,6 +69,8 @@ CODING_STANDARDS.md、docs/standards/）。存在 .sdlc/check.sh → 升级模�
 | `GLOSSARY.md` | 首建种入"流程术语与状态"章；已有只补该章，项目术语不动 |
 | `.git/hooks/commit-msg`、`pre-push` | 一行转发，幂等重装；外来 hook **不覆盖**，报告并给手动合并方案 |
 | docs/ 八个产物目录 | 懒创建，本技能不建、不留 .gitkeep |
+| `.sdlc/members.list`（仅多仓工作区模式） | 按决策 4 确认结果逐行落成员目录名；setup 所有权，重跑整体重写 |
+| 根 `.gitignore` 成员标记段（仅多仓工作区模式） | 带标记段幂等登记成员目录，防误收编；用户自有行一字不动；写法见 references/generation.md「多仓工作区模式」 |
 | 源码与一切其他文件 | **永不触碰** |
 
 ## 4. AGENTS.md 收口（最后一步，其余全部落定后再写）
@@ -80,7 +88,7 @@ references/generation.md 与 references/agent-adapters/ 为准。
 
 ## 禁止事项（任何时候）
 
-- 触碰源码与一切用户文件；往 .gitignore 加任何流程产物。
+- 触碰源码与一切用户文件；往 .gitignore 加任何流程产物（唯一例外：多仓工作区模式的成员登记标记段，见 references/generation.md「多仓工作区模式」）。
 - 覆盖 config.sh、自定义 tracker、外来 hooks、docs/standards/ 同名文件、GLOSSARY 项目术语。
 - 凭据/MCP 验证失败时静默降级。
 - 在仓库之外写入任何文件；初始化后顺手建产物目录或示例产物。
