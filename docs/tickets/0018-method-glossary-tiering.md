@@ -2,9 +2,10 @@
 id: 0018
 type: feature
 spec: 0007
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-29
+done: 2026-10-29
 ---
 # 0018: METHOD/GLOSSARY 分档成文
 
