@@ -68,6 +68,7 @@ CODING_STANDARDS.md、docs/standards/）。存在 .sdlc/check.sh → 升级模�
 | `CODING_STANDARDS.md` | 首建"索引+兜底"；已有内容不动 |
 | `GLOSSARY.md` | 首建种入"流程术语与状态"章；已有只补该章，项目术语不动 |
 | `.git/hooks/commit-msg`、`pre-push` | 一行转发，幂等重装；外来 hook **不覆盖**，报告并给手动合并方案 |
+| 成员 `.git/hooks/commit-msg`（仅多仓工作区模式） | 一行转发到工作区仓库 check.sh commit-msg，先取消息文件绝对路径、cd 锚定工作区仓库根再 exec；**不装 pre-push**；外来 hook 处置同根（写法与理由见 references/generation.md「多仓工作区模式」） |
 | docs/ 八个产物目录 | 懒创建，本技能不建、不留 .gitkeep |
 | `.sdlc/members.list`（仅多仓工作区模式） | 按决策 4 确认结果逐行落成员目录名；setup 所有权，重跑整体重写 |
 | 根 `.gitignore` 成员标记段（仅多仓工作区模式） | 带标记段幂等登记成员目录，防误收编；用户自有行一字不动；写法见 references/generation.md「多仓工作区模式」 |

@@ -91,6 +91,17 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
   - 已有 begin 标记 → 只重写 begin/end 之间的行；标记行与块外内容一字不动，不重复追加段。
   - 成员为零（用户排除全部候选）时段内留空，标记行保留。用户自有行（标记段外的任何行）任何情况下不动。
 
+- **成员 hook `<成员>/.git/hooks/commit-msg`（成员提交门禁转发；只装 commit-msg，不装 pre-push——成员不跑 lint/test，need C3）**：转发模板如下，`sdlc-managed` 标记保留（幂等判定靠它，重装整体覆盖）：
+
+  ```sh
+  #!/bin/sh
+  # sdlc-managed: forward to workspace root .sdlc/check.sh（由 setup-workspace 安装，重装会覆盖本文件）
+  msg="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+  cd "$(dirname "$(git rev-parse --show-toplevel)")" && exec ./.sdlc/check.sh commit-msg "$msg"
+  ```
+
+  两步各有硬理由：git 传给 hook 的是相对成员仓库的消息文件路径，先取绝对路径，否则锚定后路径失效、读错消息文件；check.sh 以 `git rev-parse --show-toplevel` 自定位仓库根，成员内触发会落到成员仓库、根 docs/tickets/ 被读空——先 `cd` 锚定到工作区仓库根再 `exec`，成员提交校验的才是工作区仓库根 docs/tickets/ 里的工单。外来 hook 沿用本节以上「.git/hooks/commit-msg、pre-push」条款：不覆盖，报告并给合并方案。成员被单独 clone 到工作区根之外时转发会因找不到 check.sh 拦截提交——那是安装损坏信号，重跑 /setup-workspace 复原。
+
 ## 2. AGENTS.md 收口（§4，最后一步执行）
 
 哨兵块固定文本（措辞勿改，与 assets/METHOD.md、GLOSSARY.md 的引用关系已内置）：

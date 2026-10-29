@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup-workspace 门禁脚本测试套件：在临时仓库断言 assets/check.sh 各子命令行为，
-# 对 dev-accept 蒸馏清扫出口做 SKILL.md 文本契约与 git 端到端断言，
-# 并断言 METHOD/GLOSSARY/check.sh 活本与生成资产逐字一致。
+# 以临时多仓夹具（工作区仓库根 + 成员）实测成员门禁转发，对 dev-accept 蒸馏清扫出口
+# 做 SKILL.md 文本契约与 git 端到端断言，并断言 METHOD/GLOSSARY/check.sh 活本与生成资产逐字一致。
 # 用法：tests/run-tests.sh；全部通过输出 "ALL PASSED"，否则列出失败项并以非零退出。
 set -u
 
@@ -1541,6 +1541,113 @@ printf 'z\n' > "$TMP/f2.txt"
 git -C "$TMP" add f2.txt
 t "非法 message 被 hook 拦截" 1 "git -C $TMP commit -qm 'no tag'" "[#NNNN]"
 rm -f "$TMP/.git/hooks/commit-msg"
+
+echo "== 多仓工作区成员门禁转发（seam 二）=="
+new_repo                        # $TMP = 工作区仓库根；成员提交的校验对象全在根 docs/tickets/
+mkdir -p "$TMP/frontend"
+git -C "$TMP/frontend" init -q -b main
+git -C "$TMP/frontend" config user.email test@example.com
+git -C "$TMP/frontend" config user.name tester
+# 成员转发 hook：照 generation.md「多仓工作区模式」模板逐字落装（复现 setup 的落装行为）；
+# 消息文件须先取绝对路径——git 传给 hook 的是相对成员仓库的路径，锚定到根后原路径失效
+install_member_hook() {
+  printf '#!/bin/sh\n# sdlc-managed: forward to workspace root .sdlc/check.sh（由 setup-workspace 安装，重装会覆盖本文件）\nmsg="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"\ncd "$(dirname "$(git rev-parse --show-toplevel)")" && exec ./.sdlc/check.sh commit-msg "$msg"\n' > "$TMP/frontend/.git/hooks/commit-msg"
+  chmod +x "$TMP/frontend/.git/hooks/commit-msg"
+}
+install_member_hook
+echo one > "$TMP/frontend/a.txt"; git -C "$TMP/frontend" add a.txt
+t "成员提交引用根库尚无的工单被拒：转发已生效且校验报不存在" 1 "git -C $TMP/frontend commit -qm '[#0002] x'" "不存在"
+wfile docs/tickets/0002-member-gate.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-10-29
+---
+# 0002: 成员门禁夹具工单
+
+**做什么：** 只落工作区仓库根 docs/tickets/，供成员转发校验
+
+**验收标准：**
+- [ ] 夹具（证据：本文件）
+
+**Blocked by：** 无
+
+## Progress
+夹具
+EOF
+echo two > "$TMP/frontend/b.txt"; git -C "$TMP/frontend" add b.txt
+t "成员提交 [#0002] 放行——工单仅在根 docs/tickets/，即 ROOT 锚定工作区根的证据" 0 "git -C $TMP/frontend commit -qm '[#0002] y'" "门禁通过"
+wfile docs/tickets/0004-ready-gate.md <<'EOF'
+---
+id: 0004
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-10-29
+---
+# 0004: ready 状态夹具工单
+
+**做什么：** 夹具
+
+**验收标准：**
+- [ ] 夹具（证据：本文件）
+
+**Blocked by：** 无
+
+## Progress
+夹具
+EOF
+wfile docs/tickets/0003-done-gate.md <<'EOF'
+---
+id: 0003
+type: feature
+spec: 0001
+status: done
+blocked-by: []
+created: 2026-10-29
+---
+# 0003: done 状态夹具工单
+
+**做什么：** 夹具
+
+**验收标准：**
+- [x] 夹具（证据：本文件）
+
+**Blocked by：** 无
+
+## Progress
+夹具
+EOF
+echo three > "$TMP/frontend/c.txt"; git -C "$TMP/frontend" add c.txt
+t "成员提交引用 ready 工单拒绝并报原因" 1 "git -C $TMP/frontend commit -qm '[#0004] x'" "先 /dev-implement 开工再提交"
+echo four > "$TMP/frontend/d.txt"; git -C "$TMP/frontend" add d.txt
+t "成员提交引用 done 工单拒绝并指路 fix" 1 "git -C $TMP/frontend commit -qm '[#0003] x'" "开新 fix 工单"
+echo five > "$TMP/frontend/e.txt"; git -C "$TMP/frontend" add e.txt
+t "成员提交引用不存在工单拒绝" 1 "git -C $TMP/frontend commit -qm '[#9999] x'" "不存在"
+echo six > "$TMP/frontend/f.txt"; git -C "$TMP/frontend" add f.txt
+t "成员无引用非豁免提交拒绝并提示规则" 1 "git -C $TMP/frontend commit -qm 'no tag'" "[#NNNN]"
+echo seven > "$TMP/frontend/g.txt"; git -C "$TMP/frontend" add g.txt
+t "成员 Merge 信息头提交机械放行" 0 "git -C $TMP/frontend commit -qm \"Merge branch 'feat/x'\"" "机械放行"
+echo eight > "$TMP/frontend/h.txt"; git -C "$TMP/frontend" add h.txt
+t "成员 Revert 信息头提交机械放行" 0 "git -C $TMP/frontend commit -qm 'Revert \"old change\"'" "机械放行"
+install_member_hook             # 幂等重装：同模板整体覆盖
+echo nine > "$TMP/frontend/i.txt"; git -C "$TMP/frontend" add i.txt
+t "sdlc-managed 重装后转发仍生效" 0 "git -C $TMP/frontend commit -qm '[#0002] z'" "门禁通过"
+t "成员 hook 带 sdlc-managed 标记（幂等判定依据）" 0 "grep -q sdlc-managed $TMP/frontend/.git/hooks/commit-msg" ""
+t "成员未装 pre-push（need C3）" 0 "test ! -f $TMP/frontend/.git/hooks/pre-push" ""
+
+echo "== 成员门禁转发成文契约（generation.md 多仓节 / SKILL §3 行）=="
+GEN="$HERE/../references/generation.md"
+SKILL="$HERE/../../setup-workspace/SKILL.md"
+mkdir -p "$TMP/txt"
+awk '/^### 多仓工作区模式/{f=1;next} /^## 2\. /{f=0} f' "$GEN" > "$TMP/txt/multi.md"
+oseq "成员 hook 细则按序成文：一行转发、不装 pre-push、消息文件绝对路径、锚定工作区仓库根、自定位错位理由、外来 hook 沿用不覆盖" "$TMP/txt/multi.md" "commit-msg" "不装 pre-push" "成员仓库" "自定位" "锚定" "外来 hook" "不覆盖"
+t "成员转发模板落文（sdlc-managed 标记 + dirname 锚定 + exec check.sh commit-msg）" 0 "grep -q 'sdlc-managed: forward to workspace root' \"$TMP/txt/multi.md\" && grep -q 'dirname' \"$TMP/txt/multi.md\" && grep -q 'exec ./.sdlc/check.sh commit-msg' \"$TMP/txt/multi.md\"" ""
+t "SKILL §3 增成员 hook 行（仅多仓工作区模式、不装 pre-push、外来 hook 处置同根）" 0 "grep -q '成员 \`.git/hooks/commit-msg\`（仅多仓' \"$SKILL\" && grep -q '不装 pre-push' \"$SKILL\" && grep -q '外来 hook 处置同根' \"$SKILL\"" ""
 
 echo "== 过程档 gitignore 行为（seam 1）=="
 new_repo
