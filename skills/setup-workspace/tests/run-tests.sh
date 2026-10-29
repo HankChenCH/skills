@@ -1031,6 +1031,227 @@ oseq "禁止事项：rejected 禁改 spec 正文在前、蒸馏例外在后" "$T
 t "禁止事项保留禁改 spec 正文且例外限定 passed" 0 "grep -q '改 spec 正文' $TMP/txt/forbidden.md && grep -q 'passed' $TMP/txt/forbidden.md" ""
 t "frontmatter description 含蒸馏清扫一句话" 0 "grep -qE '^description:.*蒸馏.*清扫' $SKILL" ""
 
+echo "== dev-accept 蒸馏清扫出口端到端（夹具模拟序列）=="
+new_repo
+wfile docs/needs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-10-29
+---
+# 结账流程
+
+## 背景与业务目标
+提高结账转化。
+
+## 干系人与用户
+买家；成功标准：下单转化率不降。
+
+## 系统能力需求
+- FR-1 支持购物车结算
+
+## 场景
+- Given 购物车有商品 When 结算 Then 生成订单
+
+## 假设与风险
+- 假设：优惠码规则稳定（代价高 × 不确定中）
+
+## 范围与非目标
+不含退款。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-10-29
+---
+# 结账规格
+
+## 问题陈述
+买家结算慢。
+
+## 方案
+一键结算。
+
+## 用户故事
+- 作为买家，我想要一键结算，以便更快下单
+
+## 实现决策
+新增 checkout 模块。
+
+## 测试决策
+在 checkout 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 集成级] Given 订单完成 When 开票 Then 发票到达邮箱
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/tickets/0001-cart.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: done
+blocked-by: []
+created: 2026-10-29
+---
+# 0001: 购物车结算
+
+**做什么：** 从购物车一键生成订单
+
+**验收标准：**
+- [x] 有商品时结算生成订单（测试：checkout_test）
+
+**Blocked by：** 无
+
+## Progress
+已完成
+EOF
+wfile docs/tickets/0002-coupon.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: done
+blocked-by: []
+created: 2026-10-29
+---
+# 0002: 优惠码
+
+**做什么：** 优惠码应用与金额减免
+
+**验收标准：**
+- [x] 有效优惠码应用后金额正确（测试：coupon_test）
+
+**Blocked by：** 无
+
+## Progress
+已完成
+EOF
+wfile docs/reviews/0001-checkout-review.md <<'EOF'
+---
+id: 0001
+status: approved
+tickets: [0001, 0002]
+branch: feat/checkout
+created: 2026-10-29
+---
+# 0001: 结账评审
+
+## 标准轴 findings
+- 无
+
+## Spec 轴 findings
+- 无
+
+## 汇总
+无阻断
+EOF
+wfile docs/acceptance/0001-checkout-round1.md <<'EOF'
+---
+id: 0001
+status: passed
+spec: 0001
+round: 1
+created: 2026-10-29
+---
+# 0001: 结账验收（round 1）
+
+## 场景结果
+- FR-1 集成级：通过
+
+## 假设验证
+- 假设：优惠码规则稳定——证伪（实际按单计价）
+
+## 残余风险
+- 优惠码叠加上限未定义（影响：对账口径；不阻塞）
+
+## 下一轮建议
+- 定义叠加上限并补对账测试
+EOF
+printf '# CODING_STANDARDS\n\n（索引：docs/standards/）\n' > "$TMP/CODING_STANDARDS.md"
+GITHUB_ADAPTER="$HERE/../assets/trackers/github.sh"
+cp "$GITHUB_ADAPTER" "$TMP/.sdlc/trackers/github.sh" && chmod +x "$TMP/.sdlc/trackers/github.sh"
+sed -i.bak 's/^TRACKER=.*/TRACKER=github/; s/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+fake_cmd gh <<'EOF'
+#!/bin/sh
+[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_LOG"
+if [ "$1" = "auth" ]; then exit "${FAKE_AUTH:-0}"; fi
+if [ "$1" = "issue" ]; then
+  case "$2" in
+    create|edit) ;;
+    *) exit 0 ;;
+  esac
+  prev=""
+  for a in "$@"; do
+    if { [ "$prev" = "-F" ] || [ "$prev" = "--body-file" ]; } && [ -f "$a" ]; then cat "$a" >> "$FAKE_LOG"; fi
+    prev="$a"
+  done
+  if [ "$2" = "create" ]; then printf '%s\n' "${FAKE_URL:-https://github.com/acme/widget/issues/41}"; fi
+fi
+exit 0
+EOF
+t "验收报告发布并落映射（issues/41）" 0 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/acceptance/0001-checkout-round1.md" "投影"
+t "映射记录已发布对象编号" 0 "grep -q 'docs/acceptance/0001-checkout-round1.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/41' \"$TMP/.sdlc/trackers/github.map\"" ""
+git -C "$TMP" add docs CODING_STANDARDS.md
+git -C "$TMP" commit -qm "[trivial] 端到端夹具基线"
+BASE="$(git -C "$TMP" rev-parse HEAD)"
+
+# 蒸馏①：need「假设与风险」逐条标注验证结果 + 残余风险与下一轮建议折回
+awk '
+  /^- 假设：优惠码规则稳定/ {
+    print $0 "（验证：证伪——实际按单计价）"
+    print "- 残余风险：优惠码叠加上限未定义（影响：对账口径；不阻塞）"
+    print "- 下一轮建议：定义叠加上限并补对账测试（折回自验收报告 0001）"
+    next
+  }
+  { print }
+' "$TMP/docs/needs/0001-checkout.md" > "$TMP/need.new" && mv "$TMP/need.new" "$TMP/docs/needs/0001-checkout.md"
+# 蒸馏②：spec 验收场景按实现中发现的实际边界行为修订
+sed -i.bak 's/Then 发票到达邮箱/\&（边界修订：附件超限转失败可见）/' "$TMP/docs/specs/0001-checkout.md" && rm -f "$TMP/docs/specs/0001-checkout.md.bak"
+# 蒸馏③：有架构分量的决策新立 ADR
+wfile docs/adr/0001-atomic-closeout.md <<'EOF'
+---
+id: 0001
+status: accepted
+created: 2026-10-29
+---
+# 0001: 验收收口为单个原子提交
+蒸馏、清扫、置 done 合并为恰一个 [trivial] 提交，避免门禁中间态。
+EOF
+# 蒸馏④：模式学习追加进 standards
+printf '%s\n' "- 蒸馏清扫出口：先折回再删除（来源：验收 0001）" >> "$TMP/CODING_STANDARDS.md"
+t "蒸馏落点各自 validate 通过（need / spec / ADR）" 0 "check.sh validate docs/needs/0001-checkout.md && check.sh validate docs/specs/0001-checkout.md && check.sh validate docs/adr/0001-atomic-closeout.md" "通过"
+# 残留校验活体探针：spec 先置 done 而未清扫，validate 必须红（校验空转即本用例失败）
+setfm docs/specs/0001-checkout.md status done
+t "残留校验活体探针：done 未清扫 validate 必须红" 1 "check.sh validate docs/specs/0001-checkout.md" "docs/tickets/0001"
+setfm docs/specs/0001-checkout.md status approved
+# 清扫：删除该 spec 名下全部过程档（含本次验收报告；tracker 投影不回删）
+rm "$TMP/docs/tickets/0001-cart.md" "$TMP/docs/tickets/0002-coupon.md" "$TMP/docs/reviews/0001-checkout-review.md" "$TMP/docs/acceptance/0001-checkout-round1.md"
+# 置 done：spec frontmatter 置 done 并追加 done 日期
+setfm docs/specs/0001-checkout.md status done
+awk '{print} /^round:/{print "done: 2026-10-29"}' "$TMP/docs/specs/0001-checkout.md" > "$TMP/spec.new" && mv "$TMP/spec.new" "$TMP/docs/specs/0001-checkout.md"
+t "置 done 且清扫后全库 validate 通过" 0 "for f in docs/needs/*.md docs/specs/*.md docs/adr/*.md; do check.sh validate \"\$f\" || exit 9; done" ""
+# 原子提交：蒸馏编辑 + 清扫删除 + 置 done 合为恰一个 [trivial] 提交
+git -C "$TMP" add docs CODING_STANDARDS.md
+git -C "$TMP" commit -qm "[trivial] 验收收口 spec 0001：蒸馏折回、清扫过程档、置 done"
+t "序列恰产生一个新提交" 0 "[ \"\$(git -C \"$TMP\" rev-list --count $BASE..HEAD)\" = 1 ]" ""
+t "新提交为 [trivial] 提交" 0 "git -C \"$TMP\" log --format=%s -1 | grep -q '\[trivial\]'" ""
+t "commit-msg 门禁放行原子提交信息" 0 "git -C \"$TMP\" log --format=%s -1 > \"$TMP/msg.txt\" && check.sh commit-msg \"$TMP/msg.txt\"" "豁免"
+t "原子提交承载全部蒸馏编辑与清扫删除" 0 "git -C \"$TMP\" show --name-status --format= HEAD > \"$TMP/stat.txt\" && grep -q '^M.*needs' \"$TMP/stat.txt\" && grep -q '^M.*specs' \"$TMP/stat.txt\" && grep -q '^M.*CODING_STANDARDS' \"$TMP/stat.txt\" && grep -q '^A.*adr' \"$TMP/stat.txt\" && grep -q '^D.*tickets' \"$TMP/stat.txt\" && grep -q '^D.*reviews' \"$TMP/stat.txt\" && grep -q '^D.*acceptance' \"$TMP/stat.txt\"" ""
+t "恰删除四个过程档" 0 "[ \"\$(grep -c '^D' \"$TMP/stat.txt\")\" = 4 ]" ""
+t "盘面该 spec 名下过程档为零" 0 "[ -z \"\$(find \"$TMP\"/docs/tickets \"$TMP\"/docs/reviews \"$TMP\"/docs/acceptance -name '*.md')\" ]" ""
+t "清扫后映射文件仍记录已发布对象编号" 0 "grep -q 'docs/acceptance/0001-checkout-round1.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/41' \"$TMP/.sdlc/trackers/github.map\"" ""
+
 echo "== L4 guard（PreToolUse 判定脚本）=="
 GUARD="$HERE/../assets/hooks/l4-guard.sh"
 # gj <json>：把工具调用载荷喂给 L4 guard（guard 以 cwd 定位仓库，t/tn 已 cd 到夹具仓库）
