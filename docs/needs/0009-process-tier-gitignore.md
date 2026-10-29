@@ -1,8 +1,9 @@
 ---
 id: 0009
-status: confirmed
+status: fulfilled
 created: 2026-10-29
 confirmed: 2026-10-29
+fulfilled: 2026-10-30
 ---
 # 过程档 gitignore 化（过程档不进 git）
 
