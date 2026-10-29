@@ -72,14 +72,14 @@
 
 ## 5. 产物与状态机
 
-frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段（`blocked-by`、`tickets`）必须单行书写：`[]` 或 `[0006, 0008]`。
+frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段（`blocked-by`、`repos`、`tickets`）必须单行书写：`[]` 或 `[0006, 0008]`。
 
 | 产物 | frontmatter 字段 | 状态机（箭头上是推进者） |
 |---|---|---|
 | need | `id` `status` | draft →confirmed（dev-clarify）→fulfilled（dev-accept，末轮通过且成功标准核销、无未接受风险） |
 | spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫） |
 | design | `id` `spec` `status` | draft →approved（dev-design） |
-| ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
+| ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `repos?` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
 | review | `id` `tickets: []` `branch` `status` | draft →approved（dev-review，两轴阻断项清零） |
 | acceptance | `id` `spec` `round` `status` | draft →passed \| rejected（dev-accept） |
 | adr | `id` `status` | accepted →superseded（被新 ADR 取代时） |
@@ -88,6 +88,8 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 各状态的含义与推进者详见 GLOSSARY.md 的"流程术语与状态"章。
 
 **FR-N 追溯链**：need 里系统需求编号 FR-1、FR-2…；spec 验收场景必须标注覆盖哪个 FR（`[FR-N | 工单级]` 映射进工单，`[FR-N | 集成级]` 留给集成后验证）；任何 FR 没有被验收场景覆盖，`check.sh validate` 报孤儿。工单依赖图必须无环，`validate` 全库检查。
+
+**工单点名成员**：多仓工作区里，跨成员仓库的工单可选填单行 `repos: [frontend, backend]`（值为 `.sdlc/members.list` 成员清单中的目录名），`validate` 在该字段非空时逐值校验其在册、缺省不触发。
 
 ## 6. 流程拓扑
 

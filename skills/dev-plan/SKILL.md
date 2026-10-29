@@ -46,6 +46,9 @@ docs/adr/ 中相关 ADR → GLOSSARY.md → 粗读改动将落到的代码区域
   它们是 dev-accept 的运行清单，规划时单列并向用户点明集成风险。
 - **阻塞边**：只标真实依赖（后一片在前一片的端到端行为上叠加），写进 `blocked-by`；
   能并行就并行，禁止为"看起来有序"加边，禁止成环（validate 会拦）。
+- **跨仓库工单应填 repos**：多仓工作区中改动跨成员仓库的工单，frontmatter 填可选单行
+  `repos: [frontend, backend]`（值为成员清单 `.sdlc/members.list` 中的目录名，validate
+  校验在册；单仓工作区不填）。
 - **机械重构**：重命名、改共享符号类型这类宽泛机械改动不硬塞切片，
   按 expand–contract 拆：先并存、分批迁移、最后收缩，每批单独保 CI 绿。
 - **固定模板**：确认后用下面的模板落盘 `docs/tickets/NNNN-slug.md`
