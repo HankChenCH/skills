@@ -2,9 +2,10 @@
 id: 0004
 type: feature
 spec: 0008
-status: implemented
+status: done
 blocked-by: [0003]
 created: 2026-10-29
+done: 2026-10-29
 ---
 # 0004: 增量对齐与补扫协议（重跑语义）
 

@@ -49,3 +49,15 @@ docs/tickets/0007-member-commit-gate.md	57	https://github.com/HankChenCH/skills/
 docs/tickets/0008-member-sentinel.md	58	https://github.com/HankChenCH/skills/issues/58
 docs/tickets/0009-rerun-diff-restore.md	59	https://github.com/HankChenCH/skills/issues/59
 docs/tickets/0010-ticket-repos-field.md	60	https://github.com/HankChenCH/skills/issues/60
+docs/specs/0010-setup-migrate.md	61	https://github.com/HankChenCH/skills/issues/61
+docs/tickets/0011-blueprint-glossary-sync-setup-migrate.md	62	https://github.com/HankChenCH/skills/issues/62
+docs/tickets/0012-superpower-research-report.md	63	https://github.com/HankChenCH/skills/issues/63
+docs/tickets/0013-setup-migrate-skeleton-identify-ledger.md	64	https://github.com/HankChenCH/skills/issues/64
+docs/tickets/0014-translation-mapping-protocol.md	65	https://github.com/HankChenCH/skills/issues/65
+docs/tickets/0015-issue-close-skill-disposal.md	66	https://github.com/HankChenCH/skills/issues/66
+docs/tickets/0016-two-state-onboarding-exit.md	67	https://github.com/HankChenCH/skills/issues/67
+docs/needs/0009-process-tier-gitignore.md	68	https://github.com/HankChenCH/skills/issues/68
+docs/specs/0011-process-tier-gitignore.md	69	https://github.com/HankChenCH/skills/issues/69
+docs/tickets/0017-repo-sweep-gitignore-behavior.md	70	https://github.com/HankChenCH/skills/issues/70
+docs/tickets/0018-setup-gitignore-generation.md	71	https://github.com/HankChenCH/skills/issues/71
+docs/tickets/0019-docs-tiering-adr-supersede.md	72	https://github.com/HankChenCH/skills/issues/72
