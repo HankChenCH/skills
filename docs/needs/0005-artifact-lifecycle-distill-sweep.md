@@ -63,7 +63,8 @@ confirmed: 2026-10-29
 - A2 协作者对被清扫产物的发现成本上升（工作区 grep 不到，需 `git log -- docs/tickets/` 考古或查 tracker 投影）：拍板 D1 已接受该代价换工作区干净。不确定度：低。（验证：通过——被删文件 git 历史可查，tracker 投影保留不回删）
 - A3 全库状态-存在性校验与既有"依赖无环"校验同类（扫 docs/ frontmatter），check.sh 复杂度增量小。不确定度：低。（验证：通过——新增 spec_residue 单函数，run-tests 既有 148 用例零破坏，148→150 仅新增）
 - 残余风险：`.sdlc/config.sh` 未定义任何检查命令（CHECK_LINT / CHECK_TYPE / CHECK_TEST 全空），`check.sh all` 只能响亮警告，run-tests.sh 150 用例依赖会话手动执行，出口门禁证据存在漏跑可能（来源：验收报告 0002，不阻塞验收）。
-- 下一轮建议：不开新轮。收尾两项不属本 need 范围，走 `[trivial]` 或后续工单：① config.sh 接线 `CHECK_TEST="bash skills/setup-workspace/tests/run-tests.sh"`；② GLOSSARY 状态表 spec.done 行是否补"名下过程档已清扫"语义（评审 0012 范围外备注）。
+- 残余风险：spec 0006（dev-execute-orchestrator，round 2 已 passed 置 done）名下过程档 9 个仍在盘上（tickets 0012–0015、reviews 0006–0009、acceptance 0001）——它闭单于 FR-4 门禁诞生之前，validate spec 0006 及任何全库校验持续报红（来源：验收 0002 实跑发现；门禁行为正确，属遗留债）。
+- 下一轮建议：① 对 spec 0006 补跑同款蒸馏清扫出口（其验收报告 0001 的残余风险与建议折回 need 0004 后清扫 9 个过程档，单个 `[trivial]` 提交）——这是"validate 全库通过"恢复的唯一路径；② config.sh 接线 `CHECK_TEST="bash skills/setup-workspace/tests/run-tests.sh"`；③ GLOSSARY 状态表 spec.done 行是否补"名下过程档已清扫"语义（评审 0012 范围外备注）。
 - round 1 靶心：FR-2 蒸馏的落点完整性（E3 边界）与 FR-4 门禁（新机制）；FR-1 / FR-3 是既有行为的收拢，风险最低。（结果：全部命中——FR-4 由工单 0016 落地，FR-2/3/6 由工单 0017 落地，FR-5 由工单 0018 落地）
 
 ## 范围与非目标
