@@ -760,6 +760,214 @@ t "codeup 幂等：无第二次创建调用" 0 "! grep -q 'workitem -H' \"$TMP/c
 t "codeup 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/codeup.map\")\" -eq 1 ]" ""
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
+echo "== spec done 残留扫描（清扫门禁）=="
+new_repo
+wfile docs/needs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-10-29
+---
+# 结账流程
+
+## 背景与业务目标
+提高结账转化。
+
+## 干系人与用户
+买家；成功标准：下单转化率不降。
+
+## 系统能力需求
+- FR-1 支持购物车结算
+
+## 场景
+- Given 购物车有商品 When 结算 Then 生成订单
+
+## 假设与风险
+- 假设：优惠码规则稳定
+
+## 范围与非目标
+不含退款。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0001-swept.md <<'EOF'
+---
+id: 0001
+status: done
+need: 0001
+round: 1
+created: 2026-10-29
+---
+# 已清扫规格
+
+## 问题陈述
+买家结算慢。
+
+## 方案
+一键结算。
+
+## 用户故事
+- 作为买家，我想要一键结算，以便更快下单
+
+## 实现决策
+新增 checkout 模块。
+
+## 测试决策
+在 checkout 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有商品 When 结算 Then 订单生成
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/specs/0002-fresh.md <<'EOF'
+---
+id: 0002
+status: approved
+need: 0001
+round: 1
+created: 2026-10-29
+---
+# 进行中规格
+
+## 问题陈述
+发票开具慢。
+
+## 方案
+接入电子发票。
+
+## 用户故事
+- 作为买家，我想要电子发票，以便报销
+
+## 实现决策
+新增 invoice 模块。
+
+## 测试决策
+在 invoice 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 订单完成 When 开票 Then 发票生成
+
+## 非目标
+不含纸质发票。
+
+## 备注
+EOF
+wfile docs/tickets/0001-old-cart.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: done
+blocked-by: []
+created: 2026-10-29
+---
+# 0001: 已收尾工单
+
+**做什么：** spec 0001 名下已完成的工单
+
+**验收标准：**
+- [x] 已完成（证据：评审通过）
+
+**Blocked by：** 无
+
+## Progress
+已完成
+EOF
+wfile docs/tickets/0002-new-cart.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0002
+status: ready
+blocked-by: []
+created: 2026-10-29
+---
+# 0002: 进行中工单
+
+**做什么：** spec 0002 名下的工单
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+尚未开工
+EOF
+wfile docs/reviews/0001-old-review.md <<'EOF'
+---
+id: 0001
+status: approved
+tickets: [0001]
+branch: feat/old
+created: 2026-10-29
+---
+# 0001: 已收尾评审
+
+## 标准轴 findings
+- 无
+
+## Spec 轴 findings
+- 无
+
+## 汇总
+无阻断
+EOF
+wfile docs/reviews/0002-new-review.md <<'EOF'
+---
+id: 0002
+status: draft
+tickets: [0002]
+branch: feat/new
+created: 2026-10-29
+---
+# 0002: 进行中评审
+
+## 标准轴 findings
+- 无
+
+## Spec 轴 findings
+- 无
+
+## 汇总
+无
+EOF
+wfile docs/acceptance/0001-old-round1.md <<'EOF'
+---
+id: 0001
+status: passed
+spec: 0001
+round: 1
+created: 2026-10-29
+---
+# 0001: 已收尾验收（round 1）
+
+## 场景结果
+- FR-1：通过
+
+## 假设验证
+- 通过
+
+## 残余风险
+- 无
+
+## 下一轮建议
+- 无
+EOF
+t "done spec 名下工单残留被点名" 1 "check.sh validate docs/specs/0001-swept.md" "docs/tickets/0001-old-cart.md"
+t "done spec 名下评审残留被点名" 1 "check.sh validate docs/specs/0001-swept.md" "docs/reviews/0001-old-review.md"
+t "done spec 名下验收残留被点名" 1 "check.sh validate docs/specs/0001-swept.md" "docs/acceptance/0001-old-round1.md"
+t "approved spec 不触发残留扫描" 0 "check.sh validate docs/specs/0002-fresh.md" "通过"
+rm "$TMP/docs/tickets/0001-old-cart.md" "$TMP/docs/reviews/0001-old-review.md" "$TMP/docs/acceptance/0001-old-round1.md"
+t "清扫后 done spec 校验通过" 0 "check.sh validate docs/specs/0001-swept.md" "通过"
+tn "其他 spec 名下工单不误报为残留" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-cart"
+tn "仅指向其他 spec 工单的评审不误报" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-review"
+
 echo "== L4 guard（PreToolUse 判定脚本）=="
 GUARD="$HERE/../assets/hooks/l4-guard.sh"
 # gj <json>：把工具调用载荷喂给 L4 guard（guard 以 cwd 定位仓库，t/tn 已 cd 到夹具仓库）

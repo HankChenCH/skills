@@ -191,6 +191,36 @@ ticket_cycles() {
   '
 }
 
+# spec_residue SPECID：输出该 spec 名下仍在盘上的过程档路径（相对仓库根，每行一个）。
+# 名下关系：ticket / acceptance 的 spec 字段指向该 spec；review 的 tickets 与名下工单有交集。
+# 供 validate 清扫门禁使用：done 的 spec 名下过程档必须为零。
+spec_residue() {
+  local sid="$1" f tspec t tids tid
+  tids=" "
+  for f in "$DOCS"/tickets/*.md; do
+    [ -f "$f" ] || continue
+    tspec="$(pad4 "$(fm_get "$f" spec)" 2>/dev/null)" || continue
+    [ "$tspec" = "$sid" ] || continue
+    echo "${f#"$ROOT"/}"
+    tid="$(basename "$f" .md)"; tid="${tid%%-*}"
+    tids="$tids$tid "
+  done
+  for f in "$DOCS"/acceptance/*.md; do
+    [ -f "$f" ] || continue
+    tspec="$(pad4 "$(fm_get "$f" spec)" 2>/dev/null)" || continue
+    [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
+  done
+  for f in "$DOCS"/reviews/*.md; do
+    [ -f "$f" ] || continue
+    for t in $(fm_list "$f" tickets); do
+      tid="$(pad4 "$t" 2>/dev/null)" || continue
+      case "$tids" in
+        *" $tid "*) echo "${f#"$ROOT"/}"; break ;;
+      esac
+    done
+  done
+}
+
 # ---------- 子命令 ----------
 
 cmd_phase() {
@@ -470,7 +500,7 @@ cmd_validate() {
   type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 八个产物目录内）：$file"
   local ERRORS=0
   err() { echo "  ✗ $*"; ERRORS=$((ERRORS+1)); }
-  local base id status pad spec_id need_id need_file frs covered missing round dep t any
+  local base id status pad spec_id need_id need_file frs covered missing round dep t any residue
   base="$(basename "$file")"
 
   # --- 通用：frontmatter、id、文件名、状态 ---
@@ -522,6 +552,12 @@ cmd_validate() {
         else
           err "need 字段指向的 need $need_id 不存在"
         fi
+      fi
+      # 清扫门禁：done 的 spec 名下必无过程档残留（蒸馏清扫完成后才允许置 done）
+      if [ "$status" = "done" ]; then
+        for residue in $(spec_residue "$pad"); do
+          err "spec 已置 done 但名下过程档未清扫：$residue"
+        done
       fi
       ;;
     ticket)
@@ -580,7 +616,7 @@ usage() {
   frontier              列出阻塞已清、可开工的工单
   ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
-  validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环）
+  validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
   commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]
   pre-push              重门禁：分支上 implemented 工单须被 approved 评审覆盖
   publish <file>        按 TRACKER 发布产物（local=确认在盘）
