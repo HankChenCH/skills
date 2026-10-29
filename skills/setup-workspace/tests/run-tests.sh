@@ -959,11 +959,33 @@ created: 2026-10-29
 ## 下一轮建议
 - 无
 EOF
+wfile docs/tickets/0003-slug-ref.md <<'EOF'
+---
+id: 0003
+type: feature
+spec: 0001-swept
+status: done
+blocked-by: []
+created: 2026-10-29
+---
+# 0003: slug 引用工单
+
+**做什么：** 以 slug 形态引用 spec 0001 的工单
+
+**验收标准：**
+- [x] 已完成（证据：本文件）
+
+**Blocked by：** 无
+
+## Progress
+已完成
+EOF
 t "done spec 名下工单残留被点名" 1 "check.sh validate docs/specs/0001-swept.md" "docs/tickets/0001-old-cart.md"
 t "done spec 名下评审残留被点名" 1 "check.sh validate docs/specs/0001-swept.md" "docs/reviews/0001-old-review.md"
 t "done spec 名下验收残留被点名" 1 "check.sh validate docs/specs/0001-swept.md" "docs/acceptance/0001-old-round1.md"
+t "slug 形态 spec 引用同样计入残留" 1 "check.sh validate docs/specs/0001-swept.md" "docs/tickets/0003-slug-ref.md"
 t "approved spec 不触发残留扫描" 0 "check.sh validate docs/specs/0002-fresh.md" "通过"
-rm "$TMP/docs/tickets/0001-old-cart.md" "$TMP/docs/reviews/0001-old-review.md" "$TMP/docs/acceptance/0001-old-round1.md"
+rm "$TMP/docs/tickets/0001-old-cart.md" "$TMP/docs/reviews/0001-old-review.md" "$TMP/docs/acceptance/0001-old-round1.md" "$TMP/docs/tickets/0003-slug-ref.md"
 t "清扫后 done spec 校验通过" 0 "check.sh validate docs/specs/0001-swept.md" "通过"
 tn "其他 spec 名下工单不误报为残留" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-cart"
 tn "仅指向其他 spec 工单的评审不误报" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-review"

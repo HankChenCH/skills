@@ -199,7 +199,8 @@ spec_residue() {
   tids=" "
   for f in "$DOCS"/tickets/*.md; do
     [ -f "$f" ] || continue
-    tspec="$(pad4 "$(fm_get "$f" spec)" 2>/dev/null)" || continue
+    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
+    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
     [ "$tspec" = "$sid" ] || continue
     echo "${f#"$ROOT"/}"
     tid="$(basename "$f" .md)"; tid="${tid%%-*}"
@@ -207,13 +208,14 @@ spec_residue() {
   done
   for f in "$DOCS"/acceptance/*.md; do
     [ -f "$f" ] || continue
-    tspec="$(pad4 "$(fm_get "$f" spec)" 2>/dev/null)" || continue
+    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
+    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
     [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
   done
   for f in "$DOCS"/reviews/*.md; do
     [ -f "$f" ] || continue
     for t in $(fm_list "$f" tickets); do
-      tid="$(pad4 "$t" 2>/dev/null)" || continue
+      tid="$(pad4 "${t%%-*}" 2>/dev/null)" || continue
       case "$tids" in
         *" $tid "*) echo "${f#"$ROOT"/}"; break ;;
       esac
