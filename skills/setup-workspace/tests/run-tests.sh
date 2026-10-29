@@ -1155,6 +1155,58 @@ t "phase 原样显示 reconstructed 状态" 0 "check.sh phase" "0001-legacy-beha
 t "frontier 输出不受逆向产物影响" 0 "check.sh frontier" "（空）"
 tn "frontier 不列逆向产物" 0 "check.sh frontier" "reconstructed"
 
+echo "== setup-reconstruct 主文档文本契约（seam 3）=="
+new_repo
+SKILL="$HERE/../../setup-reconstruct/SKILL.md"
+TPLDIR="$HERE/../../setup-reconstruct/references/templates"
+mkdir -p "$TMP/txt"
+t "技能自身文件齐备（主文档 + 两个参考 + 三张模板）" 0 "test -f \"$SKILL\" && test -f \"$HERE/../../setup-reconstruct/references/scan-protocol.md\" && test -f \"$HERE/../../setup-reconstruct/references/artifact-templates.md\" && test -f \"$TPLDIR/need.md\" && test -f \"$TPLDIR/spec.md\" && test -f \"$TPLDIR/adr.md\"" ""
+t "frontmatter description 含存量扫描与确认一句话" 0 "grep -qE '^description:.*存量.*扫描' \"$SKILL\" && grep -qE '^description:.*确认' \"$SKILL\"" ""
+t "两级结构成文：主文档按需指向两个参考文档" 0 "grep -q 'references/scan-protocol.md' \"$SKILL\" && grep -q 'references/artifact-templates.md' \"$SKILL\""
+
+awk '/^## 0\. /{f=1;next} /^## 1\. /{f=0} f' "$SKILL" > "$TMP/txt/gate.md"
+oseq "FR-1 入口门禁：git 仓库在前、技能自身文件完整在后、不要求 check.sh 收尾" "$TMP/txt/gate.md" "git 仓库" "技能自身文件" "不要求" "check.sh"
+tn "FR-1 门禁不沿用未接入即拒的措辞（不要求 check.sh 存在）" 0 "cat \"$TMP/txt/gate.md\"" "未接入开发流程"
+
+awk '/^## 2\. /{f=1;next} /^## 3\. /{f=0} f' "$SKILL" > "$TMP/txt/scan.md"
+oseq "FR-6 扫描纪律：全程只读在前、轮末覆盖与未覆盖清单在后" "$TMP/txt/scan.md" "只读" "未覆盖"
+
+awk '/^## 3\. /{f=1;next} /^## 4\. /{f=0} f' "$SKILL" > "$TMP/txt/draft.md"
+oseq "FR-3 证据纪律：文件:行 证据格式在前、查无证据三选一在后" "$TMP/txt/draft.md" "文件:行" "补扫取证" "低置信" "开放问题"
+t "FR-3 断言与推断边界成文（查无证据不得写成断言）" 0 "grep -q '不得写成断言' \"$TMP/txt/draft.md\"" ""
+oseq "FR-4 五路落点齐备：逆向 need、逆向 spec、ADR、折叠三载体、扫描基线" "$TMP/txt/draft.md" "逆向 need" "逆向 spec" "ADR" "AGENTS.md" "GLOSSARY" "standards" "扫描基线"
+t "FR-4 逆向 spec 的 need 字段指向逆向 need" 0 "grep -q 'need 字段指向' \"$TMP/txt/draft.md\"" ""
+t "落盘状态关键词 reconstructed 成文（need 与 spec）" 0 "grep -q 'status: reconstructed' \"$SKILL\"" ""
+oseq "FR-5 扫描基线字段成文：commit、日期、已覆盖、未覆盖、不得读成不存在" "$TMP/txt/draft.md" "扫描基线" "commit" "已覆盖" "未覆盖" "不得读成不存在"
+
+awk '/^## 4\. /{f=1;next} /^## 5\. /{f=0} f' "$SKILL" > "$TMP/txt/lane.md"
+oseq "FR-6 确认前置：草案先行、不确认不落盘、显式确认、沉默不算确认" "$TMP/txt/lane.md" "草案" "不落盘" "显式确认" "沉默不算确认"
+oseq "FR-2 落盘两路：未接入先 setup-workspace 全流程一次完成、已接入仅写逆向产物" "$TMP/txt/lane.md" "setup-workspace 全流程" "一次" "已接入" "仅写逆向产物"
+oseq "FR-2 同名不覆盖成文：standards 与 GLOSSARY 同名均指名" "$TMP/txt/lane.md" "同名" "standards" "GLOSSARY"
+
+awk '/^## 5\. /{f=1;next} /^## 6\. /{f=0} f' "$SKILL" > "$TMP/txt/exit.md"
+t "FR-6 按需服务定位：路由表不加行" 0 "grep -q '路由表不加行' \"$TMP/txt/exit.md\"" ""
+t "FR-6 出口 = 报告 + 指路" 0 "grep -q '报告' \"$TMP/txt/exit.md\" && grep -q '指路' \"$TMP/txt/exit.md\"" ""
+t "重跑 = 增量对齐关键词在主文档（seam 3 契约）" 0 "grep -q '增量对齐' \"$SKILL\"" ""
+
+awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/forbidden.md"
+oseq "禁止事项：未确认不落盘、推断不成断言、扫描期零改动、同名不覆盖" "$TMP/txt/forbidden.md" "确认" "断言" "任何文件" "同名"
+t "禁止事项声明不做 git 提交、不自动重扫" 0 "grep -q 'git 提交' \"$TMP/txt/forbidden.md\" && grep -q '重扫' \"$TMP/txt/forbidden.md\"" ""
+
+echo "== setup-reconstruct 模板喂 validate（FR-2 实测）=="
+new_repo
+t "模板即 reconstructed / accepted 落盘形态" 0 "grep -q '^status: reconstructed' \"$TPLDIR/need.md\" && grep -q '^status: reconstructed' \"$TPLDIR/spec.md\" && grep -q '^status: accepted' \"$TPLDIR/adr.md\"" ""
+t "need 模板七节齐备" 0 "for s in 背景与业务目标 干系人与用户 系统能力需求 场景 假设与风险 范围与非目标 开放问题; do grep -q \"^## \$s\" \"$TPLDIR/need.md\" || exit 9; done" ""
+t "spec 模板八节齐备" 0 "for s in 问题陈述 方案 用户故事 实现决策 测试决策 验收场景 非目标 备注; do grep -q \"^## \$s\" \"$TPLDIR/spec.md\" || exit 9; done" ""
+t "模板扫描基线带未覆盖声明" 0 "grep -q '未覆盖区不得读成不存在' \"$TPLDIR/need.md\" && grep -q '未覆盖区不得读成不存在' \"$TPLDIR/spec.md\" && grep -q '未覆盖区不得读成不存在' \"$TPLDIR/adr.md\"" ""
+mkdir -p "$TMP/docs/needs" "$TMP/docs/specs" "$TMP/docs/adr"
+cp "$TPLDIR/need.md" "$TMP/docs/needs/0001-legacy-rules.md"
+cp "$TPLDIR/spec.md" "$TMP/docs/specs/0001-legacy-behavior.md"
+cp "$TPLDIR/adr.md" "$TMP/docs/adr/0001-legacy-decision.md"
+t "逆向 need 模板喂 validate 通过（扫描基线为附加节零改动兼容）" 0 "check.sh validate docs/needs/0001-legacy-rules.md" "通过"
+t "逆向 spec 模板喂 validate 通过（need 指向逆向 need 且孤儿 FR 覆盖齐）" 0 "check.sh validate docs/specs/0001-legacy-behavior.md" "通过"
+t "逆向 ADR 模板喂 validate 通过" 0 "check.sh validate docs/adr/0001-legacy-decision.md" "通过"
+
 echo "== dev-accept 蒸馏清扫出口（SKILL.md 文本契约）=="
 new_repo
 SKILL="$HERE/../../dev-accept/SKILL.md"
