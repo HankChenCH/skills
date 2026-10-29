@@ -1532,6 +1532,56 @@ git -C "$TMP" add f2.txt
 t "非法 message 被 hook 拦截" 1 "git -C $TMP commit -qm 'no tag'" "[#NNNN]"
 rm -f "$TMP/.git/hooks/commit-msg"
 
+echo "== 过程档 gitignore 行为（seam 1）=="
+new_repo
+printf 'docs/tickets/\ndocs/reviews/\ndocs/acceptance/\n' >> "$TMP/.gitignore"
+mkdir -p "$TMP/docs/reviews" "$TMP/docs/acceptance"
+# 真实仓库中 docs/ 知识档是被跟踪的：先入库一张知识档做基线，
+# 否则整个 docs/ 未跟踪会被 status 折叠为 `?? docs/`，两层行为都观测不到
+wfile docs/needs/0001-tier-contrast.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-10-29
+---
+# 忽略行为对照 need
+
+## 背景与业务目标
+测试夹具。
+EOF
+git -C "$TMP" add docs/needs/0001-tier-contrast.md
+git -C "$TMP" commit -qm "[trivial] fixture 知识档进库基线"
+wfile docs/needs/0002-tier-contrast-new.md <<'EOF'
+---
+id: 0002
+status: draft
+created: 2026-10-29
+---
+# 忽略行为对照 need（新建）
+
+## 背景与业务目标
+测试夹具。
+EOF
+wfile docs/tickets/0001-swept-ticket.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-10-29
+---
+# 0001: 过程档忽略行为夹具工单
+
+## Progress
+- 测试夹具。
+EOF
+tn "过程档新建票不进 git status" 0 "git status --porcelain" "docs/tickets"
+t "check-ignore 命中 docs/tickets" 0 "git check-ignore -q docs/tickets" ""
+t "check-ignore 命中 docs/reviews" 0 "git check-ignore -q docs/reviews" ""
+t "check-ignore 命中 docs/acceptance" 0 "git check-ignore -q docs/acceptance" ""
+t "知识档新建文件照常入 git status" 0 "git status --porcelain" "docs/needs"
+
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
