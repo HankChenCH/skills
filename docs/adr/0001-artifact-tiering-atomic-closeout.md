@@ -1,9 +1,11 @@
 ---
 id: 0001
-status: accepted
+status: superseded
 created: 2026-10-29
 ---
 # 0001: 流程产物按知识档/过程档分档，验收后原子收口
+
+> 本 ADR 已被 [ADR 0002](0002-process-tier-gitignore-distill.md)（过程档 gitignore 化叠加蒸馏清扫）取代（status: superseded）；收口机制（蒸馏 + 清扫 + 置 done 原子提交）由 ADR 0002 沿用。
 
 流程产物分两档归置：知识档（need、spec、design、adr、research、standards）进库永久留存；过程档（ticket、review、acceptance）过程中照常进库，验收通过后从工作区删除，git 历史即其归档。收口是单个 `[trivial]` 原子提交：蒸馏折回（need / spec / ADR / standards）+ 清扫删除 + spec 置 done 一次完成，`check.sh validate` 机械拦截"done spec 名下过程档残留"。
 

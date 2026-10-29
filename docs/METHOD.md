@@ -49,7 +49,7 @@
 └── CHANGELOG.md                # 懒创建，仅需要发布流程的项目
 ```
 
-三条总原则：机器物与人文物分家（`.sdlc/` vs `docs/`）；流程产物按价值是否越过终态分档进版本库——知识档（need、spec、design、adr、research、standards）永久留存，过程档（ticket、review、acceptance）过程中照常进库、验收通过后随蒸馏清扫删除、以 git 历史为归档——归置手段是终态删除而非 gitignore，因此不往 `.gitignore` 加任何东西（审计链是门禁的一部分）；可升级不覆盖（setup 幂等重跑，按所有权表决定覆盖/保留/补缺）。`src/` 或其他源码目录——无论仓库实际布局如何——setup 永不触碰。
+三条总原则：机器物与人文物分家（`.sdlc/` vs `docs/`）；流程产物按价值是否越过终态分档归置——知识档（need、spec、design、adr、research、standards）进库永久留存，过程档（ticket、review、acceptance）过程中盘上存在、被 `.gitignore` 排除、不进任何提交，验收通过后随蒸馏清扫删除——审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用；可升级不覆盖（setup 幂等重跑，按所有权表决定覆盖/保留/补缺）。`src/` 或其他源码目录——无论仓库实际布局如何——setup 永不触碰。
 
 **目录懒创建**：setup 只建 `.sdlc/` 与 `docs/`，八个产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
 
@@ -66,7 +66,7 @@
 ### 4.3 明确的"不做"
 
 - 不设 `.scratch/` 草稿区：草稿就是 `status: draft` 的正式产物，杜绝第二真相源。
-- 不 gitignore 任何流程产物：归置靠终态删除（验收后蒸馏清扫），不靠过程忽略——评审报告和工单是审计链本身。
+- 不 gitignore 知识档、不跟踪过程档：归置分档——知识档进库永久留存，过程档被 `.gitignore` 排除、验收后蒸馏清扫删除，审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用。
 - METHOD.md 不放产物模板：模板内嵌在写产物的技能里。
 - 门禁只管有真实代价的事：分支名等约定不进 check.sh。
 
