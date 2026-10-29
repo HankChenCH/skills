@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.19 · 2026-10-29（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.20 · 2026-10-29（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -38,6 +38,8 @@
 > **v1.17 修订记录（spec 0006 round 2 命名修订同步，2026-10-28，票 0013 重入）**：§11.17 分支命名行改为——运行分支 `run/<spec-id>`、票分支 `run/<spec-id>-t<ticket-id>`。起因：round 1 命名 `run/<spec-id>[/<ticket-id>]` 在 git ref 名空间不可实现（`run/0006` 存在时 `run/0006/0012` 被 D/F 冲突拒绝，票 0013 首轮演练临时仓库一手复现），spec 0006 round 2 修订为扁平 `-t` 后缀（实测共存无冲突），本行随票 0013 同步；§11.17 续接行补"frontmatter 以运行/票 worktree 为准，主工作区在运行合回主干前是旧态"（演练实锤）。版本行补正：v1.16 时漏更，本版一并更至 1.17。
 > **v1.18 修订记录（setup-reconstruct 规划定稿，2026-10-29，need 0006 / spec 0008）**：新增 §11.18 setup-reconstruct——存量项目知识逆向扫描技能（§10.1 清单 21 → 22）。定位按需服务同 dev-docs：不进 sdlc next-mode 路由表，用户手动触发，出口报告 + 指路。核心契约：逆向产物五路落点——逆向 need / 逆向 spec 落盘即 status: reconstructed（不进 frontier 与待办语义）、逆向 ADR status: accepted、折叠内容进 AGENTS.md 哨兵块外项目速览 / GLOSSARY 项目术语章 / docs/standards/ + CODING_STANDARDS.md 索引，产物形态与既有模板同构，check.sh 唯一机械改动 = 状态机表 need / spec 两行各加 reconstructed（随票 0001 落地）；证据与置信纪律——每条行为断言句末带统一 文件:行 证据引用、证据格式全文统一可 grep，查无证据的推断三选一（补扫取证 / 显式低置信 + 理由 + 补证路径 / 移入「开放问题」）；每张产物带扫描基线节（commit SHA、扫描日期、已覆盖 / 未覆盖范围，未覆盖区不得读成不存在）；确认前置——扫描全程只读、草案先行，用户显式确认后才落盘；落盘两路——未接入仓库先按 setup-workspace 全流程接入再写产物一次完成，已接入仓库仅写逆向产物、同名不覆盖；重跑 = 增量对齐——按基线 commit → HEAD diff 只重验涉漂移断言，基线缺失回落全量扫描；分轮协议按顶层模块边界切轮、入口优先、每轮收口一次确认，补扫 = 带范围参数的重跑。蒸馏永不触碰 reconstructed 产物（正向 / 逆向双轨互不污染）。
 > **v1.19 修订记录（setup-migrate 规划定稿，2026-10-29，need 0007 / spec 0010）**：新增 §11.19 setup-migrate——存量项目套件迁移技能（§10.1 清单 22 → 23）。定位按需服务同 setup-reconstruct：不进 sdlc next-mode 路由表，用户手动触发，出口 = 迁移报告 + 对账清单 + 指路。核心契约：识别内置 matt / superpower 两套点名套件特征清单，不做通用识别器（matt 特征 2026-10-29 一手核验：§10.3 生命周期技能十四项、tracker 五枚 triage 标签、本地 tracker 目录 .scratch/、GLOSSARY-MAP.md、docs/agents/；superpower 特征以 dev-research 调研报告为准），非点名套件痕迹标"未处理"不擅自处置；翻译映射逐件分态——未完成外来工作进正向流程现态（spec 落 draft / ticket 落 ready 照常推进），已完成历史产物落盘即 reconstructed（复用 need 0006 状态机扩展，零新增状态），来源区分走产物正文「来源」行 + 对账清单、不走状态机，wontfix 显式弃置；tracker 开着的-issue 翻译后关闭并注明已迁移（平台 CLI 同款调用面，不扩 trackers 适配器，关闭失败留痕不阻断）；生命周期类外来技能移除或归档、写作类保留（判据沿 §10.3；用户全局安装须经用户确认作用域，不擅动）；门禁接入两态同 setup-reconstruct；对账清单落 docs/migrations/（§5.2 目录树与所有权表随之补行，轻产物待遇同 docs/retros/，frontmatter 仅 id/created，一次迁移一张落盘即终态）；superpower 实现票开工前须有 dev-research 调研报告；出口指路 setup-reconstruct 可选串联。check.sh 与 trackers 适配器零改动；GLOSSARY 登记「翻译映射」词条，README 技能表 setup-\* 区加行。
+>
+> **v1.20 修订记录（成员提交门禁，2026-10-29，spec 0009 / ticket 0007）**：§5.4 commit-msg 轻门禁增 Merge/Revert 信息头机械放行——合并/回退提交是 git 操作产物而非署名工作，不应要求工单引用；工作区仓库自身与成员转发（setup-workspace 成员 hook，转发细则在 generation.md「多仓工作区模式」）共用此子命令，一并受益。
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
 ## 1. 背景与目标
@@ -183,7 +185,7 @@
 | `ticket NNNN` | 入口校验：工单 ready（或 in-progress 重入续接）、阻塞已清、spec approved | dev-implement 入口 |
 | `all` | 全量 lint / typecheck / test（按 config.sh，经 `RUN_PREFIX` 包裹执行以适配 docker / 版本管理器）；仓库没定义任何检查命令时输出响亮警告并视为发现（exit 0），不静默跳过 | dev-implement 出口、dev-ship、dev-accept |
 | `validate <file>` | 模板完整性校验：必填节齐全、frontmatter 合法、FR 编号规范、验收场景可追溯（无孤儿 FR）、工单依赖无环 | 各产物技能的出口门禁 |
-| `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单状态合法（in-progress/implemented），或带 `[trivial]`；挂载于 git commit-msg hook | git hook |
+| `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单状态合法（in-progress/implemented），或带 `[trivial]`；Merge/Revert 信息头机械放行（合并/回退无工单可挂）；挂载于 git commit-msg hook | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖（review 的 `tickets: []` 声明覆盖面） | git hook |
 | `publish <file>` | 按 config.sh 的 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh` 发布/镜像产物到对应平台；适配器未安装（缺对应文件）时明确警告并跳过（exit 0）；适配器自身的投影失败（CLI 缺失/未认证/API 报错/坐标配置缺失）同样警告跳过（exit 0），均不阻断技能出口链——产物在盘上已是真相源 | 各技能落盘后 |
 

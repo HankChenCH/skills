@@ -106,7 +106,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | `ticket NNNN` | 入口校验：工单 ready（或 in-progress 重入）、阻塞已清、spec approved | dev-implement 入口 |
 | `all` | 全量 lint / typecheck / test（按 config.sh，经 RUN_PREFIX 包裹）；未定义任何检查命令时响亮警告并视为发现（不静默跳过） | dev-implement 出口、dev-ship、dev-accept |
 | `validate <file>` | 模板完整性：必填节、frontmatter、id 与文件名、FR 追溯（孤儿报错）、依赖无环、done spec 名下过程档残留扫描（未清扫即报错并逐个列出文件） | 各产物技能的出口门禁 |
-| `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单 in-progress/implemented，或带 `[trivial]`（挂 git commit-msg hook） | git hook |
+| `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单 in-progress/implemented，或带 `[trivial]`；Merge/Revert 信息头机械放行（合并/回退无工单可挂）（挂 git commit-msg hook） | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖 | git hook |
 | `publish <file>` | 按 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh` 发布产物；适配器未安装或投影失败（CLI 缺失/未认证/API 报错）时明确警告并跳过，不阻断 | 各技能落盘后 |
 
