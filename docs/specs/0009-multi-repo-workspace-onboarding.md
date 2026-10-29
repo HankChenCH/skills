@@ -1,10 +1,11 @@
 ---
 id: 0009
-status: approved
+status: done
 need: 0008
 round: 1
 created: 2026-10-29
 approved: 2026-10-29
+done: 2026-10-29
 ---
 # setup-workspace 多仓工作区接入（根目录非仓库 + 多个子仓库）
 
@@ -119,7 +120,9 @@ check.sh 的 git 仓库定位会落到成员仓库、校验对象错位。校验
   正常输出。
 - [FR-9 | 工单级] Given 工单 frontmatter `repos: [frontend, backend]` 且两值均在清单，
   When validate 该工单，Then 通过；When repos 含清单外值，Then validate 报错点名非法值；
-  When repos 缺省，Then 不触发该校验。
+  When repos 缺省，Then 不触发该校验。（实现实测边界，折回自验收 0001：repos 空列表
+  同缺省跳过；多行书写按「repos 须单行书写」拒绝，先例 blocked-by；成员清单文件缺失
+  时逐值报「不在成员清单（.sdlc/members.list）」不静默。）
 - [FR-10 | 集成级] Given 新成员经重跑入册完成，When 检查该成员，Then 其门禁与哨兵和
   初始成员完全一致、清单已含该成员、其提交受门禁校验。
 - [FR-9 | 集成级] Given 跨仓库需求工单点名 frontend 与 backend，When 两成员分别提交
