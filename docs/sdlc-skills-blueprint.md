@@ -7,7 +7,7 @@
 
 # SDLC 技能集设计蓝图
 
-> 版本 1.17 · 2026-10-28（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
+> 版本 1.20 · 2026-10-29（初版 1.0 · 2026-10-25）· 本文档是这套技能集的唯一设计真相源。
 >
 > **v1.1 修订记录（setup-workspace 实现前定稿）**：§5.2 新增 docs/standards/，升级 GLOSSARY.md 与 CODING_STANDARDS.md 语义；§5.3 哨兵块文本更新（去 src/ 假定，增 GLOSSARY 与标准索引引用）；§5.4 ticket 允许 in-progress 重入、all 增加零检查命令行为与 RUN_PREFIX 包裹、publish 适配器缺失行为；§5.5 config.sh 新增 BASE_REF / RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS；§6.1 增列表字段单行注记；§11.1 setup-workspace 规格全面细化（智能体识别、单仓/monorepo、环境探测、标准导入、按需加载）；§13.1 附件分 assets/ 与 references/ 两类；§14 starters 定稿落点与新增待定项。实现期间补记：轻门禁由 pre-commit 修正为 **commit-msg** hook（git 时点事实：pre-commit 阶段消息未写入，机械校验无从执行）。
 >
@@ -36,6 +36,9 @@
 > **v1.15 修订记录（dev-docs 实现，2026-10-28）**：新增 §11.16 dev-docs——面向人的文档（README/API/用户文档）维护（§10.1 批 3 末项，批 3 至此全清）。定位仿 dev-research / dev-release：脊柱上有位置（§4.1 反馈沉淀 fix / retro / docs）但**不进自动串联链**——sdlc next-mode 路由表不加行，文档维护是按需服务不是必经门禁，用户手动触发。核心纪律 = **先核验后落笔**：写进文档的每条行为断言（命令/参数/输出/路径/限制）按三档核验留档——实跑 / 读实现 / 测试为证，三档都够不着如实标注"未核验"，禁止"应该如此"式措辞；文档与实现冲突以实际行为为准是默认建议，但**改哪边必须问人**（用户认定代码错 → 转 dev-fix 开票，修完再对齐——文档不将就错误行为）。维护范围限定"面向人的文档"（GLOSSARY 新词条）：流程产物归各自技能、METHOD.md 归 setup、CHANGELOG 归 dev-release、源码内注释与 docstring 属源码走工单——四条边界全是拒绝路径。§7.2 引用矩阵 dev-docs → ref-writing 行 v1.9 已有，零改动；§8 决策点全表补 dev-docs 行；不开新产物目录、无 frontmatter、不进 validate（README 等人文物非八类产物，与 CHANGELOG 同理），check.sh 零改动。
 > **v1.16 修订记录（dev-execute 规划定稿，2026-10-28，need 0004 / spec 0006）**：新增 §11.17 dev-execute——V 模型整 spec 编排运行技能（§10.1 清单 20 → 21）。定位：输入点名 approved spec，构建运行依赖顺序图（blocked-by 拓扑分层，会话内视图不落盘、check.sh 零改动），在运行分支 + 运行 worktree 中按依赖序推进整 spec：同层无依赖票每票独立 worktree 经子代理并行实现（dev-implement 纪律原文复用零改动，并行度默认上限 4、参数可覆盖）→ 逐票 dev-review 编排模式评审（显式工单范围 + diff 基线 = 运行分支，出口止于 approved，单票路径零改动，§11.7 随之补契约）→ approved 票机械合回（不设人工门）+ 每次合回后预演（`check.sh all`，V 模型右臂上行）→ 全绿一次 PR（dev-ship 前半三节模板）+ pre-push + 合并确认（单向门）→ 全部票 done → 清理 worktree → 指路手动 /dev-accept 不自动串联。人交互恰两次（开工确认 + 合并确认）；异常流（设计级阻断 / spec 缺口 / 预演失败 / 合回冲突）一律停下问人带连坐阻塞面与指路。多会话可各跑各的 spec（worktree 隔离互不阻塞）；sdlc 默认报告增"运行中 worktree"段、next-mode 路由表加行（多票同 approved spec → 问询编排默认 / 单票，§11.2 随之同步）。工票 0012–0015。
 > **v1.17 修订记录（spec 0006 round 2 命名修订同步，2026-10-28，票 0013 重入）**：§11.17 分支命名行改为——运行分支 `run/<spec-id>`、票分支 `run/<spec-id>-t<ticket-id>`。起因：round 1 命名 `run/<spec-id>[/<ticket-id>]` 在 git ref 名空间不可实现（`run/0006` 存在时 `run/0006/0012` 被 D/F 冲突拒绝，票 0013 首轮演练临时仓库一手复现），spec 0006 round 2 修订为扁平 `-t` 后缀（实测共存无冲突），本行随票 0013 同步；§11.17 续接行补"frontmatter 以运行/票 worktree 为准，主工作区在运行合回主干前是旧态"（演练实锤）。版本行补正：v1.16 时漏更，本版一并更至 1.17。
+> **v1.18 修订记录（setup-reconstruct 规划定稿，2026-10-29，need 0006 / spec 0008）**：新增 §11.18 setup-reconstruct——存量项目知识逆向扫描技能（§10.1 清单 21 → 22）。定位按需服务同 dev-docs：不进 sdlc next-mode 路由表，用户手动触发，出口报告 + 指路。核心契约：逆向产物五路落点——逆向 need / 逆向 spec 落盘即 status: reconstructed（不进 frontier 与待办语义）、逆向 ADR status: accepted、折叠内容进 AGENTS.md 哨兵块外项目速览 / GLOSSARY 项目术语章 / docs/standards/ + CODING_STANDARDS.md 索引，产物形态与既有模板同构，check.sh 唯一机械改动 = 状态机表 need / spec 两行各加 reconstructed（随票 0001 落地）；证据与置信纪律——每条行为断言句末带统一 文件:行 证据引用、证据格式全文统一可 grep，查无证据的推断三选一（补扫取证 / 显式低置信 + 理由 + 补证路径 / 移入「开放问题」）；每张产物带扫描基线节（commit SHA、扫描日期、已覆盖 / 未覆盖范围，未覆盖区不得读成不存在）；确认前置——扫描全程只读、草案先行，用户显式确认后才落盘；落盘两路——未接入仓库先按 setup-workspace 全流程接入再写产物一次完成，已接入仓库仅写逆向产物、同名不覆盖；重跑 = 增量对齐——按基线 commit → HEAD diff 只重验涉漂移断言，基线缺失回落全量扫描；分轮协议按顶层模块边界切轮、入口优先、每轮收口一次确认，补扫 = 带范围参数的重跑。蒸馏永不触碰 reconstructed 产物（正向 / 逆向双轨互不污染）。
+> **v1.19 修订记录（setup-migrate 规划定稿，2026-10-29，need 0007 / spec 0010）**：新增 §11.19 setup-migrate——存量项目套件迁移技能（§10.1 清单 22 → 23）。定位按需服务同 setup-reconstruct：不进 sdlc next-mode 路由表，用户手动触发，出口 = 迁移报告 + 对账清单 + 指路。核心契约：识别内置 matt / superpower 两套点名套件特征清单，不做通用识别器（matt 特征 2026-10-29 一手核验：§10.3 生命周期技能十四项、tracker 五枚 triage 标签、本地 tracker 目录 .scratch/、GLOSSARY-MAP.md、docs/agents/；superpower 特征以 dev-research 调研报告为准），非点名套件痕迹标"未处理"不擅自处置；翻译映射逐件分态——未完成外来工作进正向流程现态（spec 落 draft / ticket 落 ready 照常推进），已完成历史产物落盘即 reconstructed（复用 need 0006 状态机扩展，零新增状态），来源区分走产物正文「来源」行 + 对账清单、不走状态机，wontfix 显式弃置；tracker 开着的-issue 翻译后关闭并注明已迁移（平台 CLI 同款调用面，不扩 trackers 适配器，关闭失败留痕不阻断）；生命周期类外来技能移除或归档、写作类保留（判据沿 §10.3；用户全局安装须经用户确认作用域，不擅动）；门禁接入两态同 setup-reconstruct；对账清单落 docs/migrations/（§5.2 目录树与所有权表随之补行，轻产物待遇同 docs/retros/，frontmatter 仅 id/created，一次迁移一张落盘即终态）；superpower 实现票开工前须有 dev-research 调研报告；出口指路 setup-reconstruct 可选串联。check.sh 与 trackers 适配器零改动；GLOSSARY 登记「翻译映射」词条，README 技能表 setup-\* 区加行。
+> **v1.20 修订记录（成员提交门禁，2026-10-29，spec 0009 / ticket 0007）**：§5.4 commit-msg 轻门禁增 Merge/Revert 信息头机械放行——合并/回退提交是 git 操作产物而非署名工作，不应要求工单引用；工作区仓库自身与成员转发（setup-workspace 成员 hook，转发细则在 generation.md「多仓工作区模式」）共用此子命令，一并受益。
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
 ## 1. 背景与目标
@@ -125,6 +128,7 @@
 │   ├── reviews/                # 评审报告     NNNN-slug.md
 │   ├── acceptance/             # 验收报告     NNNN-slug.md
 │   ├── retros/                 # 复盘报告     NNNN-slug.md（轻产物，不进 check.sh 门禁）
+│   ├── migrations/             # 迁移对账清单 NNNN-slug.md（轻产物，不进 check.sh 门禁）
 │   ├── standards/              # 用户自有/团队编码标准（setup 增量导入，可多份）
 │   └── adr/                    # 架构决策记录 NNNN-slug.md
 ├── AGENTS.md                   # 追加 sdlc 哨兵块
@@ -137,7 +141,7 @@
 
 **目录懒创建**：setup 只建 `.sdlc/` 和 `docs/`，其余产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
 
-`docs/retros/` 是唯一的非门禁产物目录：复盘报告由 dev-retro 落盘，`validate` / `phase` / `publish` 不受理（§11.10），符合 §5.7"门禁只管有真实代价的事"；审计链价值靠版本库留痕，不靠门禁。
+`docs/retros/` 与 `docs/migrations/` 是非门禁产物目录：复盘报告由 dev-retro 落盘（§11.10），迁移对账清单由 setup-migrate 落盘（§11.19），`validate` / `phase` / `publish` 均不受理，符合 §5.7"门禁只管有真实代价的事"；审计链价值靠版本库留痕，不靠门禁。
 
 | 路径 | 首次创建 | 日常写入者 | setup-workspace 重跑时 |
 |---|---|---|---|
@@ -151,6 +155,7 @@
 | CODING_STANDARDS.md | setup（索引 + 兜底基线） | 用户与 dev-review | 已有内容不动 |
 | docs/standards/* | setup 导入（§11.1 决策 3：标准来源） | 用户 | 同名文件不覆盖，只增不删 |
 | CHANGELOG.md | 首个产物时 | 对应技能与用户 | 只补缺失骨架 |
+| `docs/migrations/*` | 首个产物时 | setup-migrate | 不触碰已有文件（轻产物，不进 check.sh 门禁） |
 | `docs/` 产物目录 | 首个产物时 | 对应技能 | 不触碰已有文件 |
 | `.git/hooks/*` | setup | — | 幂等重装 |
 | `src/` 及一切其他文件 | — | — | **永不触碰** |
@@ -179,7 +184,7 @@
 | `ticket NNNN` | 入口校验：工单 ready（或 in-progress 重入续接）、阻塞已清、spec approved | dev-implement 入口 |
 | `all` | 全量 lint / typecheck / test（按 config.sh，经 `RUN_PREFIX` 包裹执行以适配 docker / 版本管理器）；仓库没定义任何检查命令时输出响亮警告并视为发现（exit 0），不静默跳过 | dev-implement 出口、dev-ship、dev-accept |
 | `validate <file>` | 模板完整性校验：必填节齐全、frontmatter 合法、FR 编号规范、验收场景可追溯（无孤儿 FR）、工单依赖无环 | 各产物技能的出口门禁 |
-| `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单状态合法（in-progress/implemented），或带 `[trivial]`；挂载于 git commit-msg hook | git hook |
+| `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单状态合法（in-progress/implemented），或带 `[trivial]`；Merge/Revert 信息头机械放行（合并/回退无工单可挂）；挂载于 git commit-msg hook | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖（review 的 `tickets: []` 声明覆盖面） | git hook |
 | `publish <file>` | 按 config.sh 的 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh` 发布/镜像产物到对应平台；适配器未安装（缺对应文件）时明确警告并跳过（exit 0）；适配器自身的投影失败（CLI 缺失/未认证/API 报错/坐标配置缺失）同样警告跳过（exit 0），均不阻断技能出口链——产物在盘上已是真相源 | 各技能落盘后 |
 
@@ -400,11 +405,13 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 
 ## 10. 技能总清单与建设计划
 
-### 10.1 清单（21 个 = 16 流程 + 5 参考）
+### 10.1 清单（23 个 = 18 流程 + 5 参考）
 
 | 技能 | 层 | 一句话职责 |
 |---|---|---|
 | setup-workspace | 流程 | 交互式初始化/升级工作区（幂等） |
+| setup-reconstruct | 流程 | 存量项目知识逆向扫描：分轮读码产出带证据与扫描基线的套件形态沉淀物，确认后落盘，重跑即增量对齐（按需服务） |
+| setup-migrate | 流程 | 存量项目套件迁移：识别点名套件痕迹，外来产物逐件翻译映射与对账清单收口，生命周期技能处置，两态接入本套件门禁（按需服务） |
 | sdlc | 流程 | 总控：报当前阶段、下一步、被哪个门禁挡住；`next` 模式自动推进到决策点 |
 | dev-clarify | 流程 | 想法 → need（内置 §9 方法论选择器） |
 | dev-research | 流程 | 技术调研 → 带来源引用的报告（后台代理执行） |
@@ -616,6 +623,36 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 - **异常流（一律停下问人，报告连坐阻塞面与指路）**：评审设计级阻断（机械问题仍自动修自动重审）；spec 缺口 → 指路 /dev-spec（门禁回路）；预演失败 → 指路 /dev-fix 开 fix 票、票并入图重算后续跑；合回冲突 → 问人怎么解，可指路 expand–contract 拆票回 /dev-plan。不自动重试、不自动解冲突。
 - **决策点**：开工确认（依赖序图展示后）；合并确认（单向门）；异常流处置。
 - **边界**：编排不拆票（拆分归 dev-plan）；一次运行只处理点名 spec 名下的票，fix 票插入也只重算本 spec 的图；术语"运行 / 运行依赖顺序图"见 GLOSSARY 项目术语章。
+
+### 11.18 setup-reconstruct
+
+- **触发**：用户手动（"把这个存量项目扫一遍接入""逆向出这个仓库的业务规则和架构""代码大改了，重扫对齐一下"）。归 setup-\* 家族，按需服务定位同 dev-docs / dev-research / dev-release：**不进自动串联链**——sdlc next-mode 路由表不加行，没有任何技能自动调它，扫描与重扫一律用户手动触发。
+- **定位**：存量项目知识逆向扫描——对存量 git 仓库分轮只读读码，逆向推断并产出本套件知识档形态的沉淀物（术语「逆向产物」见 GLOSSARY 项目术语章），让后续会话只读沉淀物即可接续开发，不重复支付"理解这个项目"的全量扫描代价。技能由主文档与按需加载的参考文档构成（两级结构先例 ref-testing / dev-clarify）：主文档管入口门禁、流程骨架与禁止事项；参考文档承载逆向扫描协议（分轮切分、证据采集与置信标注）、产物模板与证据格式、增量对齐协议。可在任意 git 仓库运行，**不要求 check.sh 已存在**——入口前置只查 git 仓库与技能自身文件完整。
+- **逆向产物五路落点（形态与既有模板同构，靠形态兼容换 check.sh 零扩展）**：① 逆向 need 落目标仓库 docs/needs/，编号接目录内最大号 +1（空目录从 0001 起），need 模板七节齐备，「开放问题」节收扫描推断不了、须仓库主人补答的问题——落盘即 status: **reconstructed**；② 逆向 spec 落 docs/specs/，spec 模板八节齐备，need 字段指向对应逆向 need（孤儿 FR 校验照常生效，迫使行为断言覆盖全部逆向业务规则），验收场景 [FR-N] 标签语义复用为"单模块内可对照证据核验 / 跨模块协作行为"——落盘即 status: **reconstructed**；③ 逆向 ADR 落 docs/adr/，status: accepted（描述的是当前在生效的决策，adr 状态机 accepted / superseded 零扩展）；④ 折叠内容三载体：AGENTS.md 哨兵块外追加项目速览段（架构一句话、入口位置、各沉淀物索引），GLOSSARY 项目术语章按既有格式追加领域术语，docs/standards/ 落逆向编码标准文件并在 CODING_STANDARDS.md 索引登记；⑤ 每张逆向产物带「扫描基线」节（术语「扫描基线」见 GLOSSARY）：commit SHA、扫描日期、已覆盖范围、未覆盖范围，附一句声明"未覆盖区不得读成不存在"。已接入仓库的同名标准文件与同名术语**不覆盖**，报告冲突交用户处置（setup-workspace 同名不覆盖先例）。
+- **证据与置信纪律**：每条行为断言句末带统一格式的证据引用（相对路径:行号），多处证据并列可写；**证据格式全文统一可 grep**，为增量对齐的漂移定位提供机械抓手。查无证据的推断不得写成断言——三选一：补扫取证；显式标低置信 + 一句理由 + 补证路径；移入「开放问题」。
+- **确认前置（不确认不落盘）**：扫描全程只读，产物先以草案呈报——逐张列产物要点、关键断言、证据抽样、低置信清单、未覆盖区——**用户显式确认后才写入**，沉默不算确认。
+- **落盘两路**：无 check.sh 的仓库先按 setup-workspace 全流程执行接入（含其决策点），随后写入逆向产物，一次会话从白纸到可用；已接入仓库仅写入逆向产物，不重跑接入。技能本身不做 git 提交，落盘后报告提示仓库主人自行提交（纯文档改动适用 [trivial] 豁免，同 setup-workspace 家族先例）。
+- **增量对齐（重跑语义）**：先读逆向产物的扫描基线 commit，取基线 commit → HEAD 的变更文件集；按证据引用把存量断言分为涉漂移 / 未涉漂移两组，**只重验涉漂移断言**（证据失效则重取证，或与用户确认后标过时），新增文件产出增量断言草案；全部更新走同一确认门后合并写入，不推倒未漂移部分；完成后逐张更新扫描基线为新 commit。基线缺失（如手写产物）回落全量扫描。
+- **分轮协议**：切分依据 = 顶层模块边界（monorepo 按子项目，单仓按目录子树或分层），入口优先——构建入口、路由注册、schema 定义先扫，被引用多的模块次之；每轮以"可独立确认的一组沉淀物"为界收口一次确认；轮末更新基线的覆盖与未覆盖清单；用户可对未覆盖区发起补扫，补扫 = 带范围参数的重跑，在增量对齐协议下只动该范围。
+- **check.sh 状态机表扩展（唯一机械改动）**：状态机表 need 行与 spec 行各追加 `reconstructed` 一个合法值——reconstructed 不进 frontier 与待办语义，phase 原样显示，done 残留门禁不触发，孤儿 FR 校验对逆向 spec 照常生效；validate 只查必填节不排新增节，扫描基线节零改动兼容。改动落在活本，与 setup-workspace 生成资产整文件复制同步。
+- **边界（正向 / 逆向双轨互不污染）**：正向开发在已逆向仓库上照常开新 need/spec，dev-accept 蒸馏只折回正向产物，**蒸馏永不触碰 reconstructed 产物**；逆向产物时效由扫描基线显性化（对应哪个 commit、多旧），不做自动漂移检测与定时重扫。
+- **出口（指路，不自动串联）**：报告三件——落盘产物清单、未覆盖区清单、提交提示；后续：知识过时再手动重扫（增量对齐），接入问题回 setup-workspace，正向开发走 /dev-clarify。
+- **禁止事项**：未获用户显式确认即落盘（含任何"顺手写入"）；把查无证据的推断写成断言；扫描阶段改动目标仓库任何文件；覆盖既有同名标准文件与同名术语；替代仓库主人做 git 提交；自动触发重扫或定时漂移检测；进 sdlc next-mode 路由表。
+
+### 11.19 setup-migrate
+
+- **触发**：用户手动（"把这个 matt 项目的仓库迁移接入""外来技能和 issue 一起清掉，换本套件流程"）。归 setup-\* 家族，按需服务定位同 dev-docs / setup-reconstruct：**不进自动串联链**——sdlc next-mode 路由表不加行，没有任何技能自动调它，迁移一律用户手动触发。出口形态 = 迁移报告 + 对账清单 + 指路。
+- **定位**：存量项目套件迁移——对已使用 matt / superpower 等外来技能套件的存量仓库做一次迁移：识别安装痕迹 → 外来产物逐件翻译映射 → tracker 开着的-issue 关闭 → 生命周期技能处置 → 本套件门禁接入 → 对账清单收口，之后所有会话只按本套件规则工作。技能由主文档与按需加载的参考文档构成（两级结构同 setup-reconstruct）：主文档管入口门禁、流程骨架与禁止事项；参考文档承载套件识别特征清单、翻译映射表、处置协议（issue 关闭 / 技能归档 / 两态接入）与对账清单模板。入口前置：git 仓库 + 技能自身文件完整，**不要求已接入本套件**（两态在落盘阶段分流）；识别全程只读。
+- **套件识别（内置点名特征清单，不做通用识别器）**：matt 特征（2026-10-29 一手核验）——技能目录中的生命周期类技能（§10.3 清单十四项）、tracker 上带五枚 triage 标签（needs-triage / needs-info / ready-for-agent / ready-for-human / wontfix）的 spec / ticket issue、本地 markdown tracker 目录（.scratch/）、GLOSSARY-MAP.md、docs/agents/；superpower 特征以调研报告为准（见调研前置）。识别出非点名套件痕迹 → 对账清单标"未处理"并提示用户，不擅自处置。
+- **翻译映射（术语「翻译映射」见 GLOSSARY 项目术语章；逐件翻译，不以原样归档替代）**：产物对产物——spec issue → 本套件 spec（八节齐备）；ticket issue → 未闭环落正向 ticket（ready），已闭环不产 ticket 产物（过程档不留僵尸），耐久内容折进对应沉淀 spec / ADR；questionnaire issue → need（未闭环落正向 draft，已闭环落沉淀形态，同分态规则）；ADR 文件 → 本套件 ADR，status: accepted（判据同逆向 ADR：描述当前生效的决策）；GLOSSARY 术语 → 项目术语章（同名术语不覆盖，冲突报告交用户——setup-workspace 先例）；GLOSSARY-MAP.md → 显式弃置（其功能被本套件 GLOSSARY 取代），对账清单记理由；docs/agents/ 配置 → 随生命周期技能处置，对账清单记行。分态规则：未完成的外来工作（开着的 issue，非 wontfix）→ 正向流程现态——spec 落 draft 交用户走 dev-spec 审定，ticket 落 ready 且 spec 字段指向翻译出的 spec，照常走本套件流程；已完成的历史产物（已闭环 issue）→ 沉淀形态，落盘即 status: reconstructed（复用 need 0006 状态机扩展，零新增状态），或折进既有沉淀产物；wontfix → 对账清单"显式弃置"，理由记"外来套件已拒"。每张翻译产物正文首部带「来源」行（外来产物位置 + 迁移日期）承载来源区分（迁移 vs 逆向的区分走正文来源行 + 对账清单，不走状态机）；翻译产物不带扫描基线节（非扫描所得）；外来特有语义（如 ready-for-human）在产物正文显式记录，不新增状态；翻译沉淀 spec 的 need 字段可空（外来 spec issue 通常自含行为描述，不为凑字段伪造 need）。
+- **tracker issue 处置**：开着的-issue 外来 issue 全部翻译后关闭，关闭评论注明"已迁移"并指向对账清单；经平台 CLI（gh / glab 等，与 publish 适配器同款调用面），不扩 trackers 适配器（只发布语义不变）；本地 tracker（.scratch/）文件无外部副作用：标记关闭并归位。关闭失败（凭据 / 权限）→ 对账清单留失败明细，不阻断本地翻译与门禁接入，事后人工补办。
+- **生命周期技能处置**：判据沿 §10.3——生命周期类移除或归档（处置 = 移出技能发现路径；改 description 之类的软禁用不采用，不满足"不再被自动触发"），写作类保留。作用域：装在仓库专属位置 → 直接处置；装在用户全局技能目录（其他项目可能仍用）→ 默认归档而非删除，且**处置前必须经用户确认作用域**，不擅动全局安装。superpower 生命周期技能清单以调研报告为准。每件处置在对账清单记行。
+- **门禁接入（两态，同 setup-reconstruct）**：未接入仓库先按 setup-workspace 全流程执行接入（含其决策点），随后落迁移产物，一次会话完成；已接入仓库仅补迁移产物与对账清单，接入资产逐字不变。
+- **对账清单（快照语义）**：落 docs/migrations/NNNN-slug.md，轻产物不进 check.sh 门禁（retro 先例同构），frontmatter 仅 `id` / `created`——一次迁移一张，落盘即终态，重跑迁移生成新编号清单；每行：来源（本地路径 / issue 编号 + 平台）→ 归宿（新产物路径 / 归档位置 / 显式弃置及理由）→ 处置结果（已翻译 / 已关闭 / 失败待补 / 未处理）；失败项人工补办后在原清单对应行补记。
+- **调研前置**：superpower 实现票开工前必须存在带来源引用与检索日期的调研报告（dev-research 纪律，落 docs/research/）；调研不可行（够不着一手来源）→ superpower 支持范围回用户决策（缩小为报告所得特征，或延期下一轮），决策记录进对账清单备注。
+- **出口（指路，不自动串联）**：报告迁移结果与对账清单位置；出口指路 setup-reconstruct 可选串联知识逆向——迁移只保证外来产物归宿，存量代码的知识逆向是另一件事，用户自选触发，不自动串联（dev-docs / dev-research 先例）。
+- **check.sh 与 trackers 适配器零改动；蓝图与清单同步即本节落点**：§10.1 清单 22 → 23、§5.2 目录树与所有权表补 docs/migrations/（轻产物待遇同 docs/retros/）、版本修订记录一条（v1.19）、README 技能表 setup-\* 区加一行、GLOSSARY 项目术语章登记「翻译映射」词条。
+- **禁止事项**：识别阶段改动目标仓库任何文件；擅自处置非点名套件痕迹；以原样归档替代翻译；为迁移新增状态机状态或产物类型（翻译产物用既有模板同构 + 正文来源行）；未经用户确认处置全局安装的技能；进 sdlc next-mode 路由表。
 
 ## 12. dev-implement 范文（文风与浓度基准，全文照此实现）
 

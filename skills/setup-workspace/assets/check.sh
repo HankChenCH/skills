@@ -106,8 +106,8 @@ type_of() {
 
 allowed_list() {
   case "$1" in
-    need) echo "draft confirmed fulfilled" ;;
-    spec) echo "draft approved done" ;;
+    need) echo "draft confirmed fulfilled reconstructed" ;;
+    spec) echo "draft approved done reconstructed" ;;
     design) echo "draft approved" ;;
     ticket) echo "ready in-progress implemented done" ;;
     review) echo "draft approved" ;;
@@ -386,6 +386,15 @@ cmd_commit_msg() {
     info "✓ [trivial] 豁免提交（留痕于 commit message，dev-retro 审计）"
     return 0
   fi
+  # Merge/Revert 信息头是 git 操作产物而非署名工作，机械放行（要求带空格/引号的完整头形态）
+  local first_line
+  first_line="$(head -n 1 "$msg")"
+  case "$first_line" in
+    Merge\ *|'Revert "'*)
+      info "✓ Merge/Revert 信息头机械放行（合并/回退无需工单引用）"
+      return 0
+      ;;
+  esac
   local refs rc=0 d f st
   refs="$(commit_refs "$msg")"
   if [ -z "$refs" ]; then
@@ -502,7 +511,7 @@ cmd_validate() {
   type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 八个产物目录内）：$file"
   local ERRORS=0
   err() { echo "  ✗ $*"; ERRORS=$((ERRORS+1)); }
-  local base id status pad spec_id need_id need_file frs covered missing round dep t any residue
+  local base id status pad spec_id need_id need_file frs covered missing round dep t any residue r
   base="$(basename "$file")"
 
   # --- 通用：frontmatter、id、文件名、状态 ---
@@ -566,6 +575,7 @@ cmd_validate() {
       has_sec "$file" "Progress" || err "缺必填节：## Progress"
       grep -qE '^[[:space:]]*- \[( |x)\]' "$file" || err "缺验收标准条目（**验收标准：** 下至少一条 - [ ]）"
       fm_bare_key "$file" "blocked-by" && err "blocked-by 须单行书写：[] 或 [0006, 0008]"
+      fm_bare_key "$file" "repos" && err "repos 须单行书写：[frontend, backend]"
       spec_id="$(fm_get "$file" spec)"
       if [ -n "$spec_id" ]; then
         artifact_file spec "$spec_id" >/dev/null 2>&1 || err "关联 spec $spec_id 不存在"
@@ -574,6 +584,11 @@ cmd_validate() {
       fi
       for dep in $(fm_list "$file" blocked-by); do
         artifact_file ticket "$dep" >/dev/null 2>&1 || err "blocked-by 引用的工单 $dep 不存在"
+      done
+      # FR-9：repos 非空时逐值校验其在成员清单内，缺省不触发该校验
+      for r in $(fm_list "$file" repos); do
+        grep -qxF "$r" "$SDL/members.list" 2>/dev/null \
+          || err "repos 值 $r 不在成员清单（.sdlc/members.list）"
       done
       ticket_cycles >/dev/null 2>&1 || err "工单依赖存在环：$(ticket_cycles | sed 's/^CYCLE //')"
       ;;
@@ -619,7 +634,7 @@ usage() {
   ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
-  commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]
+  commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行
   pre-push              重门禁：分支上 implemented 工单须被 approved 评审覆盖
   publish <file>        按 TRACKER 发布产物（local=确认在盘）
   help                  本说明

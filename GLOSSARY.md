@@ -47,7 +47,7 @@
 - **[trivial]**：提交豁免标记，限 typo 与纯文档改动；每次豁免留痕于 commit message，dev-retro 审计。
 - **哨兵块**：AGENTS.md 中 `<!-- sdlc:begin/end -->` 之间的内容，由 setup-workspace 管理，勿手改。
 - **盘上主本 / tracker 投影**：docs/ 是唯一真相源，tracker（GitHub/GitLab/Codeup）只单向接收发布，不回读。
-- **门禁分级**：commit-msg 查轻量项（[#NNNN] 状态合法或 [trivial]）；pre-push 查重项（implemented 工单须有 approved 评审覆盖）。
+- **门禁分级**：commit-msg 查轻量项（[#NNNN] 状态合法或 [trivial]；Merge/Revert 信息头机械豁免）；pre-push 查重项（implemented 工单须有 approved 评审覆盖）。
 - **L4 hook**：平台层拦截（`.sdlc/hooks/l4-guard.sh`，经 ZCode PreToolUse 触发）：拦含 `--no-verify` 的命令与无在办（in-progress）工单的 CODE_DIRS 源码编辑；失效安全为放行（fail-open），自身故障不锁死工作。
 - **红绿循环**：每个行为先写一个失败的测试（红），再写刚好让它通过的实现（绿）的实现节奏；标准细则见 ref-testing 技能。
 - **分诊定级**：dev-fix 对缺陷的定级（阻断：主流程不可用/数据错误或丢失/安全漏洞；重要：功能受损有绕行、影响面大；一般：影响面小；轻微：文案样式纯文档）与处置决策（现在修/排期/不修），落进 fix 票正文。
@@ -62,8 +62,15 @@
 - **投影** —— tracker 适配器把 docs/ 产物单向镜像到平台对象（GitHub/GitLab issue、Codeup 工作项+评论）的行为；投影失败一律警告跳过不阻断，盘上产物永远是真相源（首次出现：need 0002 / spec 0004）。
 - **映射文件** —— 适配器同目录的 `<tracker>.map` 三字段表（盘上相对路径、平台对象编号、对象 URL），支撑同一产物重复 publish 时更新而非新建；丢失映射的后果仅是可能新建重复对象（首次出现：spec 0004 实现决策）。
 - **运行（run）** —— dev-execute 对一张 approved spec 的一次完整编排执行：独立运行分支 + 运行 worktree 内按运行依赖顺序图推进名下全部工票，止于一次合并确认；票合回运行分支是机械操作，不设人工门（首次出现：need 0004）。
+- **工作区仓库** —— 多仓工作区形态下由 setup-workspace 在根目录 git init 出的仓库：只装流程基础设施（`.sdlc/`、`docs/`、AGENTS.md 等），不装子仓库源码（首次出现：need 0008）。
+- **成员子仓库** —— 根目录第一层经用户确认入册的 git 仓库；受门禁、被扫描，各为单仓或 monorepo（首次出现：need 0008）。
+- **成员清单** —— 工作区成员子仓库的落盘名册：初始化确认后生成，重跑按其 diff 增补/移出（首次出现：need 0008）。
 - **运行依赖顺序图** —— 对一张 spec 名下全部工票按 blocked-by 拓扑排序得到的分层视图：同层票无依赖可并行，层间 blocked-by 边是串行约束；会话内计算、不落盘，执行进度由工单状态机表达（首次出现：need 0004）。
 - **知识档** —— 价值越过终态仍被回读的产物档：need、spec、design、adr、research、standards；终态后留存于工作区与版本库（首次出现：need 0005）。
 - **过程档** —— 价值在终态耗尽的产物档：ticket、review、acceptance；过程中照常进库，验收通过后删除、以 git 历史为归档（首次出现：need 0005）。
 - **蒸馏** —— dev-accept 在验收通过时把过程档产物中的耐久内容折回知识档的动作，四路落点：残余风险与证伪假设回 need、行为契约修正回 spec 验收场景、架构决策立 ADR、模式学习进编码标准；必须先于清扫（首次出现：need 0005）。
 - **清扫** —— 蒸馏完成后删除该 spec 名下全部过程档产物（tickets / reviews / acceptance 报告）的动作，与蒸馏、spec 置 done 同一提交原子完成；不回删 tracker 投影（首次出现：need 0005）。
+- **逆向产物** —— 扫描技能从存量代码逆向推断出的知识档沉淀物：need/spec/adr 形态与 AGENTS.md、GLOSSARY 项目术语章、docs/standards/ 的折叠内容；每条行为断言带文件:行证据与置信标注，逆向 need/spec 落盘即置 `status: reconstructed`，不进正向待办流（首次出现：need 0006）。
+- **扫描基线** —— 逆向产物记录的扫描覆盖快照：扫描时点的 commit 与日期、已覆盖与未覆盖范围；补扫增量对齐后随之更新，未覆盖区不得被读成"不存在"（首次出现：need 0006）。
+- **对账清单** —— 迁移技能产出的逐件归宿清单：每件外来产物一行，来源（本地路径 / issue 编号）→ 归宿（新产物路径 / 归档位置 / 显式弃置及理由）；外来 issue 处置失败也在此留痕（首次出现：need 0007）。
+- **翻译映射** —— 迁移技能把外来产物逐件译为本套件形态的动作：未完成的外来工作进正向流程现态（spec 落 draft、ticket 落 ready，照常推进），已完成的历史产物译为沉淀形态（落盘即 reconstructed）或折进既有沉淀产物；逐件翻译不以原样归档替代，来源区分走产物正文「来源」行与对账清单，不走状态机（首次出现：spec 0010）。

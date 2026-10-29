@@ -2,7 +2,7 @@
 
 **门禁式 SDLC 技能集——把「个人 + AI 协作开发」的流程规矩变成机器门禁。**
 
-21 个技能驱动一条脊柱流水线，八类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
+23 个技能驱动一条脊柱流水线，八类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
 
 ```
 need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现）→ review（评审）→ ship（交付）→ accept（验收）
@@ -57,7 +57,7 @@ AI 协作开发的三种常见失控：
 /dev-clarify → /dev-spec → /dev-plan → /dev-implement → /dev-review → /dev-ship → /dev-accept
 ```
 
-## 技能清单（21 个）
+## 技能清单（23 个）
 
 **总控与初始化**
 
@@ -65,6 +65,8 @@ AI 协作开发的三种常见失控：
 |---|---|
 | [sdlc](./skills/sdlc/SKILL.md) | 流程总控（只读）：盘点现状、报告被哪个门禁挡住；next 模式自动推进到下一个决策点 |
 | [setup-workspace](./skills/setup-workspace/SKILL.md) | 交互式初始化/升级工作区：生成门禁脚本与配置、装 git hooks，幂等可重跑 |
+| [setup-reconstruct](./skills/setup-reconstruct/SKILL.md) | 存量项目知识逆向扫描：分轮只读读码，产出带 文件:行 证据与扫描基线的套件形态沉淀物，确认后落盘，重跑即增量对齐（按需服务，手动触发） |
+| [setup-migrate](./skills/setup-migrate/SKILL.md) | 存量项目套件迁移：识别 matt / superpower 安装痕迹，外来产物逐件翻译映射、tracker issue 关闭、生命周期技能处置，两态接入本套件门禁，对账清单逐件留痕（按需服务，手动触发） |
 
 **脊柱（一次变更的必经门禁线）**
 
@@ -133,4 +135,4 @@ AI 协作开发的三种常见失控：
 
 ## 项目状态
 
-21 个技能已全部实现，2026-10-26 起按设计蓝图分批落地。本仓库自身即按这套流程开发——docs/ 下的 needs、specs、tickets、reviews 就是流程产物的真实样本。
+22 个技能已全部实现，第 23 个（setup-migrate）已入蓝图 v1.19、实现接续中，2026-10-26 起按设计蓝图分批落地。本仓库自身即按这套流程开发——docs/ 下的 needs、specs、tickets、reviews 就是流程产物的真实样本。
