@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # setup-workspace 门禁脚本测试套件：在临时仓库断言 assets/check.sh 各子命令行为，
-# 并对 dev-accept 蒸馏清扫出口做 SKILL.md 文本契约与 git 端到端断言。
+# 对 dev-accept 蒸馏清扫出口做 SKILL.md 文本契约与 git 端到端断言，
+# 并断言 METHOD/GLOSSARY 活本与生成资产逐字一致。
 # 用法：tests/run-tests.sh；全部通过输出 "ALL PASSED"，否则列出失败项并以非零退出。
 set -u
 
@@ -1332,6 +1333,11 @@ printf 'z\n' > "$TMP/f2.txt"
 git -C "$TMP" add f2.txt
 t "非法 message 被 hook 拦截" 1 "git -C $TMP commit -qm 'no tag'" "[#NNNN]"
 rm -f "$TMP/.git/hooks/commit-msg"
+
+echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
+ROOT="$HERE/../../.."
+t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
+t "两份 GLOSSARY.md 逐字一致" 0 "diff \"$ROOT/GLOSSARY.md\" \"$HERE/../assets/GLOSSARY.md\""
 
 echo
 echo "通过 $PASS / 失败 $FAIL"
