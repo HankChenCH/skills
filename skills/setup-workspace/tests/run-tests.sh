@@ -1535,6 +1535,7 @@ rm -f "$TMP/.git/hooks/commit-msg"
 echo "== 过程档 gitignore 行为（seam 1）=="
 new_repo
 printf 'docs/tickets/\ndocs/reviews/\ndocs/acceptance/\n' >> "$TMP/.gitignore"
+# check-ignore 的目录级模式（尾斜杠）只命中磁盘上真实存在的目录，空目录也要先建出来
 mkdir -p "$TMP/docs/reviews" "$TMP/docs/acceptance"
 # 真实仓库中 docs/ 知识档是被跟踪的：先入库一张知识档做基线，
 # 否则整个 docs/ 未跟踪会被 status 折叠为 `?? docs/`，两层行为都观测不到
