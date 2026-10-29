@@ -1,10 +1,11 @@
 ---
 id: 0008
-status: approved
+status: done
 need: 0006
 round: 1
 created: 2026-10-29
 approved: 2026-10-29
+done: 2026-10-29
 ---
 # 存量项目知识逆向扫描技能（setup-reconstruct）
 
