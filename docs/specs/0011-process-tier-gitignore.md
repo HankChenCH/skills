@@ -1,10 +1,11 @@
 ---
 id: 0011
-status: approved
+status: done
 need: 0009
 round: 1
 created: 2026-10-29
 approved: 2026-10-29
+done: 2026-10-30
 ---
 # 过程档 gitignore 化（C+蒸馏清扫叠加落地）
 
@@ -56,6 +57,7 @@ need 0005 交付的机制是"过程档过程中照常进库、验收后蒸馏清
 - [FR-6 | 工单级] Given 文档与生成面成文，When run-tests.sh 全量运行，Then 双份逐字一致断言通过、新增 seam 1/seam 2 用例通过、全量 ALL PASSED。
 - [FR-7 | 工单级] Given 本 spec 全部改动，When diff .sdlc/check.sh skills/setup-workspace/assets/check.sh 及其对改动前版本，Then 均零字节变化；commit-msg / pre-push 行为用例全部原样通过。
 - [FR-1、FR-2、FR-6 | 集成级] Given 本仓完成收口，When 三张在飞 spec 中任一张走完验收，Then 收口提交 git show 仅含知识档路径变更，无 docs/tickets|reviews|acceptance 内容；此后 git log 新增提交均不含过程档路径。（留验收阶段）
+  - 验收实证（2026-10-30，验收报告 0001 / issue #77）：首个实例即本 spec 自身验收——PR #76 合并提交 9a8ef77 与验收收口提交均仅含知识档路径，收口提交 21ebddf 后全部提交零过程档路径；运行 worktree 过程档物化细则见 ADR 0003。
 
 ## 非目标
 
