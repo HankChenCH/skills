@@ -1258,6 +1258,23 @@ oseq "FR-6 模板行结构按序：来源、归宿、处置结果" "$LEDGER" "�
 t "FR-6 模板落点 docs/migrations/ 成文" 0 "grep -q 'docs/migrations/' \"$LEDGER\"" ""
 t "FR-6 快照语义：一次迁移一张落盘即终态" 0 "grep -q '落盘即终态' \"$LEDGER\"" ""
 
+echo "== setup-migrate 对账清单不进门禁（seam 3）=="
+new_repo
+wfile docs/migrations/0001-matt-checkout.md <<'EOF'
+---
+id: 0001
+created: 2026-10-29
+---
+# 0001-matt-checkout：迁移对账清单
+
+| 来源 | 归宿 | 处置结果 |
+|---|---|---|
+| .scratch/0001-checkout.md | docs/specs/0001-checkout.md | 已翻译 |
+EOF
+t "validate 对 docs/migrations/ 文件报无法识别产物类型（不受理即不进状态机）" 1 "check.sh validate docs/migrations/0001-matt-checkout.md" "无法识别产物类型"
+tn "phase 输出不受 docs/migrations/ 存在影响" 0 "check.sh phase" "matt-checkout"
+tn "frontier 输出不受 docs/migrations/ 存在影响" 0 "check.sh frontier" "matt-checkout"
+
 echo "== setup-reconstruct 模板喂 validate（FR-2 实测）=="
 new_repo
 t "模板即 reconstructed / accepted 落盘形态" 0 "grep -q '^status: reconstructed' \"$TPLDIR/need.md\" && grep -q '^status: reconstructed' \"$TPLDIR/spec.md\" && grep -q '^status: accepted' \"$TPLDIR/adr.md\"" ""
