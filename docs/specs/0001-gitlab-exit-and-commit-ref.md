@@ -1,10 +1,11 @@
 ---
 id: 0001
-status: approved
+status: done
 need: 0001
 round: 1
 created: 2026-10-27
 approved: 2026-10-27
+done: 2026-10-29
 ---
 # GitLab 出口选项、平台模型参考与 ref-git-commit 技能
 
