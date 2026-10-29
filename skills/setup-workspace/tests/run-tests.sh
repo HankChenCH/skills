@@ -1258,6 +1258,32 @@ oseq "FR-6 模板行结构按序：来源、归宿、处置结果" "$LEDGER" "�
 t "FR-6 模板落点 docs/migrations/ 成文" 0 "grep -q 'docs/migrations/' \"$LEDGER\"" ""
 t "FR-6 快照语义：一次迁移一张落盘即终态" 0 "grep -q '落盘即终态' \"$LEDGER\"" ""
 
+echo "== setup-migrate 翻译映射协议（seam 1）=="
+TRANS="$HERE/../../setup-migrate/references/translation-mapping.md"
+t "翻译映射参考文档存在（两级结构第三件）" 0 "test -f \"$TRANS\"" ""
+t "主文档按需加载指向翻译协议（翻译步入口）" 0 "grep -q 'references/translation-mapping.md' \"$SKILL\"" ""
+
+awk '/^## 产物对产物/{f=1;next} /^## 状态对状态/{f=0} f' "$TRANS" > "$TMP/txt/trans-prod.md"
+oseq "FR-2 产物映射按序：spec issue、ticket issue、questionnaire、ADR、GLOSSARY 术语、GLOSSARY-MAP.md、docs/agents/" "$TMP/txt/trans-prod.md" "spec issue" "ticket issue" "questionnaire" "ADR 文件" "GLOSSARY 术语" "GLOSSARY-MAP.md" "docs/agents/"
+t "FR-2 spec issue → 本套件 spec 八节齐备" 0 "grep -q '八节齐备' \"$TMP/txt/trans-prod.md\"" ""
+t "FR-2 ticket issue 未闭环落正向 ready、已闭环不产 ticket 产物（过程档不留僵尸）" 0 "grep -q '不产 ticket 产物' \"$TMP/txt/trans-prod.md\"" ""
+t "FR-2 耐久内容折进沉淀 spec / ADR（已闭环 ticket 的归宿）" 0 "grep -q '折进' \"$TMP/txt/trans-prod.md\"" ""
+t "FR-2 ADR 以 accepted 落本套件（判据：当前生效的决策）" 0 "grep -q 'accepted' \"$TMP/txt/trans-prod.md\"" ""
+t "FR-2 GLOSSARY 术语并入项目术语章、同名不覆盖冲突报告交用户" 0 "grep -q '项目术语章' \"$TMP/txt/trans-prod.md\" && grep -q '不覆盖' \"$TMP/txt/trans-prod.md\"" ""
+t "FR-2 GLOSSARY-MAP.md 显式弃置、docs/agents/ 随生命周期技能处置" 0 "grep -q '显式弃置' \"$TMP/txt/trans-prod.md\" && grep -q '随生命周期技能处置' \"$TMP/txt/trans-prod.md\"" ""
+
+awk '/^## 状态对状态/{f=1;next} /^## E2/{f=0} f' "$TRANS" > "$TMP/txt/trans-state.md"
+oseq "FR-2 分态规则按序：未完成进正向现态、已完成落 reconstructed、wontfix 显式弃置" "$TMP/txt/trans-state.md" "未完成" "reconstructed" "wontfix"
+t "FR-2 未完成 ticket 落 ready 且 spec 字段指向翻译 spec；未完成 spec 落 draft 交 dev-spec 审定" 0 "grep -q '指向' \"$TMP/txt/trans-state.md\" && grep -q 'draft' \"$TMP/txt/trans-state.md\"" ""
+t "FR-2 来源行承载迁移区分：外来位置 + 迁移日期、正文首部（总则，适用全部翻译产物）" 0 "grep -q '迁移日期' \"$TRANS\" && grep -q '正文首部' \"$TRANS\"" ""
+t "FR-2 翻译产物不带扫描基线节（非扫描所得；总则显式排除）" 0 "grep -q '不带扫描基线节' \"$TRANS\"" ""
+t "FR-2 沉淀 spec 的 need 字段可空（不为凑字段伪造 need）" 0 "grep -q 'need 字段可空' \"$TMP/txt/trans-state.md\"" ""
+t "FR-2 外来特有语义正文显式记录不新增状态（ready-for-human）" 0 "grep -q 'ready-for-human' \"$TMP/txt/trans-state.md\"" ""
+t "FR-2 wontfix 显式弃置理由：外来套件已拒" 0 "grep -q '外来套件已拒' \"$TMP/txt/trans-state.md\"" ""
+
+awk '/^## E2/{f=1} f' "$TRANS" > "$TMP/txt/trans-e2.md"
+t "E2 语义无法对应：显式弃置与理由、不硬造产物" 0 "grep -q '显式弃置' \"$TMP/txt/trans-e2.md\" && grep -q '不硬造' \"$TMP/txt/trans-e2.md\"" ""
+
 echo "== setup-migrate 对账清单不进门禁（seam 3）=="
 new_repo
 wfile docs/migrations/0001-matt-checkout.md <<'EOF'
