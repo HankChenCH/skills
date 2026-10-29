@@ -1,8 +1,9 @@
 ---
 id: 0008
-status: confirmed
+status: fulfilled
 created: 2026-10-29
 confirmed: 2026-10-29
+fulfilled: 2026-10-29
 ---
 # setup-workspace 多仓工作区接入（根目录非仓库 + 多个子仓库）
 
