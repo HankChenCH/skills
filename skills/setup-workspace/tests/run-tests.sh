@@ -2197,6 +2197,11 @@ t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../as
 t "两份 GLOSSARY.md 逐字一致" 0 "diff \"$ROOT/GLOSSARY.md\" \"$HERE/../assets/GLOSSARY.md\""
 t "两份 check.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$CHECK\""
 
+echo "== 终态断言：spec 0011 零改动面（check.sh 机械层与 dev-accept 蒸馏清扫序列不动）=="
+t "零改动面：check.sh 与生成资产 diff 为空" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$HERE/../assets/check.sh\""
+t "零改动面：dev-accept 清扫范围句原样" 0 "grep -qF \"删除该 spec 名下全部 tickets、reviews 与本次验收报告文件\" \"$ROOT/skills/dev-accept/SKILL.md\""
+t "零改动面：dev-accept 原子提交序列句原样" 0 "grep -qF \"蒸馏编辑 + 清扫删除 + 置 done 合为恰一个\" \"$ROOT/skills/dev-accept/SKILL.md\""
+
 echo
 echo "通过 $PASS / 失败 $FAIL"
 [ "$FAIL" = 0 ] && echo "ALL PASSED"
