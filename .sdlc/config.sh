@@ -9,4 +9,4 @@ CODE_DIRS=
 
 CHECK_LINT=""
 CHECK_TYPE=""
-CHECK_TEST=""
+CHECK_TEST="bash skills/setup-workspace/tests/run-tests.sh"
