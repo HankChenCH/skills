@@ -1,10 +1,11 @@
 ---
 id: 0007
-status: approved
+status: done
 need: 0005
 round: 1
 created: 2026-10-29
 approved: 2026-10-29
+done: 2026-10-29
 ---
 # 验收后蒸馏与清扫（流程产物生命周期归置）
 

@@ -59,10 +59,12 @@ confirmed: 2026-10-29
 
 ## 假设与风险
 
-- A1 清扫提交直接落 main 可行——本仓库为 solo + 自举场景；团队受保护分支场景未验证，代价：需改走 PR，蒸馏/清扫步骤本身不变。不确定度：低，代价：低。
-- A2 协作者对被清扫产物的发现成本上升（工作区 grep 不到，需 `git log -- docs/tickets/` 考古或查 tracker 投影）：拍板 D1 已接受该代价换工作区干净。不确定度：低。
-- A3 全库状态-存在性校验与既有"依赖无环"校验同类（扫 docs/ frontmatter），check.sh 复杂度增量小。不确定度：低。
-- round 1 靶心：FR-2 蒸馏的落点完整性（E3 边界）与 FR-4 门禁（新机制）；FR-1 / FR-3 是既有行为的收拢，风险最低。
+- A1 清扫提交直接落 main 可行——本仓库为 solo + 自举场景；团队受保护分支场景未验证，代价：需改走 PR，蒸馏/清扫步骤本身不变。不确定度：低，代价：低。（验证：通过——round 1 清扫提交即落 main 并过 commit-msg 门禁；保护分支场景未触及，原判据维持）
+- A2 协作者对被清扫产物的发现成本上升（工作区 grep 不到，需 `git log -- docs/tickets/` 考古或查 tracker 投影）：拍板 D1 已接受该代价换工作区干净。不确定度：低。（验证：通过——被删文件 git 历史可查，tracker 投影保留不回删）
+- A3 全库状态-存在性校验与既有"依赖无环"校验同类（扫 docs/ frontmatter），check.sh 复杂度增量小。不确定度：低。（验证：通过——新增 spec_residue 单函数，run-tests 既有 148 用例零破坏，148→150 仅新增）
+- 残余风险：`.sdlc/config.sh` 未定义任何检查命令（CHECK_LINT / CHECK_TYPE / CHECK_TEST 全空），`check.sh all` 只能响亮警告，run-tests.sh 150 用例依赖会话手动执行，出口门禁证据存在漏跑可能（来源：验收报告 0002，不阻塞验收）。
+- 下一轮建议：不开新轮。收尾两项不属本 need 范围，走 `[trivial]` 或后续工单：① config.sh 接线 `CHECK_TEST="bash skills/setup-workspace/tests/run-tests.sh"`；② GLOSSARY 状态表 spec.done 行是否补"名下过程档已清扫"语义（评审 0012 范围外备注）。
+- round 1 靶心：FR-2 蒸馏的落点完整性（E3 边界）与 FR-4 门禁（新机制）；FR-1 / FR-3 是既有行为的收拢，风险最低。（结果：全部命中——FR-4 由工单 0016 落地，FR-2/3/6 由工单 0017 落地，FR-5 由工单 0018 落地）
 
 ## 范围与非目标
 
