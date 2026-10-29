@@ -1716,6 +1716,18 @@ t "成员哨兵固定文本落文（begin/end 标记与三要素特征行）" 0 
 t "SKILL §3 增成员哨兵行（仅多仓工作区模式、随 §4 三态收口）" 0 "grep -q '成员 AGENTS.md 哨兵块（仅多仓' \"$SKILL\" && grep -q '随 §4 三态收口' \"$SKILL\"" ""
 t "SKILL §4 增成员行（同三态、成员内不落根版流程块）" 0 "grep -q '成员版哨兵块' \"$SKILL\" && grep -q '不落根版流程块' \"$SKILL\"" ""
 
+echo "== SKILL §1 多仓重跑 diff 与决策 4 消失成员话术（成文契约，FR-7/FR-8）=="
+new_repo
+DEC="$HERE/../references/decisions.md"
+mkdir -p "$TMP/txt"
+awk '/^## 1\. /{f=1;next} /^## 2\. /{f=0} f' "$SKILL" > "$TMP/txt/s1.md"
+oseq "SKILL §1 升级模式增多仓 diff 规则按序成文：求差、新增确认入册补装且与初始成员完全一致、消失报告、经确认才移出、未确认前清单一字不动、幂等重装、复原清单命中视为已确认零重复询问" "$TMP/txt/s1.md" "升级模式" "求差" "新增" "确认入册" "补装" "完全一致" "消失" "报告" "经确认才移出" "未确认前清单" "一字不动" "幂等重装" "视为已确认" "零重复询问"
+t "SKILL §0 模式差异点名 §1 增重跑 diff（交叉引用一致）" 0 "grep -q '§1 增重跑 diff' \"$SKILL\"" ""
+awk '/^## 决策 4/{f=1} f' "$DEC" > "$TMP/txt/dec4.md"
+oseq "决策 4 重跑分支按序成文：求差只问新增、既有成员不重复询问幂等重装" "$TMP/txt/dec4.md" "求差" "新增" "不重复询问" "幂等重装"
+oseq "决策 4 消失成员话术按序成文：不再是 git 仓库即报告、确认才移出、同步 .gitignore 标记段、确认前清单与接入物一字不动、沉默与拒绝不动清单" "$TMP/txt/dec4.md" "不再是 git 仓库" "报告" "确认" "移出" ".gitignore 标记段" "一字不动" "沉默"
+t "决策 4 复原零询问成文：清单命中的成员视为已确认、零重复询问" 0 "grep -q '清单命中的成员视为已确认' \"$TMP/txt/dec4.md\" && grep -q '零重复询问' \"$TMP/txt/dec4.md\"" ""
+
 echo "== 过程档 gitignore 行为（seam 1）=="
 new_repo
 printf 'docs/tickets/\ndocs/reviews/\ndocs/acceptance/\n' >> "$TMP/.gitignore"
