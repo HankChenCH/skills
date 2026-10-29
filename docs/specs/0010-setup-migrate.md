@@ -1,10 +1,11 @@
 ---
 id: 0010
-status: approved
+status: done
 need: 0007
 round: 1
 created: 2026-10-29
 approved: 2026-10-29
+done: 2026-10-30
 ---
 # 存量项目套件迁移技能（setup-migrate）
 
@@ -78,7 +79,7 @@ approved: 2026-10-29
 - [FR-2 | 工单级] Given matt ADR 文件与 GLOSSARY 术语，When 翻译落盘，Then ADR 以 accepted 落本套件 ADR 目录、术语并入 GLOSSARY 项目术语章；同名术语不覆盖，冲突报告交用户处置。
 - [FR-3 | 工单级] Given matt tracker 上开着的-issue 外来 issue 已全部翻译，When 执行处置，Then issue 关闭且评论注明已迁移，对账清单记录 issue 编号与新产物路径。
 - [FR-3 | 工单级] Given 某 issue 关闭失败（E3），When 执行处置，Then 对账清单记失败明细，本地翻译与门禁接入继续完成，不被阻断。
-- [FR-4 | 工单级] Given 生命周期类外来技能装在仓库专属位置，When 处置，Then 技能移除或归档出技能发现路径，写作类技能保留，对账清单逐件记录归宿。
+- [FR-4 | 工单级] Given 生命周期类外来技能装在仓库专属位置，When 处置，Then 技能移除或归档出技能发现路径，写作类技能保留，对账清单逐件记录归宿。（验收 0001 边界修订 2026-10-30：逐件记录指处置件——移除 / 归档 / 弃置——逐行；保留的写作类不占清单行，处置结果四值无"保留"，由识别报告第 1 类清单承载并在迁移报告点名。）
 - [FR-4 | 工单级] Given 生命周期类外来技能装在用户全局技能目录，When 处置，Then 技能不擅自改动全局安装，经用户确认作用域后再归档或移除。
 - [FR-5 | 工单级] Given 仓库未接入本套件，When 迁移落盘，Then setup-workspace 全流程接入完成后才写迁移产物，一次会话完成，check.sh phase 与 frontier 可正常执行。
 - [FR-5 | 工单级] Given 仓库已接入本套件，When 迁移落盘，Then 接入资产逐字不变，仅新增迁移产物与对账清单。
