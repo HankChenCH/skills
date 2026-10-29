@@ -1,8 +1,9 @@
 ---
 id: 0006
-status: confirmed
+status: fulfilled
 created: 2026-10-29
 confirmed: 2026-10-29
+fulfilled: 2026-10-29
 ---
 # 存量项目知识逆向：扫描沉淀，冷启动免全量扫描
 
