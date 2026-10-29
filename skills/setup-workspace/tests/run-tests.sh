@@ -1162,7 +1162,7 @@ TPLDIR="$HERE/../../setup-reconstruct/references/templates"
 mkdir -p "$TMP/txt"
 t "技能自身文件齐备（主文档 + 三个参考 + 三张模板）" 0 "test -f \"$SKILL\" && test -f \"$HERE/../../setup-reconstruct/references/scan-protocol.md\" && test -f \"$HERE/../../setup-reconstruct/references/artifact-templates.md\" && test -f \"$HERE/../../setup-reconstruct/references/incremental-alignment.md\" && test -f \"$TPLDIR/need.md\" && test -f \"$TPLDIR/spec.md\" && test -f \"$TPLDIR/adr.md\"" ""
 t "frontmatter description 含存量扫描与确认一句话" 0 "grep -qE '^description:.*存量.*扫描' \"$SKILL\" && grep -qE '^description:.*确认' \"$SKILL\"" ""
-t "两级结构成文：主文档按需指向两个参考文档" 0 "grep -q 'references/scan-protocol.md' \"$SKILL\" && grep -q 'references/artifact-templates.md' \"$SKILL\""
+t "两级结构成文：主文档按需指向三个参考文档" 0 "grep -q 'references/scan-protocol.md' \"$SKILL\" && grep -q 'references/artifact-templates.md' \"$SKILL\" && grep -q 'references/incremental-alignment.md' \"$SKILL\""
 
 awk '/^## 0\. /{f=1;next} /^## 1\. /{f=0} f' "$SKILL" > "$TMP/txt/gate.md"
 oseq "FR-1 入口门禁：git 仓库在前、技能自身文件完整在后、不要求 check.sh 收尾" "$TMP/txt/gate.md" "git 仓库" "技能自身文件" "不要求" "check.sh"
@@ -1201,7 +1201,6 @@ oseq "FR-7 确认门合并与收口：同一确认门合并写入、未漂移逐
 t "FR-7 基线缺失回落全量扫描成文" 0 "grep -q '回落全量扫描' \"$RA\"" ""
 awk '/^## 补扫/{f=1;next} /^## /{f=0} f' "$RA" > "$TMP/txt/rescan.md"
 oseq "FR-5 补扫协议：范围参数、只产出该范围增量产物、更新基线覆盖清单、已确认存量产物不被重写" "$TMP/txt/rescan.md" "范围参数" "增量产物" "覆盖清单" "不被重写"
-t "主文档出口指向增量对齐细则（两级结构）" 0 "grep -q 'references/incremental-alignment.md' \"$SKILL\"" ""
 
 echo "== setup-reconstruct 模板喂 validate（FR-2 实测）=="
 new_repo
