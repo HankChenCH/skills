@@ -2,8 +2,9 @@
 id: 0017
 type: feature
 spec: 0007
-status: implemented
+status: done
 blocked-by: [0016]
+done: 2026-10-29
 created: 2026-10-29
 ---
 # 0017: dev-accept 蒸馏清扫出口
