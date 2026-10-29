@@ -1284,6 +1284,24 @@ t "FR-2 wontfix 显式弃置理由：外来套件已拒" 0 "grep -q '外来套�
 awk '/^## E2/{f=1} f' "$TRANS" > "$TMP/txt/trans-e2.md"
 t "E2 语义无法对应：显式弃置与理由、不硬造产物" 0 "grep -q '显式弃置' \"$TMP/txt/trans-e2.md\" && grep -q '不硬造' \"$TMP/txt/trans-e2.md\"" ""
 
+echo "== setup-migrate 处置协议（seam 1）=="
+DISPOSE="$HERE/../../setup-migrate/references/disposal-protocol.md"
+t "处置协议参考文档存在（两级结构第四件）" 0 "test -f \"$DISPOSE\"" ""
+t "主文档按需加载与处置步指向处置协议" 0 "grep -q 'references/disposal-protocol.md' \"$SKILL\"" ""
+
+awk '/^## tracker issue 处置/{f=1;next} /^## 生命周期技能处置/{f=0} f' "$DISPOSE" > "$TMP/txt/disp-issue.md"
+oseq "FR-3 issue 处置按序：全部翻译后关闭、评论注明已迁移、指向对账清单" "$TMP/txt/disp-issue.md" "全部翻译" "已迁移" "对账清单"
+t "FR-3 平台 CLI 与 publish 同款调用面，不扩 trackers 适配器" 0 "grep -q '平台 CLI' \"$TMP/txt/disp-issue.md\" && grep -q '不扩' \"$TMP/txt/disp-issue.md\"" ""
+t "FR-3 本地 tracker 文件标记关闭并归位（无外部副作用）" 0 "grep -q '标记关闭并归位' \"$TMP/txt/disp-issue.md\"" ""
+t "FR-3 E3 关闭失败留痕不阻断：清单记失败明细，翻译与接入继续" 0 "grep -q '失败待补' \"$TMP/txt/disp-issue.md\" && grep -q '不阻断' \"$TMP/txt/disp-issue.md\"" ""
+t "FR-3 已闭环 issue 无 tracker 操作（非目标）" 0 "grep -q '无 tracker 操作' \"$TMP/txt/disp-issue.md\"" ""
+
+awk '/^## 生命周期技能处置/{f=1;next} f' "$DISPOSE" > "$TMP/txt/disp-skill.md"
+t "FR-4 判据沿 §10.3：生命周期类处置、写作类保留" 0 "grep -q '§10.3' \"$TMP/txt/disp-skill.md\" && grep -q '写作类保留' \"$TMP/txt/disp-skill.md\"" ""
+t "FR-4 处置 = 移出技能发现路径，软禁用不采用" 0 "grep -q '移出技能发现路径' \"$TMP/txt/disp-skill.md\" && grep -q '软禁用' \"$TMP/txt/disp-skill.md\"" ""
+t "FR-4 全局安装默认归档且处置前必须经用户确认作用域，不擅动全局" 0 "grep -q '确认作用域' \"$TMP/txt/disp-skill.md\" && grep -q '不擅动' \"$TMP/txt/disp-skill.md\"" ""
+t "FR-4 superpower 生命周期清单按调研报告，writing- 前缀不作写作类判据" 0 "grep -q '0002-superpower-skills-suite' \"$TMP/txt/disp-skill.md\" && grep -q 'writing- 前缀' \"$TMP/txt/disp-skill.md\"" ""
+
 echo "== setup-migrate 对账清单不进门禁（seam 3）=="
 new_repo
 wfile docs/migrations/0001-matt-checkout.md <<'EOF'
