@@ -2202,6 +2202,26 @@ t "零改动面：check.sh 与生成资产 diff 为空" 0 "diff \"$ROOT/.sdlc/ch
 t "零改动面：dev-accept 清扫范围句原样" 0 "grep -qF \"删除该 spec 名下全部 tickets、reviews 与本次验收报告文件\" \"$ROOT/skills/dev-accept/SKILL.md\""
 t "零改动面：dev-accept 原子提交序列句原样" 0 "grep -qF \"蒸馏编辑 + 清扫删除 + 置 done 合为恰一个\" \"$ROOT/skills/dev-accept/SKILL.md\""
 
+echo "== 过程档 gitignore 生成面文本契约（seam 2）=="
+new_repo
+GEN="$HERE/../references/generation.md"
+SKILL="$HERE/../../setup-workspace/SKILL.md"
+mkdir -p "$TMP/txt"
+awk '/^### \.gitignore/{f=1;next} /^### |^## /{f=0} f' "$GEN" > "$TMP/txt/gen-gitignore.md"
+t "generation.md 含 .gitignore 节" 0 "test -s \"$TMP/txt/gen-gitignore.md\"" ""
+t "忽略行 docs/tickets/ 确切写法成文" 0 "grep -qx 'docs/tickets/' \"$TMP/txt/gen-gitignore.md\"" ""
+t "忽略行 docs/reviews/ 确切写法成文" 0 "grep -qx 'docs/reviews/' \"$TMP/txt/gen-gitignore.md\"" ""
+t "忽略行 docs/acceptance/ 确切写法成文" 0 "grep -qx 'docs/acceptance/' \"$TMP/txt/gen-gitignore.md\"" ""
+oseq ".gitignore 节按序成文：确切写法在前、每行先 grep 后追加、已有内容一行不动、不设标记块在后" "$TMP/txt/gen-gitignore.md" "docs/tickets/" "grep" "一行不动" "标记块"
+t "幂等语义锚定 spec 措辞：每行先 grep 后追加" 0 "grep -q '先 grep 后追加' \"$TMP/txt/gen-gitignore.md\"" ""
+awk '/^## 4\. /{f=1} f' "$GEN" > "$TMP/txt/report.md"
+t "收尾报告模板含 .gitignore 行（三条落点齐备）" 0 "grep -q '\.gitignore' \"$TMP/txt/report.md\" && grep -q 'docs/tickets/' \"$TMP/txt/report.md\" && grep -q 'docs/acceptance/' \"$TMP/txt/report.md\"" ""
+awk '/^\| `\.gitignore\`/{f=1} f' "$SKILL" > "$TMP/txt/skill-gitignore-row.md"
+t "SKILL §3 生成表含 .gitignore 行（幂等追加、已有内容不动、指向 generation.md）" 0 "grep -q '幂等追加' \"$TMP/txt/skill-gitignore-row.md\" && grep -q '一行不动' \"$TMP/txt/skill-gitignore-row.md\" && grep -q 'generation.md' \"$TMP/txt/skill-gitignore-row.md\"" ""
+awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/skill-forbidden.md"
+t "禁止事项改为只禁三行以外内容（新表述成文，成员标记段例外保留）" 0 "grep -q '过程档忽略三行以外的任何内容' \"$TMP/txt/skill-forbidden.md\" && grep -q '唯一例外' \"$TMP/txt/skill-forbidden.md\"" ""
+tn "SKILL.md 全文不再含旧句「往 .gitignore 加任何流程产物」" 0 "cat \"$SKILL\"" "往 .gitignore 加任何流程产物"
+
 echo
 echo "通过 $PASS / 失败 $FAIL"
 [ "$FAIL" = 0 ] && echo "ALL PASSED"
