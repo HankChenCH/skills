@@ -73,6 +73,7 @@ git 仓库列为候选，按 §2 决策 4 确认入册后补装门禁与哨兵�
 | `docs/standards/` | 决策 3 导入的标准文件；同名不覆盖 |
 | `CODING_STANDARDS.md` | 首建"索引+兜底"；已有内容不动 |
 | `GLOSSARY.md` | 首建种入"流程术语与状态"章；已有只补该章，项目术语不动 |
+| `.gitignore` | 幂等追加三条过程档忽略行（docs/tickets/、docs/reviews/、docs/acceptance/），已有内容一行不动；写法见 references/generation.md「.gitignore」 |
 | `.git/hooks/commit-msg`、`pre-push` | 一行转发，幂等重装；外来 hook **不覆盖**，报告并给手动合并方案 |
 | 成员 `.git/hooks/commit-msg`（仅多仓工作区模式） | 一行转发到工作区仓库 check.sh commit-msg，先取消息文件绝对路径、cd 锚定工作区仓库根再 exec；**不装 pre-push**；外来 hook 处置同根（写法与理由见 references/generation.md「多仓工作区模式」） |
 | 成员 AGENTS.md 哨兵块（仅多仓工作区模式） | 每个入册成员子仓库落成员版哨兵块（成员身份、工作区根指引、流程操作回根+代码照常），随 §4 三态收口；固定文本见 references/generation.md「AGENTS.md 收口」节成员小节 |
@@ -99,7 +100,7 @@ references/generation.md 与 references/agent-adapters/ 为准。
 
 ## 禁止事项（任何时候）
 
-- 触碰源码与一切用户文件；往 .gitignore 加任何流程产物（唯一例外：多仓工作区模式的成员登记标记段，见 references/generation.md「多仓工作区模式」）。
+- 触碰源码与用户自有文件；往 .gitignore 写过程档忽略三行以外的任何内容（唯一例外：多仓工作区模式的成员登记标记段，见 references/generation.md「多仓工作区模式」）。
 - 覆盖 config.sh、自定义 tracker、外来 hooks、docs/standards/ 同名文件、GLOSSARY 项目术语。
 - 凭据/MCP 验证失败时静默降级。
 - 在仓库之外写入任何文件；初始化后顺手建产物目录或示例产物。
