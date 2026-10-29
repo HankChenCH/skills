@@ -1,13 +1,13 @@
 ---
 name: setup-workspace
-description: 交互式初始化或升级本仓库的 SDLC 开发流程工作区——识别当前智能体并按接入参考适配，区分单仓库/monorepo 扫描，生成 .sdlc/check.sh 门禁脚本、config.sh（含运行环境探测）、tracker 适配器、docs/METHOD.md、GLOSSARY.md 流程术语与状态、CODING_STANDARDS.md 索引，最后写 AGENTS.md 哨兵块与 git hooks；幂等可重跑，按所有权表决定覆盖或补缺，永不触碰源码与用户文件。当用户要求初始化工作区、接入开发流程、安装 sdlc 门禁、setup workspace 时使用——不在 git 仓库内或要求改动规范之外的东西时会拒绝。
+description: 交互式初始化或升级本仓库的 SDLC 开发流程工作区——识别当前智能体并按接入参考适配，区分单仓库/monorepo/多仓工作区形态扫描，生成 .sdlc/check.sh 门禁脚本、config.sh（含运行环境探测）、tracker 适配器、docs/METHOD.md、GLOSSARY.md 流程术语与状态、CODING_STANDARDS.md 索引，最后写 AGENTS.md 哨兵块与 git hooks；幂等可重跑，按所有权表决定覆盖或补缺，永不触碰源码与用户文件。当用户要求初始化工作区、接入开发流程、安装 sdlc 门禁、setup workspace 时使用——根目录非 git 仓库且第一层也无 git 仓库、或要求改动规范之外的东西时会拒绝。
 ---
 
 # setup-workspace：初始化/升级工作区
 
-你只做一件事：把这个 **git 仓库**变成**接入 SDLC 流程的工作区**，
-并把接入方式适配到**当前正在运行的智能体**。
-不在 git 仓库内、或要求改动工作区规范之外的东西，一律拒绝。
+你只做一件事：把这个 **git 仓库**、或第一层平铺着 **git 仓库的多仓工作区根**，变成
+**接入 SDLC 流程的工作区**，并把接入方式适配到**当前正在运行的智能体**。
+不在 git 仓库内、第一层也没有 git 仓库、或要求改动工作区规范之外的东西，一律拒绝。
 拒绝不是失礼，是本技能的职责。
 
 **按需加载**：进入每个阶段前才 Read 对应 references/ 文件，一次只载一个；
@@ -15,8 +15,13 @@ assets/ 是逐字拷贝进目标仓库的模板，不得凭记忆手写替代。
 
 ## 0. 前置校验
 
-- `git rev-parse --show-toplevel` 必须成功；失败 → 停止："这里不是 git 仓库，
-  SDLC 工作区只初始化在 git 仓库内。"
+- 形态判定三分支（以当前工作目录为根）：
+  1. `git rev-parse --show-toplevel` 成功 → 单仓 / monorepo 现行流程，按 §1 继续。
+  2. 失败但根下第一层存在 ≥1 个 git 仓库 → 进入**多仓工作区模式**（scan-signals §1
+     第三形态）：根为工作区仓库根，第一层 git 仓库为成员子仓库候选；第一层扫描信号
+     （跳过点目录）按 references/scan-signals.md §1 执行。
+  3. 失败且第一层无任何 git 仓库 → 停止："这里不是 git 仓库，SDLC 工作区只初始化
+     在 git 仓库内。"拒绝路径**零写入**：不创建、不修改任何文件。
 - 校验 assets/ 与 references/ 完整（check.sh、METHOD.md、GLOSSARY.md、
   trackers/、hooks/、standards/、scan-signals.md、decisions.md、generation.md、
   tracker-platforms.md、agent-adapters/）；缺失 → 停止报告安装损坏。
@@ -25,7 +30,8 @@ assets/ 是逐字拷贝进目标仓库的模板，不得凭记忆手写替代。
 
 ## 1. 扫描仓库（只读；先扫后问）
 
-Read references/scan-signals.md，按其信号表扫出：仓库类型（单仓/monorepo）、
+Read references/scan-signals.md，按其信号表扫出：仓库类型（单仓/monorepo；
+多仓工作区模式下改扫第一层成员候选，见 scan-signals §1 第三形态）、
 语言与框架、检查命令（monorepo 优先聚合命令）、环境已述项（运行环境/版本管理/
 包管理器）、已有接入物（.sdlc/check.sh、AGENTS.md、GLOSSARY.md、
 CODING_STANDARDS.md、docs/standards/）。存在 .sdlc/check.sh → 升级模式：
