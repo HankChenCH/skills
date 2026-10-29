@@ -1,8 +1,9 @@
 ---
 id: 0001
-status: confirmed
+status: fulfilled
 created: 2026-10-27
 confirmed: 2026-10-27
+fulfilled: 2026-10-29
 ---
 # 出口平台扩展（GitLab）与提交/合并信息规范
 

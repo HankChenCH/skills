@@ -1,7 +1,8 @@
 ---
 id: 0002
-status: confirmed
+status: fulfilled
 confirmed: 2026-10-27
+fulfilled: 2026-10-29
 created: 2026-10-27
 ---
 # tracker 平台适配器（github / gitlab / codeup）

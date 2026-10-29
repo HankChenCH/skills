@@ -1,8 +1,9 @@
 ---
 id: 0004
-status: confirmed
+status: fulfilled
 created: 2026-10-28
 confirmed: 2026-10-28
+fulfilled: 2026-10-29
 ---
 # V 模型整 spec 编排运行技能（dev-execute）
 

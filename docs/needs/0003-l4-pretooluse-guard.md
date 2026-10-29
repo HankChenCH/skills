@@ -1,7 +1,8 @@
 ---
 id: 0003
-status: confirmed
+status: fulfilled
 confirmed: 2026-10-28
+fulfilled: 2026-10-29
 created: 2026-10-28
 ---
 # L4 平台层拦截 hook（PreToolUse guard）
