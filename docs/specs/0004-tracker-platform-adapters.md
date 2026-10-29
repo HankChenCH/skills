@@ -1,7 +1,8 @@
 ---
 id: 0004
-status: approved
+status: done
 approved: 2026-10-27
+done: 2026-10-29
 need: 0002
 round: 1
 created: 2026-10-27
