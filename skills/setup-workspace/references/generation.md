@@ -124,6 +124,28 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 
 智能体额外动作（命中 references/agent-adapters/ 时）在此一并执行——如 Claude Code：CLAUDE.md 不存在则创建一行 `@AGENTS.md`；已存在则在文末追加该行（已有则跳过）。ZCode：把 L4 的 PreToolUse hooks 块合并进工作区 `<repo>/.zcode/config.json`（模板与幂等语义见 references/agent-adapters/zcode.md）——文件不存在则创建；已存在则只替换/新增 `hooks` 键，其余内容（如 mcp 配置）一字不动；`hooks.enabled` 必须为 `true`（配置文件 hooks 缺省禁用），用户已有其他 hooks 一并保留，收尾报告说明置 true 的连带影响（原本禁用的配置 hooks 将一并生效）；合并后确认全文仍是可解析的 JSON，不可解析即回滚本次合并并报告。
 
+### 成员 AGENTS.md 哨兵块（仅多仓工作区模式）
+
+多仓工作区模式下，对每个入册成员子仓库落**成员版**哨兵块（成员内不落根版流程块）；
+固定文本如下，落装时 `<成员目录名>` 替换为成员清单中的目录名（措辞勿改）：
+
+```markdown
+<!-- sdlc:begin 由 setup-workspace 管理，勿在此块内手改 -->
+## 开发流程（本仓库是 SDLC 多仓工作区的成员子仓库）
+本仓库 `<成员目录名>` 是多仓工作区的成员子仓库，所属工作区仓库在上级目录：need/spec/工单、docs/、.sdlc/ 等流程产物全在工作区根。
+- 流程操作（/sdlc、need/spec/工单、check.sh）一律回工作区根进行，本仓库内不落流程产物。
+- 代码修改在本仓库内照常进行；提交须带 [#NNNN] 或 [trivial] 豁免，成员 commit-msg hook 会转发到工作区根校验。
+- 完整规则见工作区根 docs/METHOD.md，术语与状态定义见工作区根 GLOSSARY.md。
+<!-- sdlc:end -->
+```
+
+三态与根版同规则：
+1. 文件不存在 → 创建：一级标题 `# AGENTS.md`、空行、成员哨兵块；收尾报告说明已代建。
+2. 存在但无 `<!-- sdlc:begin` 标记 → 原内容不动，文末空一行后追加成员哨兵块。
+3. 已有标记 → 只替换 `<!-- sdlc:begin …` 到 `<!-- sdlc:end -->` 之间的内容为成员哨兵块。
+
+块外内容任何情况下一字不动；幂等重装靠标记判定，同文本重跑文件零变化。
+
 ## 3. 自检（§5 第 1 步）
 
 依次运行并确认正常输出（在仓库根执行）：

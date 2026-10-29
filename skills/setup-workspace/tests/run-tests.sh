@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # setup-workspace 门禁脚本测试套件：在临时仓库断言 assets/check.sh 各子命令行为，
-# 以临时多仓夹具（工作区仓库根 + 成员）实测成员门禁转发，对 dev-accept 蒸馏清扫出口
-# 做 SKILL.md 文本契约与 git 端到端断言，并断言 METHOD/GLOSSARY/check.sh 活本与生成资产逐字一致。
+# 以临时多仓夹具（工作区仓库根 + 成员）实测成员门禁转发与成员哨兵块三态，对 dev-accept
+# 蒸馏清扫出口做 SKILL.md 文本契约与 git 端到端断言，并断言 METHOD/GLOSSARY/check.sh
+# 活本与生成资产逐字一致。
 # 用法：tests/run-tests.sh；全部通过输出 "ALL PASSED"，否则列出失败项并以非零退出。
 set -u
 
@@ -1648,6 +1649,72 @@ awk '/^### 多仓工作区模式/{f=1;next} /^## 2\. /{f=0} f' "$GEN" > "$TMP/tx
 oseq "成员 hook 细则按序成文：一行转发、不装 pre-push、消息文件绝对路径、锚定工作区仓库根、自定位错位理由、外来 hook 沿用不覆盖" "$TMP/txt/multi.md" "commit-msg" "不装 pre-push" "成员仓库" "自定位" "锚定" "外来 hook" "不覆盖"
 t "成员转发模板落文（sdlc-managed 标记 + dirname 锚定 + exec check.sh commit-msg）" 0 "grep -q 'sdlc-managed: forward to workspace root' \"$TMP/txt/multi.md\" && grep -q 'dirname' \"$TMP/txt/multi.md\" && grep -q 'exec ./.sdlc/check.sh commit-msg' \"$TMP/txt/multi.md\"" ""
 t "SKILL §3 增成员 hook 行（仅多仓工作区模式、不装 pre-push、外来 hook 处置同根）" 0 "grep -q '成员 \`.git/hooks/commit-msg\`（仅多仓' \"$SKILL\" && grep -q '不装 pre-push' \"$SKILL\" && grep -q '外来 hook 处置同根' \"$SKILL\"" ""
+
+echo "== 多仓工作区成员哨兵块（FR-6 三态）=="
+# 成员哨兵固定文本直接从 generation.md「成员 AGENTS.md 哨兵块」小节提取并替换
+# <成员目录名> 占位——夹具落装的就是文档原文，固定文本与文档不可能漂移；
+# 三态规则（不存在→创建 / 无标记→文末追加 / 有标记→块内替换）照细则机械复现
+member_sentinel_text() {
+  awk '/^### 成员 AGENTS.md 哨兵块/{f=1;next} /^## [0-9]|^### /{f=0} f' "$GEN" \
+    | awk '/^```/{f=!f;next} f' | sed "s/<成员目录名>/$1/g"
+}
+apply_member_sentinel() { # $1 成员目录名：三态落成员版哨兵块
+  local body f
+  body="$(member_sentinel_text "$1")"
+  f="$TMP/$1/AGENTS.md"
+  if [ ! -f "$f" ]; then
+    printf '# AGENTS.md\n\n%s\n' "$body" > "$f"
+  elif ! grep -q '<!-- sdlc:begin' "$f"; then
+    printf '\n%s\n' "$body" >> "$f"
+  else
+    # awk -v 会把值里的换行当转义错处理，多行文本经 ENVIRON 原样传入
+    MEMBER_SENTINEL_REPL="$body" awk '
+      /<!-- sdlc:begin/ { print ENVIRON["MEMBER_SENTINEL_REPL"]; inblk=1; next }
+      inblk { if (/<!-- sdlc:end -->/) inblk=0; next }
+      { print }
+    ' "$f" > "$f.new" && mv "$f.new" "$f"
+  fi
+}
+rm -f "$TMP/frontend/AGENTS.md"
+apply_member_sentinel frontend
+t "成员无 AGENTS.md：创建并落成员版哨兵块标记" 0 "grep -q '<!-- sdlc:begin' \"$TMP/frontend/AGENTS.md\" && grep -q '<!-- sdlc:end -->' \"$TMP/frontend/AGENTS.md\"" ""
+t "成员创建态带一级标题" 0 "head -n 1 \"$TMP/frontend/AGENTS.md\" | grep -qx '# AGENTS.md'" ""
+oseq "成员哨兵三要素按序成文：成员身份、工作区根指引、流程回根、代码照常" "$TMP/frontend/AGENTS.md" "成员子仓库" "工作区仓库在上级目录" "回工作区根进行" "照常进行"
+mkdir -p "$TMP/backend"
+printf '# 后端仓库说明\n\n包管理器用 pnpm。\n' > "$TMP/backend/AGENTS.md"
+cp "$TMP/backend/AGENTS.md" "$TMP/backend-agents.before"
+apply_member_sentinel backend
+t "成员 AGENTS.md 无标记：文末追加哨兵块" 0 "grep -q '<!-- sdlc:begin' \"$TMP/backend/AGENTS.md\" && tail -n 1 \"$TMP/backend/AGENTS.md\" | grep -q '<!-- sdlc:end -->'" ""
+head -n 3 "$TMP/backend/AGENTS.md" > "$TMP/backend-head.out"
+t "成员无标记追加：原有内容逐字保留在前" 0 "diff \"$TMP/backend-agents.before\" \"$TMP/backend-head.out\"" ""
+t "成员无标记追加：追加前空一行分隔" 0 "test -z \"\$(sed -n '4p' \"$TMP/backend/AGENTS.md\")\"" ""
+mkdir -p "$TMP/legacy"
+cat > "$TMP/legacy/AGENTS.md" <<'EOF'
+# legacy 仓库说明
+
+自有开头说明。
+<!-- sdlc:begin 由 setup-workspace 管理，勿在此块内手改 -->
+## 开发流程（本仓库是 SDLC 多仓工作区的成员子仓库）
+上一轮 setup 留下的旧版正文，重装应被整体替换。
+<!-- sdlc:end -->
+自有结尾说明。
+EOF
+sed '/<!-- sdlc:begin/,/<!-- sdlc:end -->/d' "$TMP/legacy/AGENTS.md" > "$TMP/legacy-outside.before"
+apply_member_sentinel legacy
+sed '/<!-- sdlc:begin/,/<!-- sdlc:end -->/d' "$TMP/legacy/AGENTS.md" > "$TMP/legacy-outside.after"
+t "成员已有标记：块内替换后块外 diff 为空" 0 "diff \"$TMP/legacy-outside.before\" \"$TMP/legacy-outside.after\"" ""
+t "成员已有标记：块内换为新版固定文本" 0 "grep -q '一律回工作区根进行' \"$TMP/legacy/AGENTS.md\"" ""
+t "成员已有标记：旧版正文不再残留" 1 "grep -q '旧版正文' \"$TMP/legacy/AGENTS.md\"" ""
+cp "$TMP/frontend/AGENTS.md" "$TMP/frontend-agents.once"
+apply_member_sentinel frontend
+t "成员哨兵幂等重装：同文本重跑文件零变化" 0 "diff \"$TMP/frontend-agents.once\" \"$TMP/frontend/AGENTS.md\"" ""
+
+echo "== 成员哨兵块成文契约（generation.md 成员小节 / SKILL §3 行与 §4 行）=="
+awk '/^### 成员 AGENTS.md 哨兵块/{f=1} /^## [0-9]/{f=0} f' "$GEN" > "$TMP/txt/member-sentinel.md"
+oseq "成员哨兵细则按序成文：标题点名成员与仅多仓模式、固定文本、占位目录名、三态复述、块外一字不动" "$TMP/txt/member-sentinel.md" "成员 AGENTS.md 哨兵块" "仅多仓工作区模式" "固定文本" "<成员目录名>" "文件不存在" "无 \`<!-- sdlc:begin\`" "块外" "一字不动"
+t "成员哨兵固定文本落文（begin/end 标记与三要素特征行）" 0 "grep -q '<!-- sdlc:begin' \"$TMP/txt/member-sentinel.md\" && grep -q '成员子仓库' \"$TMP/txt/member-sentinel.md\" && grep -q '回工作区根进行' \"$TMP/txt/member-sentinel.md\" && grep -q '照常进行' \"$TMP/txt/member-sentinel.md\"" ""
+t "SKILL §3 增成员哨兵行（仅多仓工作区模式、随 §4 三态收口）" 0 "grep -q '成员 AGENTS.md 哨兵块（仅多仓' \"$SKILL\" && grep -q '随 §4 三态收口' \"$SKILL\"" ""
+t "SKILL §4 增成员行（同三态、成员内不落根版流程块）" 0 "grep -q '成员版哨兵块' \"$SKILL\" && grep -q '不落根版流程块' \"$SKILL\"" ""
 
 echo "== 过程档 gitignore 行为（seam 1）=="
 new_repo
