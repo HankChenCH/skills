@@ -2,9 +2,10 @@
 id: 0016
 type: feature
 spec: 0007
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-29
+done: 2026-10-29
 ---
 # 0016: validate 清扫门禁（双份同步）
 
