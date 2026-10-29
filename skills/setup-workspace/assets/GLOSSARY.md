@@ -67,7 +67,7 @@
 - **成员清单** —— 工作区成员子仓库的落盘名册：初始化确认后生成，重跑按其 diff 增补/移出（首次出现：need 0008）。
 - **运行依赖顺序图** —— 对一张 spec 名下全部工票按 blocked-by 拓扑排序得到的分层视图：同层票无依赖可并行，层间 blocked-by 边是串行约束；会话内计算、不落盘，执行进度由工单状态机表达（首次出现：need 0004）。
 - **知识档** —— 价值越过终态仍被回读的产物档：need、spec、design、adr、research、standards；终态后留存于工作区与版本库（首次出现：need 0005）。
-- **过程档** —— 价值在终态耗尽的产物档：ticket、review、acceptance；过程中照常进库，验收通过后删除、以 git 历史为归档（首次出现：need 0005）。
+- **过程档** —— 价值在终态耗尽的产物档：ticket、review、acceptance；过程中盘上存在、被 `.gitignore` 排除、不进任何提交，验收通过后随蒸馏清扫删除（首次出现：need 0005）。
 - **蒸馏** —— dev-accept 在验收通过时把过程档产物中的耐久内容折回知识档的动作，四路落点：残余风险与证伪假设回 need、行为契约修正回 spec 验收场景、架构决策立 ADR、模式学习进编码标准；必须先于清扫（首次出现：need 0005）。
 - **清扫** —— 蒸馏完成后删除该 spec 名下全部过程档产物（tickets / reviews / acceptance 报告）的动作，与蒸馏、spec 置 done 同一提交原子完成；不回删 tracker 投影（首次出现：need 0005）。
 - **逆向产物** —— 扫描技能从存量代码逆向推断出的知识档沉淀物：need/spec/adr 形态与 AGENTS.md、GLOSSARY 项目术语章、docs/standards/ 的折叠内容；每条行为断言带文件:行证据与置信标注，逆向 need/spec 落盘即置 `status: reconstructed`，不进正向待办流（首次出现：need 0006）。
