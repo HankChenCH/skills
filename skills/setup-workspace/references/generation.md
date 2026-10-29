@@ -55,6 +55,20 @@ CHECK_TEST="<同上>"
 - 不存在 → 用 `assets/GLOSSARY.md` 创建。
 - 已存在 → 只补缺失的"流程术语与状态"章：检查是否含 `## 流程术语与状态` 标题；缺失则把 assets/GLOSSARY.md 的该章内容追加到文件**末尾**（项目术语章在前就在其后追加，保持既有内容一字不动）。已含该章 → 跳过。
 
+### .gitignore
+
+逐行幂等追加三条过程档忽略行，确切写法（逐字落盘）：
+
+```
+docs/tickets/
+docs/reviews/
+docs/acceptance/
+```
+
+- 幂等语义：每行先 grep 后追加——缺哪行补哪行，三行齐备即跳过，重跑零变化。目录级条目，产物目录懒创建，对不存在目录无副作用。
+- 用户已有 .gitignore 内容一行不动：只追加缺失行，不改写、不重排、不删任何已有行。
+- 不设标记块：三行内容固定、追加去重即幂等，无需标记判定（标记段只有多仓工作区模式的成员登记在用，见「多仓工作区模式」）。
+
 ### .git/hooks/commit-msg、pre-push
 
 每个 hook 写成一行转发（以 commit-msg 为例，`sdlc-managed` 标记必须保留，幂等判定靠它）：
@@ -165,6 +179,7 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 **本次动作**（覆盖/保留逐项）：
 - 覆盖 .sdlc/check.sh；生成 .sdlc/config.sh（模板）；生成 .sdlc/trackers/local.sh
 - 覆盖 docs/METHOD.md；GLOSSARY.md 补"流程术语与状态"章
+- .gitignore <幂等追加过程档忽略三行 | 三行已齐备跳过>（docs/tickets/、docs/reviews/、docs/acceptance/）
 - AGENTS.md <创建|追加哨兵块|替换块内内容>；hooks <安装 commit-msg/pre-push|发现外来 hook：说明>；L4 hook <已装（guard 脚本 + .zcode/config.json hooks 块，ZCode 会话）|未识别 ZCode 会话，未装平台接线，guard 脚本仍就位>
 - 编码标准：<导入 N 份到 docs/standards/ | 引入 <lang> starter | 跳过>
 - 识别智能体：<name|未识别，走通用流程>；仓库类型：<单仓库|monorepo（N 包）|多仓工作区（N 成员）>
