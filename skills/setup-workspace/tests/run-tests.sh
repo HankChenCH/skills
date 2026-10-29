@@ -1302,6 +1302,22 @@ t "FR-4 处置 = 移出技能发现路径，软禁用不采用" 0 "grep -q '移�
 t "FR-4 全局安装默认归档且处置前必须经用户确认作用域，不擅动全局" 0 "grep -q '确认作用域' \"$TMP/txt/disp-skill.md\" && grep -q '不擅动' \"$TMP/txt/disp-skill.md\"" ""
 t "FR-4 superpower 生命周期清单按调研报告，writing- 前缀不作写作类判据" 0 "grep -q '0002-superpower-skills-suite' \"$TMP/txt/disp-skill.md\" && grep -q 'writing- 前缀' \"$TMP/txt/disp-skill.md\"" ""
 
+echo "== setup-migrate 两态接入与出口（seam 1）=="
+ONBOARD="$HERE/../../setup-migrate/references/onboarding-exit.md"
+t "两态接入与出口参考文档存在（两级结构第五件）" 0 "test -f \"$ONBOARD\"" ""
+t "主文档按需加载与接入步指向两态协议" 0 "grep -q 'references/onboarding-exit.md' \"$SKILL\"" ""
+
+awk '/^## 两态接入/{f=1;next} /^## 对账清单收口/{f=0} f' "$ONBOARD" > "$TMP/txt/onboard.md"
+oseq "FR-5 两态接入按序：未接入先 setup-workspace 全流程、接入完成才落迁移产物、已接入资产逐字不变" "$TMP/txt/onboard.md" "setup-workspace 全流程" "接入完成" "逐字不变"
+t "FR-5 接入含其决策点不跳过，一次会话完成接入与迁移" 0 "grep -q '决策点' \"$TMP/txt/onboard.md\" && grep -q '一次会话' \"$TMP/txt/onboard.md\"" ""
+
+awk '/^## 对账清单收口/{f=1;next} /^## 出口/{f=0} f' "$ONBOARD" > "$TMP/txt/ledger-final.md"
+t "FR-6 收口核验：每行 来源→归宿→处置结果 齐备，缺行不收口" 0 "grep -q '齐备' \"$TMP/txt/ledger-final.md\" && grep -q '缺行' \"$TMP/txt/ledger-final.md\"" ""
+
+awk '/^## 出口/{f=1} f' "$ONBOARD" > "$TMP/txt/exit2.md"
+oseq "FR-7 出口按序：迁移报告、对账清单、指路 setup-reconstruct" "$TMP/txt/exit2.md" "迁移报告" "对账清单" "setup-reconstruct"
+t "FR-7 可选串联用户自选触发、不自动运行、不选不产逆向产物" 0 "grep -q '不自动' \"$TMP/txt/exit2.md\" && grep -q '自选' \"$TMP/txt/exit2.md\" && grep -q '不产生逆向产物' \"$TMP/txt/exit2.md\"" ""
+
 echo "== setup-migrate 对账清单不进门禁（seam 3）=="
 new_repo
 wfile docs/migrations/0001-matt-checkout.md <<'EOF'

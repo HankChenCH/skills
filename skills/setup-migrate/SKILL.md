@@ -14,7 +14,8 @@ description: 存量项目套件迁移：识别 matt / superpower 两个点名套
 **按需加载**：进入识别阶段前才 Read references/identify-protocol.md，
 进入翻译阶段前才 Read references/translation-mapping.md，
 进入处置阶段前才 Read references/disposal-protocol.md，
-清单收口前才 Read references/ledger-template.md，一次只载一个。
+进入接入与清单收口阶段前才 Read references/onboarding-exit.md，
+清单落盘取模板时才 Read references/ledger-template.md，一次只载一个。
 
 ## 0. 前置：入口门禁
 
@@ -22,7 +23,8 @@ description: 存量项目套件迁移：识别 matt / superpower 两个点名套
   套件迁移只对 git 仓库运行。"
 - 校验技能自身文件完整（SKILL.md、references/identify-protocol.md、
   references/translation-mapping.md、references/disposal-protocol.md、
-  references/ledger-template.md）；缺失 → 停止报告安装损坏。
+  references/onboarding-exit.md、references/ledger-template.md）；
+  缺失 → 停止报告安装损坏。
 - **不要求已接入本套件**（`.sdlc/check.sh` 存在与否不构成入口前置）：
   未接入仓库照常进入识别，接入与否只在落盘阶段分路（§3 接入步）。
 
@@ -55,12 +57,14 @@ Read references/identify-protocol.md，按其特征清单识别两套点名套�
 2. **处置**：Read references/disposal-protocol.md，tracker 开着的-issue 关闭并注明
    已迁移；生命周期类外来技能移除或归档（写作类保留；处置用户全局安装前必须经
    用户确认作用域，不擅动）。
-3. **接入**：未接入仓库先 setup-workspace 全流程接入再落迁移产物，一次会话完成；
-   已接入仓库仅补迁移产物，接入资产逐字不变。
+3. **接入**：Read references/onboarding-exit.md，未接入仓库先 setup-workspace
+   全流程接入（含其决策点）再落迁移产物，一次会话完成；已接入仓库仅补迁移产物，
+   接入资产逐字不变。
 4. **清单收口**：对账清单落 `docs/migrations/NNNN-slug.md`（Read
    references/ledger-template.md 取模板），每件外来产物一行：
    来源（本地路径 / issue 编号 + 平台）→ 归宿（新产物路径 / 归档位置 /
    显式弃置及理由）→ 处置结果（已翻译 / 已关闭 / 失败待补 / 未处理）。
+   收口前逐行核验三段齐备，缺行回翻译 / 处置步补齐（references/onboarding-exit.md）。
    对账清单是轻产物，不进 check.sh 门禁；frontmatter 仅 `id` / `created`，
    一次迁移一张，落盘即终态。
 
