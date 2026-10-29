@@ -2,9 +2,10 @@
 id: 0002
 type: feature
 spec: 0008
-status: implemented
+status: done
 blocked-by: []
 created: 2026-10-29
+done: 2026-10-29
 ---
 # 0002: 蓝图 §11.18 与 README 技能清单同步
 
