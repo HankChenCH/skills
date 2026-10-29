@@ -386,6 +386,15 @@ cmd_commit_msg() {
     info "✓ [trivial] 豁免提交（留痕于 commit message，dev-retro 审计）"
     return 0
   fi
+  # Merge/Revert 信息头是 git 操作产物而非署名工作，机械放行（要求带空格/引号的完整头形态）
+  local first_line
+  first_line="$(head -n 1 "$msg")"
+  case "$first_line" in
+    Merge\ *|'Revert "'*)
+      info "✓ Merge/Revert 信息头机械放行（合并/回退无需工单引用）"
+      return 0
+      ;;
+  esac
   local refs rc=0 d f st
   refs="$(commit_refs "$msg")"
   if [ -z "$refs" ]; then
@@ -619,7 +628,7 @@ usage() {
   ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
-  commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]
+  commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行
   pre-push              重门禁：分支上 implemented 工单须被 approved 评审覆盖
   publish <file>        按 TRACKER 发布产物（local=确认在盘）
   help                  本说明

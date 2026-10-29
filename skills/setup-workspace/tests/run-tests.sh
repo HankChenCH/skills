@@ -642,6 +642,16 @@ t "引用不存在的工单拒绝" 1 "printf '[#9999] x\n' > /tmp/msg.txt && che
 t "引用 ready 工单拒绝" 1 "printf '[#1] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "ready"
 t "多位引用混合法" 0 "sed -i.bak 's/^status: ready/status: in-progress/' docs/tickets/0001-cart-checkout.md && rm -f docs/tickets/0001-cart-checkout.md.bak && printf '[#0001][#0002] both\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "门禁通过"
 setfm docs/tickets/0001-cart-checkout.md status ready
+printf '[#0004] x\n' > /tmp/msg.txt
+setfm docs/tickets/0004-extra.md status done
+t "引用 done 工单拒绝并指路 fix" 1 "check.sh commit-msg /tmp/msg.txt" "开新 fix 工单"
+setfm docs/tickets/0004-extra.md status implemented
+printf "Merge branch 'feat/x'\n\ndummy body\n" > /tmp/msg.txt
+t "Merge 信息头机械放行（无需工单引用）" 0 "check.sh commit-msg /tmp/msg.txt" "机械放行"
+printf 'Revert "old subject"\n\nThis reverts commit abc1234.\n' > /tmp/msg.txt
+t "Revert 信息头机械放行（无需工单引用）" 0 "check.sh commit-msg /tmp/msg.txt" "机械放行"
+printf 'Merged changes\n' > /tmp/msg.txt
+t "Merge 需带空格的头形态（Merged 打头不放行）" 1 "check.sh commit-msg /tmp/msg.txt" "[#NNNN]"
 
 echo "== pre-push（分支提交评审覆盖）=="
 t "主干无领先提交通过" 0 "check.sh pre-push" "无领先提交"
