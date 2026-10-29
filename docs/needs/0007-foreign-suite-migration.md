@@ -1,8 +1,9 @@
 ---
 id: 0007
-status: confirmed
+status: fulfilled
 created: 2026-10-29
 confirmed: 2026-10-29
+fulfilled: 2026-10-30
 ---
 # 存量项目套件迁移：matt / superpower 产物与规则接入本套件
 
