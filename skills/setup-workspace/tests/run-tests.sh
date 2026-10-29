@@ -1864,6 +1864,69 @@ t "幂等重装：清单零变化" 0 "diff \"$TMP/manifest.before\" \"$TMP/.sdlc
 t "幂等重装：.gitignore 零变化无重复追加" 0 "diff \"$TMP/gitignore.before\" \"$TMP/.gitignore\"" ""
 t "标记段内成员行各恰一次" 0 "[ \"\$(grep -cx 'frontend/' \"$TMP/.gitignore\")\" = 1 ] && [ \"\$(grep -cx 'gateway/' \"$TMP/.gitignore\")\" = 1 ]" ""
 
+echo "== 复原幕：新环境 clone 根仓与成员后重跑零询问（FR-8）=="
+# 原型工作区装满后整体提交，clone 出"新环境"：根仓自带 .sdlc/docs/成员清单，成员哨兵
+# 随提交走，hooks 不随 clone 传递——重跑的幂等重装是刚需而非摆设。清单命中成员视为
+# 已确认（决策 4 复原零询问），求差零新增零缺失即零询问的机械前提。
+new_repo
+mkdir -p "$TMP/frontend" "$TMP/backend"
+for m in frontend backend; do
+  git -C "$TMP/$m" init -q -b main
+  git -C "$TMP/$m" config user.email test@example.com
+  git -C "$TMP/$m" config user.name tester
+  echo base > "$TMP/$m/base.txt"
+  git -C "$TMP/$m" add base.txt
+  git -C "$TMP/$m" commit -qm init
+done
+wfile docs/tickets/0002-restore-gate.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-10-29
+---
+# 0002: 复原幕夹具工单
+
+## Progress
+- 夹具
+EOF
+mscan "$TMP" > "$TMP/.sdlc/members.list"
+{
+  printf '*.log\n\n'
+  printf '%s\n' "$ms_begin"
+  sed 's#$#/#' "$TMP/.sdlc/members.list"
+  printf '%s\n' "$ms_end"
+} > "$TMP/.gitignore"
+install_member_hook "$TMP/frontend"
+install_member_hook "$TMP/backend"
+apply_member_sentinel frontend
+apply_member_sentinel backend
+git -C "$TMP" add .sdlc docs .gitignore
+git -C "$TMP" commit -qm "[trivial] 工作区原型"
+git -C "$TMP/frontend" add AGENTS.md && git -C "$TMP/frontend" commit -qm "[trivial] sentinel"
+git -C "$TMP/backend" add AGENTS.md && git -C "$TMP/backend" commit -qm "[trivial] sentinel"
+RESTORE="$TMP/restore"
+git clone -q "$TMP" "$RESTORE"
+git clone -q "$TMP/frontend" "$RESTORE/frontend"
+git clone -q "$TMP/backend" "$RESTORE/backend"
+t "克隆根自带 check.sh 与成员清单（清单命中即复原前提）" 0 "test -x \"$RESTORE/.sdlc/check.sh\" && grep -q frontend \"$RESTORE/.sdlc/members.list\"" ""
+t "克隆起点：根与成员均无 sdlc hook（hooks 不随 clone 传递，重装是刚需）" 0 "test ! -f \"$RESTORE/.git/hooks/commit-msg\" && test ! -f \"$RESTORE/frontend/.git/hooks/commit-msg\" && test ! -f \"$RESTORE/backend/.git/hooks/commit-msg\"" ""
+t "复原求差：零新增零缺失——全程零重复询问的机械前提" 0 "[ -z \"\$(mdiff_new \"$RESTORE\")\" ] && [ -z \"\$(mdiff_missing \"$RESTORE\")\" ]" ""
+# 清单命中成员视为已确认（决策 4 复原零询问）：直接幂等重装，无任何确认交互
+install_member_hook "$RESTORE/frontend"
+install_member_hook "$RESTORE/backend"
+apply_member_sentinel frontend "$RESTORE"
+apply_member_sentinel backend "$RESTORE"
+printf '#!/bin/sh\n# sdlc-managed: forward\nexec "$(git rev-parse --show-toplevel)/.sdlc/check.sh" commit-msg "$@"\n' > "$RESTORE/.git/hooks/commit-msg"
+chmod +x "$RESTORE/.git/hooks/commit-msg"
+echo r > "$RESTORE/frontend/restored.txt"; git -C "$RESTORE/frontend" add restored.txt
+t "重装后成员提交过门禁：工单随根 clone 而来，ROOT 锚定复原根" 0 "git -C $RESTORE/frontend commit -qm '[#0002] restored'" "门禁通过"
+t "复原哨兵幂等：克隆携带的 AGENTS.md 重装零变化" 0 "cmp \"$TMP/frontend/AGENTS.md\" \"$RESTORE/frontend/AGENTS.md\"" ""
+t "复原根自身提交过自身转发 hook" 0 "git -C $RESTORE commit -q --allow-empty -m '[trivial] restore probe'" "豁免"
+t "check.sh phase 正常输出（FR-8 自检：clone 来的工单可见）" 0 "cd \"$RESTORE\" && ./.sdlc/check.sh phase" "0002-restore-gate"
+
 echo "== 过程档 gitignore 行为（seam 1）=="
 new_repo
 printf 'docs/tickets/\ndocs/reviews/\ndocs/acceptance/\n' >> "$TMP/.gitignore"
