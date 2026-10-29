@@ -1,9 +1,10 @@
 ---
 id: 0003
-status: approved
+status: done
 round: 1
 created: 2026-10-27
 approved: 2026-10-27
+done: 2026-10-29
 ---
 # ref-testing 参考技能（六类测试参考 + 场景路由）
 
