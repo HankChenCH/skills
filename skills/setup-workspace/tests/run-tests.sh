@@ -1213,6 +1213,68 @@ t "FR-7 基线缺失回落全量扫描成文" 0 "grep -q '回落全量扫描' \"
 awk '/^## 补扫/{f=1;next} /^## /{f=0} f' "$RA" > "$TMP/txt/rescan.md"
 oseq "FR-5 补扫协议：范围参数、只产出该范围增量产物、更新基线覆盖清单、已确认存量产物不被重写" "$TMP/txt/rescan.md" "范围参数" "增量产物" "覆盖清单" "不被重写"
 
+echo "== setup-migrate 主文档文本契约（seam 1）=="
+new_repo
+SKILL="$HERE/../../setup-migrate/SKILL.md"
+IDENT="$HERE/../../setup-migrate/references/identify-protocol.md"
+LEDGER="$HERE/../../setup-migrate/references/ledger-template.md"
+mkdir -p "$TMP/txt"
+t "技能自身文件齐备（主文档 + 识别协议 + 对账清单模板）" 0 "test -f \"$SKILL\" && test -f \"$IDENT\" && test -f \"$LEDGER\"" ""
+t "frontmatter description 含迁移与识别一句话" 0 "grep -qE '^description:.*迁移' \"$SKILL\" && grep -qE '^description:.*识别' \"$SKILL\"" ""
+t "两级结构成文：主文档按需指向识别协议与清单模板" 0 "grep -q 'references/identify-protocol.md' \"$SKILL\" && grep -q 'references/ledger-template.md' \"$SKILL\"" ""
+
+awk '/^## 0\. /{f=1;next} /^## 1\. /{f=0} f' "$SKILL" > "$TMP/txt/gate.md"
+oseq "FR-1 入口门禁：git 仓库在前、技能自身文件完整在后、不要求已接入收尾" "$TMP/txt/gate.md" "git 仓库" "技能自身文件" "不要求" "接入"
+tn "FR-1 门禁不沿用未接入即拒的措辞（不要求 check.sh 存在）" 0 "cat \"$TMP/txt/gate.md\"" "先运行 /setup-workspace"
+
+awk '/^## 2\. /{f=1;next} /^## 3\. /{f=0} f' "$SKILL" > "$TMP/txt/identify.md"
+oseq "FR-1 识别节按序：点名 matt 与 superpower、全程只读、非点名痕迹标未处理" "$TMP/txt/identify.md" "matt" "superpower" "只读" "未处理"
+t "FR-1 识别只认点名清单不做通用识别器" 0 "grep -q '不做通用识别器' \"$TMP/txt/identify.md\"" ""
+
+awk '/^## 3\. /{f=1;next} /^## 4\. /{f=0} f' "$SKILL" > "$TMP/txt/skeleton.md"
+oseq "FR-1 流程骨架四步按序：翻译、处置、接入、清单收口" "$TMP/txt/skeleton.md" "翻译" "处置" "接入" "清单收口"
+t "FR-1 骨架占位：后四步注明后续工票落地不超前实现" 0 "grep -q '后续工票落地' \"$TMP/txt/skeleton.md\"" ""
+oseq "FR-6 对账清单落点与行结构按序：docs/migrations/、来源、归宿、处置结果" "$TMP/txt/skeleton.md" "docs/migrations/" "来源" "归宿" "处置结果"
+t "FR-6 处置结果四值成文：已翻译、已关闭、失败待补、未处理" 0 "grep -q '已翻译' \"$TMP/txt/skeleton.md\" && grep -q '已关闭' \"$TMP/txt/skeleton.md\" && grep -q '失败待补' \"$TMP/txt/skeleton.md\" && grep -q '未处理' \"$TMP/txt/skeleton.md\"" ""
+t "FR-6 清单 frontmatter 仅 id / created 成文" 0 "grep -q 'frontmatter 仅' \"$TMP/txt/skeleton.md\" && grep -q 'id' \"$TMP/txt/skeleton.md\" && grep -q 'created' \"$TMP/txt/skeleton.md\"" ""
+
+awk '/^## 4\. /{f=1;next} /^## 5\. /{f=0} f' "$SKILL" > "$TMP/txt/exit.md"
+oseq "FR-7 出口三件按序：报告、对账清单、指路 setup-reconstruct" "$TMP/txt/exit.md" "报告" "对账清单" "setup-reconstruct"
+t "FR-1 按需服务定位：路由表不加行" 0 "grep -q '路由表不加行' \"$TMP/txt/exit.md\"" ""
+t "FR-1 sdlc next-mode 路由表零 setup 行（技能不进自动串联链）" 0 "! grep -q 'setup-' \"$HERE/../../sdlc/references/next-mode.md\"" ""
+
+awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/forbidden.md"
+oseq "禁止事项：识别期零改动、非点名不擅自处置、不进路由表" "$TMP/txt/forbidden.md" "任何文件" "未处理" "路由表"
+
+oseq "FR-1 matt 特征按序：十四项生命周期技能、五枚 triage 标签、本地三痕迹" "$IDENT" "十四项" "needs-triage" "ready-for-human" "wontfix" ".scratch/" "GLOSSARY-MAP.md" "docs/agents/"
+oseq "FR-1 superpower 特征按层：配置键、installed_plugins、仓库内 docs/superpowers 与 .superpowers" "$IDENT" "enabledPlugins" "installed_plugins.json" "docs/superpowers/" ".superpowers/"
+t "FR-8 superpower 特征以调研报告为源并带检索日期" 0 "grep -q '0002-superpower-skills-suite' \"$IDENT\" && grep -q '2026-10-29' \"$IDENT\"" ""
+t "FR-1 防误伤：superpowers 插件名精确匹配，兄弟插件按未处理" 0 "grep -q '精确匹配' \"$IDENT\" && grep -q '未处理' \"$IDENT\"" ""
+t "FR-1 识别全程只读与 E1 不擅自处置成文" 0 "grep -q '只读' \"$IDENT\" && grep -q '不擅自处置' \"$IDENT\"" ""
+t "FR-1 识别报告覆盖三类痕迹" 0 "grep -q '生命周期技能清单' \"$IDENT\" && grep -q 'issue 清单' \"$IDENT\" && grep -q '本地痕迹' \"$IDENT\"" ""
+
+t "FR-6 模板 frontmatter 仅 id 与 created（机械断言键集合）" 0 "awk '/^---\$/{c++;next} c==1 && /^[a-zA-Z_-]+:/{print \$1}' \"$LEDGER\" | tr -d ':' | paste -sd, - | grep -qx 'id,created'" ""
+oseq "FR-6 模板行结构按序：来源、归宿、处置结果" "$LEDGER" "来源" "归宿" "处置结果"
+t "FR-6 模板落点 docs/migrations/ 成文" 0 "grep -q 'docs/migrations/' \"$LEDGER\"" ""
+t "FR-6 快照语义：一次迁移一张落盘即终态" 0 "grep -q '落盘即终态' \"$LEDGER\"" ""
+
+echo "== setup-migrate 对账清单不进门禁（seam 3）=="
+new_repo
+wfile docs/migrations/0001-matt-checkout.md <<'EOF'
+---
+id: 0001
+created: 2026-10-29
+---
+# 0001-matt-checkout：迁移对账清单
+
+| 来源 | 归宿 | 处置结果 |
+|---|---|---|
+| .scratch/0001-checkout.md | docs/specs/0001-checkout.md | 已翻译 |
+EOF
+t "validate 对 docs/migrations/ 文件报无法识别产物类型（不受理即不进状态机）" 1 "check.sh validate docs/migrations/0001-matt-checkout.md" "无法识别产物类型"
+tn "phase 输出不受 docs/migrations/ 存在影响" 0 "check.sh phase" "matt-checkout"
+tn "frontier 输出不受 docs/migrations/ 存在影响" 0 "check.sh frontier" "matt-checkout"
+
 echo "== setup-reconstruct 模板喂 validate（FR-2 实测）=="
 new_repo
 t "模板即 reconstructed / accepted 落盘形态" 0 "grep -q '^status: reconstructed' \"$TPLDIR/need.md\" && grep -q '^status: reconstructed' \"$TPLDIR/spec.md\" && grep -q '^status: accepted' \"$TPLDIR/adr.md\"" ""
