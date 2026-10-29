@@ -27,7 +27,7 @@
 | need.fulfilled | 成功标准全部核销、无未接受风险（终态） | dev-accept |
 | spec.draft | 规格起草中 | dev-spec |
 | spec.approved | 用户已显式批准，可拆工单 | dev-spec |
-| spec.done | 验收通过（终态） | dev-accept |
+| spec.done | 验收通过，且名下过程档已清扫（终态） | dev-accept |
 | design.draft / approved | 技术方案起草 / 定稿 | dev-design |
 | ticket.ready | 阻塞已清、可开工 | dev-plan |
 | ticket.in-progress | 开工中，进展写进 ## Progress | dev-implement |
