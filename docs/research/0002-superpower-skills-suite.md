@@ -15,10 +15,10 @@ created: 2026-10-29
 
 ## 结论速览
 
-- **Q1**：共 15 个技能，全部在仓库 `skills/` 目录：生命周期/流程类 11 个（brainstorming → writing-plans → executing-plans / subagent-driven-development 等官方编排链），框架元/保障类 4 个（using-superpowers、verification-before-completion、diagnosing-superpowers、writing-skills），**内容写作类 0 个**（来源 1/2/3）。按蓝图 §10.3 判据，该套件整体按生命周期类处置；**`writing-plans` / `writing-skills` 名带 writing- 前缀但不是写作类**，按前缀分类会把它们误判。
-- **Q2**：产物全部落在**目标仓库内**，不用任何 issue tracker：设计文档 `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`（提交进 git）、实现计划 `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`（提交进 git）、执行台账与任务简报在 `.superpowers/sdd/<计划名>/`（git-ignored 临时区，终审后按协议删除）；评审结论不落盘（来源 4/5/6/7/8）。
-- **Q3**：官方安装路 = Claude Code 插件：`/plugin install superpowers@claude-plugins-official` 或先 `marketplace add obra/superpowers-marketplace` 再安装；落盘 `~/.claude/plugins/cache/<marketplace>/superpowers/<版本>/`，痕迹在 `settings.json` 的 `enabledPlugins`、`~/.claude/plugins/installed_plugins.json`、`known_marketplaces.json`，以及仓库内 `hooks/hooks.json` 注册的 SessionStart hook（来源 9/10/11/12）。识别须**精确匹配插件名 `superpowers`**——同一 marketplace 另有 4 个 `superpowers-*` 前缀兄弟插件，按前缀识别会误伤（来源 13）。
-- **Q4**：与 matt 的根本结构差异：matt 把 spec/ticket 发布到 issue tracker、本地几乎不留过程档、状态在五枚 triage 标签；superpower 产物与状态全在目标仓库文件 + git 历史、**无 tracker、无 issue 可关**（FR-3 的 issue 关闭路径对 superpower 无对象）。粒度也不同：matt 一票一个 issue，superpower 一张计划文件内含 Task N 子任务（来源 14/15 与本报告 Q2/Q3）。
+- **Q1**：共 15 个技能，全部在仓库 `skills/` 目录：生命周期/流程类 11 个（brainstorming → writing-plans → executing-plans / subagent-driven-development 等官方编排链），框架元/保障类 4 个（using-superpowers、verification-before-completion、diagnosing-superpowers、writing-skills），**内容写作类 0 个**（来源 1、2、8）。按蓝图 §10.3 判据，该套件整体按生命周期类处置；**`writing-plans` / `writing-skills` 名带 writing- 前缀但不是写作类**，按前缀分类会把它们误判。
+- **Q2**：产物全部落在**目标仓库内**，不用任何 issue tracker：设计文档 `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`（提交进 git）、实现计划 `docs/superpowers/plans/YYYY-MM-DD-<feature-name>.md`（提交进 git）、执行台账与任务简报在 `.superpowers/sdd/<计划名>/`（git-ignored 临时区，终审后按协议删除）；评审结论不落盘（来源 1、3–7）。
+- **Q3**：官方安装路 = Claude Code 插件：`/plugin install superpowers@claude-plugins-official` 或先 `marketplace add obra/superpowers-marketplace` 再安装；落盘 `~/.claude/plugins/cache/<marketplace>/superpowers/<版本>/`，痕迹在 `settings.json` 的 `enabledPlugins`、`~/.claude/plugins/installed_plugins.json`、`known_marketplaces.json`，以及仓库内 `hooks/hooks.json` 注册的 SessionStart hook（来源 2、9、10、11）。识别须**精确匹配插件名 `superpowers`**——同一 marketplace 另有 4 个 `superpowers-*` 前缀兄弟插件，按前缀识别会误伤（来源 11）。
+- **Q4**：与 matt 的根本结构差异：matt 把 spec/ticket 发布到 issue tracker、本地几乎不留过程档、状态在五枚 triage 标签；superpower 产物与状态全在目标仓库文件 + git 历史、**无 tracker、无 issue 可关**（FR-3 的 issue 关闭路径对 superpower 无对象）。粒度也不同：matt 一票一个 issue，superpower 一张计划文件内含 Task N 子任务（来源 12 与本报告 Q2/Q3）。
 
 ### 待用户决策的支持范围（FR-8）
 
@@ -83,7 +83,7 @@ created: 2026-10-29
 | 任务简报 / 实现者报告 | `<repo-root>/.superpowers/sdd/<计划名去 .md>/task-<N>-brief.md`、`task-<N>-report.md` | brief 由脚本从计划文件按 `Task N` 标题抽取；report 只回报 status（DONE / DONE_WITH_CONCERNS / NEEDS_CONTEXT / BLOCKED）、commits、测试摘要、concerns | subagent-driven-development/SKILL.md 及其 scripts/task-brief |
 | 进度台账 ledger | `<workspace>/progress.md`（即 `.superpowers/sdd/<计划名>/progress.md`） | 首行身份行 `# SDD ledger — plan: <计划文件路径>`；完成行 `Task <N>: complete (commits <base>..<head>, tests: …)`；裁定行 `Ruling: …`；收尾行 `Final: fixed … RED→GREEN, suite N/N` | executing-plans/SKILL.md 及 scripts/task-done |
 | 任务测试日志 | 同目录 `task-<N>-tests.log` | 测试完整输出 | executing-plans/scripts/task-done |
-| 评审包 | 同目录 `review-<base7>..&lt;head7&gt;.diff` | `# Review package` + Commits + Files changed + Diff（git diff -U10） | subagent-driven-development/scripts/review-package |
+| 评审包 | 同目录 `review-<base7>..<head7>.diff` | `# Review package` + Commits + Files changed + Diff（git diff -U10） | subagent-driven-development/scripts/review-package |
 | 评审结论 | 会话内子代理返回，**不要求写成仓库文件** | Strengths / Issues 分 Critical（Must Fix）/ Important / Minor；Critical 阻塞推进 | requesting-code-review/SKILL.md 及其 code-reviewer.md |
 | 工作区归属标记 | `<workspace>/plan-path` | 一行，记录所属计划路径，防同名计划互踩 | scripts/sdd-workspace |
 
@@ -171,14 +171,19 @@ matt 侧事实来源：本机技能原文（`~/.zcode/skills/{to-spec,to-tickets
 
 ## 来源清单（检索日期均为 2026-10-29）
 
-一手来源（本会话实际抓取原文）：
+编号供结论速览引用；正文各节另有逐条 `来源：URL（检索 2026-10-29）` 行。全部为本会话实际抓取的一手来源。
 
-- 仓库与元数据：https://api.github.com/repos/obra/superpowers ；…/commits?per_page=1 ；…/git/trees/main?recursive=1 ；…/contents/skills ；…/contents/docs/superpowers/specs ；…/contents/docs/superpowers/plans（404 实证）
-- README 与 manifest：https://raw.githubusercontent.com/obra/superpowers/main/README.md ；…/.claude-plugin/plugin.json ；…/.claude-plugin/marketplace.json ；…/hooks/hooks.json
-- SKILL.md（15 个，均 …/skills/<名>/SKILL.md）：brainstorming、using-superpowers、writing-plans、executing-plans、subagent-driven-development、dispatching-parallel-agents、using-git-worktrees、test-driven-development、systematic-debugging、verification-before-completion、requesting-code-review（含 code-reviewer.md）、receiving-code-review、finishing-a-development-branch、diagnosing-superpowers（含 references/github-issues.md）、writing-skills
-- 脚本：…/skills/subagent-driven-development/scripts/{sdd-workspace, task-brief, review-package}；…/skills/executing-plans/scripts/{task-start, task-done}
-- marketplace：https://api.github.com/repos/obra/superpowers-marketplace 及 https://raw.githubusercontent.com/obra/superpowers-marketplace/main/.claude-plugin/marketplace.json
-- Claude Code 官方文档：https://code.claude.com/docs/en/plugins/loading.md ；https://code.claude.com/docs/en/plugin-marketplaces ；https://code.claude.com/docs/en/plugins/cli-reference.md ；https://code.claude.com/docs/en/skills
-- matt 侧（本机一手）：~/.zcode/skills/{to-spec, to-tickets, triage, setup-matt-pocock-skills}/SKILL.md；docs/sdlc-skills-blueprint.md §10.3
+1. 仓库元数据与全树核对：https://api.github.com/repos/obra/superpowers ；…/commits?per_page=1 ；…/git/trees/main?recursive=1 ；…/contents/skills ；…/contents/docs/superpowers/specs ；…/contents/docs/superpowers/plans（404 实证）
+2. README（安装命令、The Basic Workflow、What's Inside、Updating）：https://raw.githubusercontent.com/obra/superpowers/main/README.md
+3. skills/brainstorming/SKILL.md（https://raw.githubusercontent.com/obra/superpowers/main/skills/brainstorming/SKILL.md）
+4. skills/writing-plans/SKILL.md（同上路径模式）
+5. skills/executing-plans/SKILL.md 与 …/skills/executing-plans/scripts/{task-start, task-done}
+6. skills/subagent-driven-development/SKILL.md 与 …/skills/subagent-driven-development/scripts/{sdd-workspace, task-brief, review-package}
+7. skills/requesting-code-review/SKILL.md 与 …/skills/requesting-code-review/code-reviewer.md
+8. 其余 SKILL.md（清单表 description 引用，15 个均经 git blobs API 抓取原文）与 skills/diagnosing-superpowers/references/github-issues.md
+9. manifest 与 hook：…/.claude-plugin/plugin.json ；…/.claude-plugin/marketplace.json ；…/hooks/hooks.json
+10. Claude Code 官方文档：https://code.claude.com/docs/en/plugins/loading.md ；https://code.claude.com/docs/en/plugin-marketplaces ；https://code.claude.com/docs/en/plugins/cli-reference.md ；https://code.claude.com/docs/en/skills
+11. obra/superpowers-marketplace：https://api.github.com/repos/obra/superpowers-marketplace 与 https://raw.githubusercontent.com/obra/superpowers-marketplace/main/.claude-plugin/marketplace.json
+12. matt 侧本机一手：~/.zcode/skills/{to-spec, to-tickets, triage, setup-matt-pocock-skills}/SKILL.md；docs/sdlc-skills-blueprint.md §10.3
 
 二手线索（未采信为事实来源）：https://blog.fsck.com/2025/10/09/superpowers/（作者博客，仅用于定位仓库）
