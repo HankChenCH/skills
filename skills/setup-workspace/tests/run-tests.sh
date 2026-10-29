@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup-workspace 门禁脚本测试套件：在临时仓库断言 assets/check.sh 各子命令行为，
 # 对 dev-accept 蒸馏清扫出口做 SKILL.md 文本契约与 git 端到端断言，
-# 并断言 METHOD/GLOSSARY 活本与生成资产逐字一致。
+# 并断言 METHOD/GLOSSARY/check.sh 活本与生成资产逐字一致。
 # 用法：tests/run-tests.sh；全部通过输出 "ALL PASSED"，否则列出失败项并以非零退出。
 set -u
 
@@ -1018,6 +1018,143 @@ t "清扫后 done spec 校验通过" 0 "check.sh validate docs/specs/0001-swept.
 tn "其他 spec 名下工单不误报为残留" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-cart"
 tn "仅指向其他 spec 工单的评审不误报" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-review"
 
+echo "== reconstructed 状态（逆向产物零改动兼容）=="
+new_repo
+wfile docs/needs/0001-legacy-rules.md <<'EOF'
+---
+id: 0001
+status: reconstructed
+created: 2026-10-29
+---
+# 逆向：结账业务规则
+
+## 背景与业务目标
+存量结账模块的业务规则沉淀（证据：src/checkout/order.py:12）。
+
+## 干系人与用户
+买家与客服。
+
+## 系统能力需求
+- FR-1 结账须校验库存（证据：src/checkout/order.py:31）
+- FR-2 优惠码叠加上限为一层（证据：src/checkout/coupon.py:8，低置信：仅单处证据）
+
+## 场景
+- Given 库存不足 When 结算 Then 拒绝订单
+
+## 假设与风险
+- 规则自代码逆向，未经产品确认
+
+## 范围与非目标
+不含模块内部实现细节。
+
+## 开放问题
+- 叠加上限是否为产品意图
+
+## 扫描基线
+commit：abc1234def；日期：2026-10-29；已覆盖：src/checkout/；未覆盖：src/billing/（未覆盖区不得读成不存在）。
+EOF
+t "reconstructed need 过 validate（含扫描基线附加节）" 0 "check.sh validate docs/needs/0001-legacy-rules.md" "通过"
+wfile docs/specs/0001-legacy-behavior.md <<'EOF'
+---
+id: 0001
+status: reconstructed
+need: 0001
+round: 1
+created: 2026-10-29
+---
+# 逆向：结账系统行为
+
+## 问题陈述
+结账模块行为无文档沉淀。
+
+## 方案
+以逆向 spec 沉淀系统行为与模块职责，断言带证据。
+
+## 用户故事
+- 作为新会话 agent，我想读沉淀物即可了解结账行为，以便不重复全量扫描
+
+## 实现决策
+行为断言句末带 文件:行 证据引用。
+
+## 测试决策
+证据可回溯抽查，不做机械校验。
+
+## 验收场景
+- [FR-1 | 工单级] Given 库存不足 When 结算 Then 拒绝订单（证据：src/checkout/order.py:31）
+- [FR-2 | 集成级] Given 第二张优惠码 When 叠加 Then 拒绝（证据：src/checkout/coupon.py:8）
+
+## 非目标
+不重构结账模块。
+
+## 备注
+
+## 扫描基线
+commit：abc1234def；日期：2026-10-29；已覆盖：src/checkout/；未覆盖：src/billing/（未覆盖区不得读成不存在）。
+EOF
+t "reconstructed spec 覆盖齐过 validate" 0 "check.sh validate docs/specs/0001-legacy-behavior.md" "通过"
+wfile docs/specs/0002-legacy-partial.md <<'EOF'
+---
+id: 0002
+status: reconstructed
+need: 0001
+round: 1
+created: 2026-10-29
+---
+# 逆向：结账行为残卷
+
+## 问题陈述
+仅部分行为已取证。
+
+## 方案
+沉淀已取证部分。
+
+## 用户故事
+- 作为新会话 agent，我想读已取证行为
+
+## 实现决策
+同逆向 spec 惯例。
+
+## 测试决策
+证据可回溯抽查。
+
+## 验收场景
+- [FR-1 | 工单级] Given 库存不足 When 结算 Then 拒绝订单（证据：src/checkout/order.py:31）
+
+## 非目标
+未取证行为不入本卷。
+
+## 备注
+EOF
+t "reconstructed spec 覆盖缺报孤儿 FR" 1 "check.sh validate docs/specs/0002-legacy-partial.md" "孤儿 FR"
+wfile docs/tickets/0001-legacy-probe.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: done
+blocked-by: []
+created: 2026-10-29
+---
+# 0001: 残留探针工单
+
+**做什么：** 挂在逆向 spec 名下验证 reconstructed 不触发清扫门禁
+
+**验收标准：**
+- [x] 构造残留（证据：本文件）
+
+**Blocked by：** 无
+
+## Progress
+测试夹具
+EOF
+t "reconstructed spec 名下有过程档不触发残留门禁" 0 "check.sh validate docs/specs/0001-legacy-behavior.md" "通过"
+setfm docs/specs/0001-legacy-behavior.md status done
+t "残留校验活体探针：同一名下过程档在 done 下必红" 1 "check.sh validate docs/specs/0001-legacy-behavior.md" "docs/tickets/0001"
+setfm docs/specs/0001-legacy-behavior.md status reconstructed
+t "phase 原样显示 reconstructed 状态" 0 "check.sh phase" "0001-legacy-behavior reconstructed"
+t "frontier 输出不受逆向产物影响" 0 "check.sh frontier" "（空）"
+tn "frontier 不列逆向产物" 0 "check.sh frontier" "reconstructed"
+
 echo "== dev-accept 蒸馏清扫出口（SKILL.md 文本契约）=="
 new_repo
 SKILL="$HERE/../../dev-accept/SKILL.md"
@@ -1338,6 +1475,7 @@ echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
 t "两份 GLOSSARY.md 逐字一致" 0 "diff \"$ROOT/GLOSSARY.md\" \"$HERE/../assets/GLOSSARY.md\""
+t "两份 check.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$CHECK\""
 
 echo
 echo "通过 $PASS / 失败 $FAIL"

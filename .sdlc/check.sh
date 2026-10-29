@@ -106,8 +106,8 @@ type_of() {
 
 allowed_list() {
   case "$1" in
-    need) echo "draft confirmed fulfilled" ;;
-    spec) echo "draft approved done" ;;
+    need) echo "draft confirmed fulfilled reconstructed" ;;
+    spec) echo "draft approved done reconstructed" ;;
     design) echo "draft approved" ;;
     ticket) echo "ready in-progress implemented done" ;;
     review) echo "draft approved" ;;
