@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# setup-workspace 门禁脚本测试套件：在临时仓库断言 assets/check.sh 各子命令行为。
+# setup-workspace 门禁脚本测试套件：在临时仓库断言 assets/check.sh 各子命令行为，
+# 并对 dev-accept 蒸馏清扫出口做 SKILL.md 文本契约与 git 端到端断言。
 # 用法：tests/run-tests.sh；全部通过输出 "ALL PASSED"，否则列出失败项并以非零退出。
 set -u
 
@@ -73,6 +74,32 @@ fake_cmd() {
   mkdir -p "$TMP/fakebin"
   cat > "$TMP/fakebin/$1"
   chmod +x "$TMP/fakebin/$1"
+}
+
+# oseq 描述 文件 词...：断言各词按给定顺序先后出现（自前一词之后的滑动窗口做字面匹配，
+# 不受换行影响）；任一词缺失或乱序即失败。展开一律用 ${var} 形式——bash 3.2 的 $var
+# 紧跟多字节字符时会被误切词，报 unbound variable
+oseq() {
+  local desc="$1" f="$2" kw txt rest head base pos prev
+  shift 2
+  txt="$(cat "$f"; printf X)"; txt="${txt%X}"
+  base=0; prev=0; rest="$txt"
+  for kw in "$@"; do
+    head="${rest%%"${kw}"*}"
+    if [ "${#head}" = "${#rest}" ]; then
+      echo "FAIL: ${desc} —— 自偏移 ${base} 起未找到「${kw}」"
+      FAIL=$((FAIL+1)); return 1
+    fi
+    pos=$(( base + ${#head} + 1 ))
+    if [ "${pos}" -le "${prev}" ]; then
+      echo "FAIL: ${desc} —— 「${kw}」偏移 ${pos} 未严格递增（前词 ${prev}）"
+      FAIL=$((FAIL+1)); return 1
+    fi
+    prev=${pos}
+    base=$(( base + ${#head} + ${#kw} ))
+    rest="${rest#*"${kw}"}"
+  done
+  echo "ok: ${desc}"; PASS=$((PASS+1))
 }
 
 new_repo() {
@@ -989,6 +1016,20 @@ rm "$TMP/docs/tickets/0001-old-cart.md" "$TMP/docs/reviews/0001-old-review.md" "
 t "清扫后 done spec 校验通过" 0 "check.sh validate docs/specs/0001-swept.md" "通过"
 tn "其他 spec 名下工单不误报为残留" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-cart"
 tn "仅指向其他 spec 工单的评审不误报" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-review"
+
+echo "== dev-accept 蒸馏清扫出口（SKILL.md 文本契约）=="
+new_repo
+SKILL="$HERE/../../dev-accept/SKILL.md"
+mkdir -p "$TMP/txt"
+awk '/^4\. \*\*passed 出口/{f=1;next} /^5\. \*\*rejected 出口/{f=0} f' "$SKILL" > "$TMP/txt/exit-passed.md"
+awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/forbidden.md"
+oseq "passed 出口序列四步按序：蒸馏→清扫→置 done→原子提交" "$TMP/txt/exit-passed.md" "蒸馏四路" "清扫" "置 done" "原子提交"
+oseq "E3 前置：残余风险与下一轮建议先折回 need 再清扫" "$TMP/txt/exit-passed.md" "残余风险" "下一轮建议" "清扫"
+t "passed 出口原子提交注明恰一个 [trivial] 且不产生中间态" 0 "grep -q '恰一个' $TMP/txt/exit-passed.md && grep -q '\[trivial\]' $TMP/txt/exit-passed.md && grep -q '不产生中间态' $TMP/txt/exit-passed.md" ""
+t "蒸馏四路落点齐备（need 假设节 / spec 验收场景 / ADR / standards）" 0 "grep -q '假设与风险' $TMP/txt/exit-passed.md && grep -q '验收场景' $TMP/txt/exit-passed.md && grep -q 'ADR' $TMP/txt/exit-passed.md && grep -q 'standards' $TMP/txt/exit-passed.md" ""
+oseq "禁止事项：rejected 禁改 spec 正文在前、蒸馏例外在后" "$TMP/txt/forbidden.md" "rejected" "例外"
+t "禁止事项保留禁改 spec 正文且例外限定 passed" 0 "grep -q '改 spec 正文' $TMP/txt/forbidden.md && grep -q 'passed' $TMP/txt/forbidden.md" ""
+t "frontmatter description 含蒸馏清扫一句话" 0 "grep -qE '^description:.*蒸馏.*清扫' $SKILL" ""
 
 echo "== L4 guard（PreToolUse 判定脚本）=="
 GUARD="$HERE/../assets/hooks/l4-guard.sh"

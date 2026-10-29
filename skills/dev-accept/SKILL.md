@@ -1,6 +1,6 @@
 ---
 name: dev-accept
-description: 对工单已全部交付（done）的 spec 做集成验收——在集成后的代码上逐条运行 spec 的集成级验收场景、逐 FR 核销、跑全量检查，写 docs/acceptance/ 验收报告（场景结果/假设验证/残余风险/下一轮建议），通过则 spec 置 done、够条件时 need 置 fulfilled，不通过则指路 dev-fix 并问用户开不开下一轮。当用户要求验收、核销需求、跑集成场景、检查 spec 是否交付完成时使用——工单未全部 done 或没有 approved spec 时会在入口被拒绝并指路 dev-ship。
+description: 对工单已全部交付（done）的 spec 做集成验收——在集成后的代码上逐条运行 spec 的集成级验收场景、逐 FR 核销、跑全量检查，写 docs/acceptance/ 验收报告（场景结果/假设验证/残余风险/下一轮建议），通过则按固定序列收口：蒸馏（残余风险与下一轮建议折回 need、验收场景按实际边界修订、架构决策立 ADR、模式学习进标准）→ 清扫（删除该 spec 名下全部过程档）→ spec 置 done → 恰一个 [trivial] 原子提交，够条件时 need 置 fulfilled，不通过则指路 dev-fix 并问用户开不开下一轮。当用户要求验收、核销需求、跑集成场景、检查 spec 是否交付完成时使用——工单未全部 done 或没有 approved spec 时会在入口被拒绝并指路 dev-ship。
 ---
 
 # dev-accept：集成验收
@@ -51,7 +51,13 @@ description: 对工单已全部交付（done）的 spec 做集成验收——在
    `round` = spec 的 round，slug 用 ASCII 小写短横线），跑 `.sdlc/check.sh validate`
    必须通过，再跑 `publish`。
 3. **判定是机械的，不问人**：集成级场景全过且 `check.sh all` 全绿 → `status: passed`；任一场景没过或检查有红灯 → `status: rejected`，缺陷与范围问题如实写进报告。报告状态变更的提交用 `[trivial]`——流程状态落盘，不是绕门禁（dev-retro 可审计）。
-4. **passed 出口**：spec frontmatter `status` 改 `done`、追加 `done: <今日>`，跑 validate + publish。随后处理 need（有 need 时）：成功标准逐条核销，且残余风险为空或逐条经用户显式接受 → need `status` 改 `fulfilled`、追加 `fulfilled: <今日>`；存在未核销标准或未接受风险 → **抛决策问题："开不开下一轮？"**，默认建议按残余风险性质给（建议开 → 下一轮从 /dev-spec 起步，round 递增，范围 = 残余风险；用户显式确认才开轮）。不开 → need 保持原状，说明差距，停。
+4. **passed 出口（固定序列，顺序不可换）**：
+   1. **蒸馏四路**（各落点过 validate）——① need「假设与风险」节逐条标注验证结果（验证通过 / 证伪 / 本轮未触发，以报告「假设验证」为准），并把残余风险与「下一轮建议」及其依据补写进该节：下一轮建议与残余风险先折回 need，是清扫的前置（E3 边界），未折回不得清扫；② spec「验收场景」按实现中发现的实际边界行为修订（仅 passed 允许）；③ 有架构分量的决策新立 ADR（status: accepted）；④ 模式学习追加进 CODING_STANDARDS.md 索引的 standards/。
+   2. **清扫**——删除该 spec 名下全部 tickets、reviews 与本次验收报告文件（含本次报告；"名下"关系与 validate 残留校验同一定义；tracker 投影不回删，映射文件保留）。
+   3. **置 done**——spec frontmatter `status` 改 `done`、追加 `done: <今日>`，validate 必须通过（done 名下过程档残留必须为零），publish 照旧。
+   4. **原子提交**——蒸馏编辑 + 清扫删除 + 置 done 合为恰一个 `[trivial]` 提交，不产生中间态提交。
+
+   序列完成后处理 need（有 need 时）：成功标准逐条核销，且残余风险为空或逐条经用户显式接受 → need `status` 改 `fulfilled`、追加 `fulfilled: <今日>`；存在未核销标准或未接受风险 → **抛决策问题："开不开下一轮？"**，默认建议按残余风险性质给（建议开 → 下一轮从 /dev-spec 起步，round 递增，范围 = 残余风险；用户显式确认才开轮）。不开 → need 保持原状，说明差距，停。
 5. **rejected 出口**：缺陷指路 dev-fix 开 fix 票，dev-fix 未实现 → 停下说明
    "缺陷清单已写进验收报告 NNNN，等 dev-fix 实现后开票"；范围问题确认已写进
    `## 下一轮建议`。停，不自动开轮。
@@ -84,8 +90,9 @@ created: <date>
 
 ## 禁止事项（任何时候）
 
-- 改工单的 status（工单生命周期归 dev-ship），或改 spec 正文——验收场景与实现
-  不符是 rejected 的证据，不是现场改场景的理由。
+- 改工单的 status（工单生命周期归 dev-ship）。rejected 时改 spec 正文同样禁止——
+  验收场景与实现不符是 rejected 的证据，不是现场改场景的理由；passed 出口蒸馏
+  ②（按实际边界行为修订「验收场景」）是禁改 spec 正文的唯一例外。
 - 场景没跑就凭读代码写"通过"。
 - 在验收中顺手修缺陷——修是 dev-fix / 新工单的事。
 - 跳过 `.sdlc/check.sh all`，或检查有红灯时写出"全绿"。
