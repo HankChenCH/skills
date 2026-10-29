@@ -1550,10 +1550,12 @@ git -C "$TMP/frontend" init -q -b main
 git -C "$TMP/frontend" config user.email test@example.com
 git -C "$TMP/frontend" config user.name tester
 # 成员转发 hook：照 generation.md「多仓工作区模式」模板逐字落装（复现 setup 的落装行为）；
-# 消息文件须先取绝对路径——git 传给 hook 的是相对成员仓库的路径，锚定到根后原路径失效
+# 消息文件须先取绝对路径——git 传给 hook 的是相对成员仓库的路径，锚定到根后原路径失效。
+# $1 成员仓库根，缺省 $TMP/frontend
 install_member_hook() {
-  printf '#!/bin/sh\n# sdlc-managed: forward to workspace root .sdlc/check.sh（由 setup-workspace 安装，重装会覆盖本文件）\nmsg="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"\ncd "$(dirname "$(git rev-parse --show-toplevel)")" && exec ./.sdlc/check.sh commit-msg "$msg"\n' > "$TMP/frontend/.git/hooks/commit-msg"
-  chmod +x "$TMP/frontend/.git/hooks/commit-msg"
+  local m="${1:-$TMP/frontend}"
+  printf '#!/bin/sh\n# sdlc-managed: forward to workspace root .sdlc/check.sh（由 setup-workspace 安装，重装会覆盖本文件）\nmsg="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"\ncd "$(dirname "$(git rev-parse --show-toplevel)")" && exec ./.sdlc/check.sh commit-msg "$msg"\n' > "$m/.git/hooks/commit-msg"
+  chmod +x "$m/.git/hooks/commit-msg"
 }
 install_member_hook
 echo one > "$TMP/frontend/a.txt"; git -C "$TMP/frontend" add a.txt
@@ -1658,10 +1660,11 @@ member_sentinel_text() {
   awk '/^### 成员 AGENTS.md 哨兵块/{f=1;next} /^## [0-9]|^### /{f=0} f' "$GEN" \
     | awk '/^```/{f=!f;next} f' | sed "s/<成员目录名>/$1/g"
 }
-apply_member_sentinel() { # $1 成员目录名：三态落成员版哨兵块
-  local body f
+apply_member_sentinel() { # $1 成员目录名 [$2 工作区根，缺省 $TMP]：三态落成员版哨兵块
+  local body f root
+  root="${2:-$TMP}"
   body="$(member_sentinel_text "$1")"
-  f="$TMP/$1/AGENTS.md"
+  f="$root/$1/AGENTS.md"
   if [ ! -f "$f" ]; then
     printf '# AGENTS.md\n\n%s\n' "$body" > "$f"
   elif ! grep -q '<!-- sdlc:begin' "$f"; then
@@ -1727,6 +1730,139 @@ awk '/^## 决策 4/{f=1} f' "$DEC" > "$TMP/txt/dec4.md"
 oseq "决策 4 重跑分支按序成文：求差只问新增、既有成员不重复询问幂等重装" "$TMP/txt/dec4.md" "求差" "新增" "不重复询问" "幂等重装"
 oseq "决策 4 消失成员话术按序成文：不再是 git 仓库即报告、确认才移出、同步 .gitignore 标记段、确认前清单与接入物一字不动、沉默与拒绝不动清单" "$TMP/txt/dec4.md" "不再是 git 仓库" "报告" "确认" "移出" ".gitignore 标记段" "一字不动" "沉默"
 t "决策 4 复原零询问成文：清单命中的成员视为已确认、零重复询问" 0 "grep -q '清单命中的成员视为已确认' \"$TMP/txt/dec4.md\" && grep -q '零重复询问' \"$TMP/txt/dec4.md\"" ""
+
+echo "== 多仓重跑 diff 三幕：新增入册 / 消失移出 / 幂等重装（FR-7/FR-10）=="
+# 独立多仓夹具：工作区仓库根 + frontend/backend 两入册成员（hook+哨兵+清单+.gitignore
+# 标记段齐备）。重跑按 SKILL §1 diff 规则与决策 4 机械复现：mscan 扫第一层（跳点目录、
+# rev-parse 解析回目录自身）→ 与清单求差 → 新增经确认补装（模板逐字取自 generation.md）
+# → 清单与 .gitignore 标记段按扫描顺序整体重写；消失成员未确认前清单与标记段一字不动。
+new_repo
+# mscan <根>：多仓第一层扫描（glob 不含点目录即跳过；rev-parse 成功且解析回目录自身
+# 才算候选），按字典序输出候选目录名——机械复现 scan-signals §1 第三形态
+mscan() {
+  local d top
+  for d in "$1"/*/; do
+    d="${d%/}"
+    [ -d "$d" ] || continue
+    top="$(git -C "$d" rev-parse --show-toplevel 2>/dev/null)" || continue
+    [ "$top" = "$(cd "$d" && pwd -P)" ] && printf '%s\n' "$(basename "$d")"
+  done
+}
+# 重跑求差的两个方向：新增 = 扫描命中不在清单；缺失 = 清单内扫描未命中
+mdiff_new() { comm -13 <(sort "$1/.sdlc/members.list") <(mscan "$1" | sort); }
+mdiff_missing() { comm -23 <(sort "$1/.sdlc/members.list") <(mscan "$1" | sort); }
+# 标记段模板行从 generation.md 逐字提取（幂等判定与措辞以文档为准）；围栏在列表项内
+# 带 2 空格缩进，须 sub 去缩进——锚定 ^# 会落空（红阶段钉死）
+ms_begin="$(awk '/sdlc:members begin/{sub(/^ */, ""); print; exit}' "$GEN")"
+ms_end="$(awk '/sdlc:members end/{sub(/^ */, ""); print; exit}' "$GEN")"
+# ms_rewrite_members_gitignore <根>：.gitignore 成员标记段按成员清单整体重写
+# （段内逐行 <目录名>/），标记行与块外内容一字不动——机械复现 generation.md
+# 「根 .gitignore 成员标记段」细则
+ms_rewrite_members_gitignore() {
+  awk -v begin="$ms_begin" -v end="$ms_end" -v list="$1/.sdlc/members.list" '
+    !inblk && $0 == begin {
+      print
+      while ((getline line < list) > 0) print line "/"
+      inblk = 1; next
+    }
+    inblk { if ($0 == end) { print; inblk = 0 } next }
+    { print }
+  ' "$1/.gitignore" > "$1/.gitignore.new" && mv "$1/.gitignore.new" "$1/.gitignore"
+}
+mkdir -p "$TMP/frontend" "$TMP/backend"
+for m in frontend backend; do
+  git -C "$TMP/$m" init -q -b main
+  git -C "$TMP/$m" config user.email test@example.com
+  git -C "$TMP/$m" config user.name tester
+done
+wfile docs/tickets/0002-act-gate.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-10-29
+---
+# 0002: 重跑三幕夹具工单
+
+## Progress
+- 夹具
+EOF
+mscan "$TMP" > "$TMP/.sdlc/members.list"     # 初装清单：按扫描顺序
+{
+  printf '*.log\n\n'
+  printf '%s\n' "$ms_begin"
+  sed 's#$#/#' "$TMP/.sdlc/members.list"
+  printf '%s\n' "$ms_end"
+} > "$TMP/.gitignore"
+install_member_hook "$TMP/frontend"
+install_member_hook "$TMP/backend"
+apply_member_sentinel frontend
+apply_member_sentinel backend
+
+echo "-- 幕一：新增 clone 重跑 → 列候选、确认后入册、清单更新，门禁与哨兵和初始成员完全一致 --"
+git init -q -b main "$TMP/.gateway-origin"  # 上游放点目录：扫描必须跳过
+git -C "$TMP/.gateway-origin" config user.email test@example.com
+git -C "$TMP/.gateway-origin" config user.name tester
+echo gw > "$TMP/.gateway-origin/gw.txt"
+git -C "$TMP/.gateway-origin" add gw.txt
+git -C "$TMP/.gateway-origin" commit -qm init
+git clone -q "$TMP/.gateway-origin" "$TMP/gateway"
+t "重跑求差：gateway 列为新增候选、点目录上游不入候选" 0 "[ \"\$(mdiff_new \"$TMP\")\" = gateway ]" ""
+t "重跑求差：此刻无缺失成员" 0 "[ -z \"\$(mdiff_missing \"$TMP\")\" ]" ""
+# 用户确认入册（决策 4 默认全入册）→ 补装门禁与哨兵 + 清单与标记段整体重写
+install_member_hook "$TMP/gateway"
+apply_member_sentinel gateway
+mscan "$TMP" > "$TMP/.sdlc/members.list"
+ms_rewrite_members_gitignore "$TMP"
+t "确认后清单按扫描顺序整体重写：backend/frontend/gateway 各一行" 0 "printf 'backend\nfrontend\ngateway\n' | diff - .sdlc/members.list" ""
+t "gateway 门禁与初始成员逐字节一致（同一转发模板）" 0 "cmp \"$TMP/frontend/.git/hooks/commit-msg\" \"$TMP/gateway/.git/hooks/commit-msg\"" ""
+sed 's/frontend/M/g' "$TMP/frontend/AGENTS.md" > "$TMP/fe.norm"
+sed 's/gateway/M/g' "$TMP/gateway/AGENTS.md" > "$TMP/gw.norm"
+t "gateway 哨兵与初始成员仅差目录名" 0 "diff \"$TMP/fe.norm\" \"$TMP/gw.norm\"" ""
+echo gw2 > "$TMP/gateway/gw2.txt"; git -C "$TMP/gateway" add gw2.txt
+t "gateway 提交引用 in-progress 工单放行（补装门禁即刻生效）" 0 "git -C $TMP/gateway commit -qm '[#0002] gateway in'" "门禁通过"
+echo gw3 > "$TMP/gateway/gw3.txt"; git -C "$TMP/gateway" add gw3.txt
+t "gateway 无引用非豁免提交同样被拦（与初始成员同规）" 1 "git -C $TMP/gateway commit -qm 'no tag'" "[#NNNN]"
+t "标记段同步 gateway/ 且 begin/end 恰一对" 0 "[ \"\$(grep -c '^# sdlc:members' \"$TMP/.gitignore\")\" = 2 ] && grep -qx 'gateway/' \"$TMP/.gitignore\"" ""
+t "用户自有行跨重写保留（*.log 仍在段外首行）" 0 "head -n 1 \"$TMP/.gitignore\" | grep -qx '*.log'" ""
+
+echo "-- 幕二：成员目录消失 → 报告缺失、未确认前清单不动、确认后才移出 --"
+rm -rf "$TMP/backend"
+cp "$TMP/.sdlc/members.list" "$TMP/manifest.before"
+cp "$TMP/.gitignore" "$TMP/gitignore.before"
+t "重跑求差：消失成员 backend 被点名报缺失" 0 "[ \"\$(mdiff_missing \"$TMP\")\" = backend ]" ""
+# 用户拒绝确认（沉默/拒绝）→ 重跑流程在此停住，不做任何写入
+t "未确认前清单一字不动" 0 "diff \"$TMP/manifest.before\" \"$TMP/.sdlc/members.list\"" ""
+t "未确认前 .gitignore 一字不动（backend/ 仍在段内）" 0 "diff \"$TMP/gitignore.before\" \"$TMP/.gitignore\" && grep -qx 'backend/' \"$TMP/.gitignore\"" ""
+# 用户显式确认移出 → 清单与标记段整体重写
+mscan "$TMP" > "$TMP/.sdlc/members.list"
+ms_rewrite_members_gitignore "$TMP"
+t "确认后清单移出 backend（frontend/gateway 各一行）" 0 "printf 'frontend\ngateway\n' | diff - .sdlc/members.list" ""
+t "确认后标记段同步移出 backend/" 1 "grep -qx 'backend/' \"$TMP/.gitignore\"" ""
+
+echo "-- 幕三：既有成员重跑 → 幂等重装无重复追加 --"
+for m in frontend gateway; do
+  cp "$TMP/$m/.git/hooks/commit-msg" "$TMP/$m.hook.before"
+  cp "$TMP/$m/AGENTS.md" "$TMP/$m.agents.before"
+done
+cp "$TMP/.sdlc/members.list" "$TMP/manifest.before"
+cp "$TMP/.gitignore" "$TMP/gitignore.before"
+t "重跑求差：零新增零缺失（纯幂等重装前提）" 0 "[ -z \"\$(mdiff_new \"$TMP\")\" ] && [ -z \"\$(mdiff_missing \"$TMP\")\" ]" ""
+install_member_hook "$TMP/frontend"
+install_member_hook "$TMP/gateway"
+apply_member_sentinel frontend
+apply_member_sentinel gateway
+mscan "$TMP" > "$TMP/.sdlc/members.list"
+ms_rewrite_members_gitignore "$TMP"
+t "幂等重装：frontend hook 零变化" 0 "cmp \"$TMP/frontend.hook.before\" \"$TMP/frontend/.git/hooks/commit-msg\"" ""
+t "幂等重装：gateway hook 零变化" 0 "cmp \"$TMP/gateway.hook.before\" \"$TMP/gateway/.git/hooks/commit-msg\"" ""
+t "幂等重装：frontend 哨兵零变化" 0 "cmp \"$TMP/frontend.agents.before\" \"$TMP/frontend/AGENTS.md\"" ""
+t "幂等重装：gateway 哨兵零变化" 0 "cmp \"$TMP/gateway.agents.before\" \"$TMP/gateway/AGENTS.md\"" ""
+t "幂等重装：清单零变化" 0 "diff \"$TMP/manifest.before\" \"$TMP/.sdlc/members.list\"" ""
+t "幂等重装：.gitignore 零变化无重复追加" 0 "diff \"$TMP/gitignore.before\" \"$TMP/.gitignore\"" ""
+t "标记段内成员行各恰一次" 0 "[ \"\$(grep -cx 'frontend/' \"$TMP/.gitignore\")\" = 1 ] && [ \"\$(grep -cx 'gateway/' \"$TMP/.gitignore\")\" = 1 ]" ""
 
 echo "== 过程档 gitignore 行为（seam 1）=="
 new_repo
