@@ -511,7 +511,7 @@ cmd_validate() {
   type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 八个产物目录内）：$file"
   local ERRORS=0
   err() { echo "  ✗ $*"; ERRORS=$((ERRORS+1)); }
-  local base id status pad spec_id need_id need_file frs covered missing round dep t any residue
+  local base id status pad spec_id need_id need_file frs covered missing round dep t any residue r
   base="$(basename "$file")"
 
   # --- 通用：frontmatter、id、文件名、状态 ---
@@ -575,6 +575,7 @@ cmd_validate() {
       has_sec "$file" "Progress" || err "缺必填节：## Progress"
       grep -qE '^[[:space:]]*- \[( |x)\]' "$file" || err "缺验收标准条目（**验收标准：** 下至少一条 - [ ]）"
       fm_bare_key "$file" "blocked-by" && err "blocked-by 须单行书写：[] 或 [0006, 0008]"
+      fm_bare_key "$file" "repos" && err "repos 须单行书写：[frontend, backend]"
       spec_id="$(fm_get "$file" spec)"
       if [ -n "$spec_id" ]; then
         artifact_file spec "$spec_id" >/dev/null 2>&1 || err "关联 spec $spec_id 不存在"
@@ -583,6 +584,11 @@ cmd_validate() {
       fi
       for dep in $(fm_list "$file" blocked-by); do
         artifact_file ticket "$dep" >/dev/null 2>&1 || err "blocked-by 引用的工单 $dep 不存在"
+      done
+      # FR-9：repos 非空时逐值校验其在成员清单内，缺省不触发该校验
+      for r in $(fm_list "$file" repos); do
+        grep -qxF "$r" "$SDL/members.list" 2>/dev/null \
+          || err "repos 值 $r 不在成员清单（.sdlc/members.list）"
       done
       ticket_cycles >/dev/null 2>&1 || err "工单依赖存在环：$(ticket_cycles | sed 's/^CYCLE //')"
       ;;

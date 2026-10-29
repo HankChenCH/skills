@@ -1978,6 +1978,97 @@ t "check-ignore 命中 docs/reviews" 0 "git check-ignore -q docs/reviews" ""
 t "check-ignore 命中 docs/acceptance" 0 "git check-ignore -q docs/acceptance" ""
 t "知识档新建文件照常入 git status" 0 "git status --porcelain" "docs/needs"
 
+echo "== repos 字段校验（FR-9，seam 三）=="
+new_repo
+printf 'frontend\nbackend\n' > "$TMP/.sdlc/members.list"
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+created: 2026-10-29
+---
+# 结账规格
+
+## 问题陈述
+x
+
+## 方案
+x
+
+## 用户故事
+x
+
+## 实现决策
+x
+
+## 测试决策
+x
+
+## 验收场景
+x
+
+## 非目标
+x
+
+## 备注
+x
+EOF
+wfile docs/tickets/0001-cross-repo.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+repos: [frontend, backend]
+created: 2026-10-29
+---
+# 0001: 跨仓库工单
+
+**做什么：** x
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+尚未开工
+EOF
+t "repos 两值均在清单通过" 0 "check.sh validate docs/tickets/0001-cross-repo.md" "通过"
+setfm docs/tickets/0001-cross-repo.md repos "[frontend, ios]"
+t "repos 含清单外值报错点名" 1 "check.sh validate docs/tickets/0001-cross-repo.md" "ios"
+setfm docs/tickets/0001-cross-repo.md repos "[]"
+t "repos 空列表不触发校验" 0 "check.sh validate docs/tickets/0001-cross-repo.md" "通过"
+setfm docs/tickets/0001-cross-repo.md repos "[frontend]"
+mv "$TMP/.sdlc/members.list" "$TMP/.sdlc/members.list.bak"
+t "成员清单缺失时 repos 非空报错不静默" 1 "check.sh validate docs/tickets/0001-cross-repo.md" "成员清单"
+mv "$TMP/.sdlc/members.list.bak" "$TMP/.sdlc/members.list"
+wfile docs/tickets/0002-multiline-repos.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+repos:
+  - frontend
+created: 2026-10-29
+---
+# 0002: 多行 repos
+
+**做什么：** x
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+尚未开工
+EOF
+t "多行 repos 拒绝（单行字段形态，先例 blocked-by）" 1 "check.sh validate docs/tickets/0002-multiline-repos.md" "repos 须单行"
+
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
