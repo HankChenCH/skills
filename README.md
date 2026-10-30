@@ -1,6 +1,6 @@
 # skills
 
-**门禁式 SDLC 技能集——把「个人 + AI 协作开发」的流程规矩变成机器门禁。**
+**门禁式 SDLC 技能集——把「团队 + AI 协作开发」的流程规矩变成机器门禁。**
 
 23 个技能驱动一条脊柱流水线，八类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
 
@@ -10,7 +10,7 @@ need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现�
 
 ## 致谢
 
-本套技能受 [Matt Pocock 的 skills 套件](https://github.com/mattpocock/skills)（"Skills for Real Engineers"，MIT 许可）启发。那套「小而可组合、对话即工作流」的技能是本方法论的直接起点——用它做真实项目时最大的不满，「指令式规范有规矩无检查」，后来成了本套件的第一设计目标。
+本套技能受 [Matt Pocock 的 skills 套件](https://github.com/mattpocock/skills)（"Skills for Real Engineers"，MIT 许可）启发。那套「小而可组合、对话即工作流」的技能是本方法论的直接起点；实践暴露出的主要短板——「指令式规范有规矩无检查」——成了本套件的第一设计目标。
 
 ## 它解决什么问题
 
@@ -135,4 +135,4 @@ AI 协作开发的三种常见失控：
 
 ## 项目状态
 
-22 个技能已全部实现，第 23 个（setup-migrate）已入蓝图 v1.19、实现接续中，2026-10-26 起按设计蓝图分批落地。本仓库自身即按这套流程开发——docs/ 下的 needs、specs、tickets、reviews 就是流程产物的真实样本。
+23 个技能已全部实现。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。
