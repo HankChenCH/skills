@@ -3,7 +3,9 @@
 SKILL.md 只留控制流；本文件是它引用的操作细则，按引用章节加载。所有命令均在
 2026-10-28 于临时 git 仓库演练实证（工单 0013：§1–§7，记录目录
 /tmp/devx-drill/records/；工单 0014：§8 收口链，记录目录
-/tmp/devx-drill/records/closeout-*.txt）。
+/tmp/devx-drill/records/closeout-*.txt）；2026-10-31 票 0022 增补演练：§4 物化、
+§7 合回前同步翻转副本与 merge-tree 干跑预检序、§8.4 done 落盘不提交、§5 多层
+在飞续接（记录目录 /tmp/devx-0022-drill/records/）。
 判断以 `.sdlc/check.sh` 输出与 `git` 实际行为为准，不凭记忆。
 
 ## 1. 约定总览
@@ -194,7 +196,9 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
   退出码 0 = 干净可合（输出仅一行结果树 OID）；1 = 冲突（首行 OID 后跟冲突条目，
   配 `--name-only` 取冲突文件名清单）。选干跑干净的候选先合；全部候选干跑皆冲突
   → SKILL.md §8 异常流停下问人。预检只排序、不做冲突内容的自动解决——merge-tree
-  纯干跑，不触碰工作树与分支。实测 git 2.50.1（Apple Git-155，2026-10-31）：真实
+  纯干跑，不触碰工作树与分支（演练实锤干跑与真合并同保真度）；干跑与真合并同受
+  xdiff 上下文规则约束：改动区相邻（中间无未改行）的候选互报冲突，预检因此偏保守。
+  实测 git 2.50.1（Apple Git-155，2026-10-31）：真实
   合并模式为**无选项双参数形态**，显式 `--write-tree` 反报 usage（exit 129），勿加。
 - **放行前提**：合回前同步已做（翻转副本在运行 worktree）。票 worktree 内没翻
   （子代理缺出口翻转）→ 让票子代理补 dev-implement 出口门禁，不绕门禁。
