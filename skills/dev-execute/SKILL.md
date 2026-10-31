@@ -1,6 +1,6 @@
 ---
 name: dev-execute
-description: 整 spec 编排运行——点名一张 approved spec，把名下全部工票按 blocked-by 依赖序图自动实现（同层票独立 worktree 经子代理并行，子代理执行 dev-implement 纪律）、逐票编排评审、机械合回运行分支并逐票预演，全绿后转收口（一次 PR → 合并确认 → 票 done → 清理 → 出口报告）。当用户要求"把 spec NNNN 整个跑完""编排执行这张 spec""一次跑完整张 spec 的全部工票"时使用——spec 未 approved 或点名单张工票会在入口被拒绝并分别指路 dev-spec / dev-implement。
+description: 整 spec 编排运行——点名一张 approved spec，把名下全部工票按 blocked-by 依赖序图自动实现（同层票独立 worktree 并行，派发按宿主自适应回退链：声明式工作流 > 后台子代理 > 同步子代理 > 串行逐票，执行 dev-implement 纪律）、逐票编排评审、机械合回运行分支并逐票预演，全绿后转收口（一次 PR → 合并确认 → 票 done → 清理 → 出口报告）。当用户要求"把 spec NNNN 整个跑完""编排执行这张 spec""一次跑完整张 spec 的全部工票"时使用——spec 未 approved 或点名单张工票会在入口被拒绝并分别指路 dev-spec / dev-implement。
 ---
 
 # dev-execute：整 spec 编排运行
@@ -54,8 +54,6 @@ ref-git-commit 为准。
    重切——落盘归 /dev-plan，用户坚持按图开工也放行，合回冲突由 §5.3 预检序与
    §8 异常流兜底）。
 4. **未确认不创建任何 worktree**。用户拒绝或要求调整 → 中止，零写入退出；
-   要调整分层或拆票 → 指路 /dev-plan（编排不拆票）。
-3. **未确认不创建任何 worktree**。用户拒绝或要求调整 → 中止，零写入退出；
    要调整分层或拆票 → 指路 /dev-plan（编排不拆票）。
 
 ## 4. 运行建立
