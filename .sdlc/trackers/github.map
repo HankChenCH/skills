@@ -65,3 +65,9 @@ docs/acceptance/0001-setup-reconstruct-round1.md	73	https://github.com/HankChenC
 docs/acceptance/0001-multi-repo-workspace-round1.md	74	https://github.com/HankChenCH/skills/issues/74
 docs/acceptance/0001-process-tier-gitignore-round1.md	77	https://github.com/HankChenCH/skills/issues/77
 docs/acceptance/0001-setup-migrate-round1.md	78	https://github.com/HankChenCH/skills/issues/78
+docs/specs/0012-dev-execute-concurrency.md	79	https://github.com/HankChenCH/skills/issues/79
+docs/tickets/0019-blueprint-sync-concurrency.md	80	https://github.com/HankChenCH/skills/issues/80
+docs/tickets/0020-host-concurrency-research.md	81	https://github.com/HankChenCH/skills/issues/81
+docs/tickets/0021-dev-plan-touch-surface-mutex.md	82	https://github.com/HankChenCH/skills/issues/82
+docs/tickets/0022-dev-execute-async-pipeline.md	83	https://github.com/HankChenCH/skills/issues/83
+docs/tickets/0023-dev-execute-preflight-adaptive-dispatch.md	84	https://github.com/HankChenCH/skills/issues/84
