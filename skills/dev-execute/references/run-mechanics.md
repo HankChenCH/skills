@@ -5,7 +5,10 @@ SKILL.md 只留控制流；本文件是它引用的操作细则，按引用章�
 /tmp/devx-drill/records/；工单 0014：§8 收口链，记录目录
 /tmp/devx-drill/records/closeout-*.txt）；2026-10-31 票 0022 增补演练：§4 物化、
 §7 合回前同步翻转副本与 merge-tree 干跑预检序、§8.4 done 落盘不提交、§5 多层
-在飞续接（记录目录 /tmp/devx-0022-drill/records/）。
+在飞续接（记录目录 /tmp/devx-0022-drill/records/）；2026-10-31 票 0023 增补演练：
+§2 开工预检（呈现与拒绝零写入）、§4 派发回退链三档命中（记录目录
+/tmp/devx-0023-drill/records/）。
+
 判断以 `.sdlc/check.sh` 输出与 `git` 实际行为为准，不凭记忆。
 
 ## 1. 约定总览
