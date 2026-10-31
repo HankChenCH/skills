@@ -132,16 +132,22 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
 ## 5. 中断续接推导
 
 1. `git worktree list`：有无 `run/<spec-id>` 条目 → 运行是否存在。
-2. 逐票读 frontmatter status。**读取顺序**：运行 worktree 最新（合回票的状态随
-   合回落地）；在办票读其票 worktree；主工作区在运行合回主干前是旧态，不作为
-   运行进度依据（演练实锤：同一票文件主仓 ready、运行 worktree implemented）。
-   done=完成；implemented=评审 approved（是否已合回看下一步）；in-progress=在办
-   （读其 `## Progress` 拿断点）；ready=未开工。
-3. 已合回判定：`git merge-base --is-ancestor "run/<spec-id>-t<NNNN>" "run/<spec-id>"`
-   （或运行分支 `git log --format=%s` 含该票 `[#NNNN]` 合回提交）→ implemented 且
-   已合回。
-4. 断点 = 首个"未合回"的票所在层：在办票续接其 Progress，未开工票照图派发；
-   已合回票与其所在层不重做。
+2. 逐票读 frontmatter status。**读取顺序**：运行 worktree 最新（已合回票的状态随
+   合回前同步与合回落地）；在办票读其票 worktree——流水线下在办票可跨多层并存，
+   逐票各读各的，不假定单层；主工作区在运行合回主干前是旧态，不作为运行进度依据
+   （演练实锤：同一票文件主仓 ready、运行 worktree implemented）。
+   done=完成；implemented=实现完成，细分两态——票 worktree docs/reviews/ 无
+   approved 评审报告=评审环节在途（重新编排评审），有=待合回（走 §7）；in-progress=
+   在办（读其 `## Progress` 拿断点）；ready=未开工（依赖已满足即照图派发，未满足
+   继续等）。
+3. 已合回判定（不变）：`git merge-base --is-ancestor "run/<spec-id>-t<NNNN>"
+   "run/<spec-id>"`（或运行分支 `git log --format=%s` 含该票 `[#NNNN]` 合回提交）
+   → implemented 且已合回。
+4. 断点按票逐个推导，不按"层"定断点（流水线下多层可同时在飞）：已合回票（§5.3
+   判定）不重做；implemented 未合回票按 §2 细分续接（评审在途 → 编排评审；
+   approved → 走 §7 合回，同步翻转副本 + merge-tree 预检序）；in-progress 票续接
+   其 Progress（可多张并行续接）；ready 票照图派发。层视图只用于展示与依赖满足
+   判定，不是续接单位。
 5. 票集变化（fix 票插入、spec 修订增删票）→ 回 SKILL.md §3 重算图，已完成票仍列
    图外，不重做。
 6. 断点落在收口链内（全部票已合回、预演绿，SKILL.md §6 未走完）→ 按序判定续接点：
