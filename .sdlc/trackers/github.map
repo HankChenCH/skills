@@ -71,3 +71,8 @@ docs/tickets/0020-host-concurrency-research.md	81	https://github.com/HankChenCH/
 docs/tickets/0021-dev-plan-touch-surface-mutex.md	82	https://github.com/HankChenCH/skills/issues/82
 docs/tickets/0022-dev-execute-async-pipeline.md	83	https://github.com/HankChenCH/skills/issues/83
 docs/tickets/0023-dev-execute-preflight-adaptive-dispatch.md	84	https://github.com/HankChenCH/skills/issues/84
+docs/needs/0011-execute-whole-graph-workflow.md	85	https://github.com/HankChenCH/skills/issues/85
+docs/specs/0013-execute-whole-graph-workflow.md	86	https://github.com/HankChenCH/skills/issues/86
+docs/tickets/0024-blueprint-whole-graph-run.md	87	https://github.com/HankChenCH/skills/issues/87
+docs/tickets/0025-execute-whole-graph-skill-docs.md	88	https://github.com/HankChenCH/skills/issues/88
+docs/tickets/0026-whole-graph-drill-and-copy-sync.md	89	https://github.com/HankChenCH/skills/issues/89
