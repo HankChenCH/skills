@@ -160,8 +160,9 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
      <BASE_REF>` 为真、票仍 implemented）→ 从 §8.4 补 done。
    - 票已 done、worktree 未清（`git worktree list` 仍有 run/ 前缀条目）→ 从
      §8.5 清理续起。
-   已合回票的评审不重做：评审报告随票分支在盘上（docs/reviews/），pre-push 按
-   覆盖面机械核对，缺了才补（SKILL.md §8 收口 pre-push 异常）。
+   已合回票的评审不重做：评审报告经合回前同步在运行 worktree 盘上（docs/
+   reviews/），pre-push 按覆盖面机械核对，缺了才补（SKILL.md §8 收口 pre-push
+   异常）。
 
 ## 6. 预演（每次合回后）
 
