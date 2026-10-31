@@ -133,8 +133,9 @@ ref-git-commit 为准。
 - **spec 缺口**（实现中发现 spec 错漏）→ 指路 /dev-spec 修订；修订产出的新票/
   改票并入运行，重算图后续跑。
 - **预演失败** → 指路 /dev-fix 开 fix 票；fix 票并入本 spec 图，重算后续跑。
-- **合回冲突** → 问人怎么解；可建议 expand–contract 拆票回 /dev-plan。绝不自动
-  解冲突。
+- **合回冲突**（merge-tree 预检后候选序仍全冲突，或干跑干净而实合冲突）→ 问人
+  怎么解；预检只排序、不自动解冲突内容；可建议 expand–contract 拆票回
+  /dev-plan。
 - **收口 pre-push 不过**（运行分支上 implemented 票缺 approved 评审覆盖——评审
   链与盘上状态不一致，如评审报告未随票分支提交）→ 停下报告缺口，指路
   /dev-review 补齐；覆盖补齐后从收口续跑（§7）。
