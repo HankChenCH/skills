@@ -104,8 +104,9 @@ ref-git-commit 为准。
 4. **执行合并**：dev-ship §4.2 同款——平台 PR 按确认方式在平台合并；本地在
    主工作区（BASE_REF）合并运行分支并 push（细则见 run-mechanics §8.3）。
 5. **票 → done**：合并后把本 spec 名下全部工票 `status` 改为 `done` 并追加
-   `done: <今日>`，状态变更用 [trivial] 提交落 BASE_REF（dev-ship 同款语义：
-   流程状态落盘，不是绕门禁，dev-retro 可审计）。
+   `done: <今日>`，状态变更**落盘不提交**（ADR 0003 物化语义：过程档无可提交
+   内容，validate 通过即终态；审计链 = tracker 投影 + 源码 `[#NNNN]` 引用 + 盘上
+   状态，细则见 run-mechanics §8.4）。
 6. **清理**：先移除全部票 worktree，再移除运行 worktree，随后删票分支与运行
    分支（顺序与命令见 run-mechanics §8.5——worktree 占用的分支删不动）。合并
    未执行不清理：单向门未过，盘上证据即运行状态。

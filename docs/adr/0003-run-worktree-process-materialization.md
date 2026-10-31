@@ -18,4 +18,4 @@ ADR 0002 裁决落地后，过程档（docs/tickets|reviews|acceptance）不再�
 
 - 正面：门禁语义完全不变（check.sh 零改动），worktree 间的盘上状态由编排者单点维护，物化副本与主工作区状态一致性在每次同步点机械可查。
 - 代价：物化是编排者的人工纪律，check.sh 不校验"worktree 是否已物化"——漏物化的失败模式是 hook 拦截（fail-loud，非静默）；多 worktree 副本在同步点之间短暂分叉，以"合回前同步"为唯一一致性要求。
-- 修订面：dev-execute run-mechanics §4（建 worktree 后物化）、§7（合回前同步翻转）、§8.4（done 落盘不提交）待下一轮成文（need 0009 验收折回记录）。
+- 修订面：dev-execute run-mechanics §4（建 worktree 后物化）、§7（合回前同步翻转）、§8.4（done 落盘不提交）已随 spec 0012 并发修订成文（票 0022，2026-10-31），本修订面核销（need 0009 验收折回记录）。

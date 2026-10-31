@@ -88,7 +88,12 @@ awk '
 git worktree add "<repo>-runs/<spec-id>-run" -b "run/<spec-id>"
 ```
 
-建立后核对清单（任一不满足即停，不派发）：
+建立后**立即物化**：把主工作区当前过程档目录（docs/tickets、docs/reviews、
+docs/acceptance）以盘上文件复制进运行 worktree——untracked、照旧不进任何提交
+（ADR 0003 裁决 1；物化纪律对任何运行/票 worktree 一律成立，票 worktree 同款见
+§4）。
+
+核对清单（任一不满足即停，不派发）：
 
 1. `git worktree list` 出现运行 worktree 条目，分支列为 `run/<spec-id>`。
 2. 主工作区 `git branch --show-current` 仍为主分支（BASE_REF）。
@@ -98,7 +103,8 @@ git worktree add "<repo>-runs/<spec-id>-run" -b "run/<spec-id>"
 
 ## 4. 票 worktree 与并行派发
 
-当前层每票，从运行分支切出票分支与票 worktree：
+依赖已满足的每票（开工后先第 1 层；此后每次合回预演绿重查图派发新满足者），从运行
+分支切出票分支与票 worktree：
 
 ```sh
 git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run/<spec-id>"
@@ -106,10 +112,20 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
 
 - **派发判据**：票 frontmatter `blocked-by` 中 spec 内依赖全部已合回（§5.3 判据）
   或 done；blocked-by 未满足的票不建 worktree、不派发（演练：无票 worktree 条目）。
-- **并行派发**：同层每票一个子代理，子代理执行 dev-implement 纪律全文，全部工作在
-  该票 worktree 内完成；并行度默认上限 4（SKILL.md 调用参数可覆盖），超出分批。
-- **交接语义**：实现提交与 `status: implemented` 翻转一并落在票分支（dev-implement
-  出口门禁）——这是 §7 合回被 commit-msg 放行的前提。
+  流水线下派发时机跟着依赖满足走，不等"当前层凑齐"。
+- **物化（建 worktree 后立即执行，ADR 0003 裁决 1）**：把主工作区当前过程档目录
+  （docs/tickets、docs/reviews、docs/acceptance）以盘上文件复制进票 worktree——
+  untracked、照旧不进任何提交。不物化 → 该 worktree 内门禁读不到过程档，
+  dev-implement 出口提交会被 commit-msg hook 拦（fail-loud，非静默）。
+- **并行派发**：满足依赖的每票一个子代理，子代理执行 dev-implement 纪律全文，全部
+  工作在该票 worktree 内完成；并行度默认上限 4（SKILL.md 调用参数可覆盖），超出
+  分批。宿主支持后台派发时用后台派发——完成通知驱动后续编排、不轮询，主会话派发
+  后可响应用户输入（SKILL.md §5.1）；同步派发为退化形态，纪律不变。
+- **交接语义（gitignore 时代，替代旧"翻转随票分支提交"条文）**：`status:
+  implemented` 翻转是纯盘上操作，落在票 worktree 的过程档副本上（ADR 0003 裁决
+  2）；实现代码提交照常落票分支（dev-implement 出口门禁的检查与提交部分）。翻转
+  副本在合回前由编排者同步到运行 worktree（§7 合回前同步）——这是 commit-msg
+  放行 `[#NNNN]` 合回的前提。
 - **隔离自证**：票 worktree 只见自己分支的改动（演练：两票 worktree 互不可见）；
   运行分支在合回前无该票内容。
 
@@ -152,18 +168,33 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
 
 ## 7. 机械合回
 
-票评审 approved 后，在**运行 worktree** 内按依赖序（分层序，同层任一序）执行：
+票评审 approved 且依赖满足后，在**运行 worktree** 内合回；每次合回前先做两件预备
+（次序固定：先同步翻转副本，再 merge-tree 干跑预检序）：
 
 ```sh
 git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 approved）"
 ```
 
-- **放行前提**：状态翻转已随票分支提交（§4 交接语义）。git 在 commit-msg hook
-  触发前已把合并结果写进工作树，hook 读到的运行 worktree 票文件是 implemented →
-  校验放行；票分支缺翻转提交 → hook 拦（"还是 ready"）——停下让票子代理补出口
-  提交，不绕门禁（两个方向均已演练实证）。
-- **预演衔接**：合回后立即跑 §6；绿灯才合回下一票或调度下一层。
-- **冲突停机**：merge 退出码 1 且 `git diff --name-only --diff-filter=U` 非空 →
+- **合回前同步翻转副本（ADR 0003 裁决 2）**：gitignore 时代过程档不进 git，票
+  worktree 内的 `status: implemented` 翻转与 docs/reviews/ 评审报告都是盘上文件，
+  由编排者复制进运行 worktree 对应路径，只覆盖该票自己的文件、不触碰其他票。git
+  在 commit-msg hook 触发前已把合并结果写进工作树，hook 读到的运行 worktree 票
+  文件是这份副本——implemented → 放行；漏同步 → hook 拦（"还是 ready"），
+  fail-loud——停下补同步，不绕门禁（两个方向均已演练实证）。评审报告随同步在盘，
+  pre-push 覆盖面校验（§8.2）据此读取（ADR 0003 裁决 4）。
+- **merge-tree 干跑预检序（"同层任一序"的机械语义 = 无冲突序优先）**：合回前对
+  候选票（已 approved 且依赖已满足、未合回者，同层为常态——跨层先后由 blocked-by
+  自然串行）逐个执行 `git merge-tree "run/<spec-id>" "run/<spec-id>-t<NNNN>"`：
+  退出码 0 = 干净可合（输出仅一行结果树 OID）；1 = 冲突（首行 OID 后跟冲突条目，
+  配 `--name-only` 取冲突文件名清单）。选干跑干净的候选先合；全部候选干跑皆冲突
+  → SKILL.md §8 异常流停下问人。预检只排序、不做冲突内容的自动解决——merge-tree
+  纯干跑，不触碰工作树与分支。实测 git 2.50.1（Apple Git-155，2026-10-31）：真实
+  合并模式为**无选项双参数形态**，显式 `--write-tree` 反报 usage（exit 129），勿加。
+- **放行前提**：合回前同步已做（翻转副本在运行 worktree）。票 worktree 内没翻
+  （子代理缺出口翻转）→ 让票子代理补 dev-implement 出口门禁，不绕门禁。
+- **预演衔接**：合回后立即跑 §6；绿灯才合回下一候选、派发新满足依赖的票。
+- **冲突停机**：干跑全冲突候选（见预检序）或干跑干净但实际 merge 退出码 1 且
+  `git diff --name-only --diff-filter=U` 非空（干跑与实合之间运行分支又前进了）→
   SKILL.md §8 异常流：停下问人；标准停机动作是 `git merge --abort` 还原运行
   worktree（票分支无损，重放 merge 即可复现冲突再按人的决策处理）。绝不自动解
   冲突（演练：先合回者过、后合回者 CONFLICT 停、abort 后工作树干净）。
@@ -223,9 +254,9 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
 
 1. 本 spec 名下全部工票逐张 `status` 改 `done`、追加 `done: <今日>`，逐张跑
    `.sdlc/check.sh validate <file>`。
-2. 状态变更**一次** [trivial] 提交落 BASE_REF：首行写明"spec <NNNN> 全部工票
-   → done"，正文留豁免理由（流程状态落盘，非绕门禁，dev-retro 审计基准内；
-   dev-ship §4.3 同款语义）。
+2. **done 落盘不提交（ADR 0003 裁决 3）**：gitignore 时代过程档无可提交内容，
+   不产生 [trivial] 提交——validate 通过即终态。审计链承载 = tracker 投影
+   （单向不回删）+ 源码 `[#NNNN]` 引用 + 盘上状态。
 3. TRACKER 指向平台 → 逐张 `publish` 投影（投影失败警告跳过不阻断，
    GLOSSARY"投影"语义）。
 
