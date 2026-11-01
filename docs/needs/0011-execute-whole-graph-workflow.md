@@ -1,8 +1,9 @@
 ---
 id: 0011
-status: confirmed
+status: fulfilled
 created: 2026-10-31
 confirmed: 2026-10-31
+fulfilled: 2026-11-01
 ---
 # dev-execute 档 1 整图单运行
 
