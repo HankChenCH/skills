@@ -85,13 +85,13 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 
 **外来 hook 处置**：已存在且不含 `sdlc-managed` → **不覆盖**；读出其内容摘要告知用户，给两个选项：把原有逻辑并进 check.sh 后重装，或用户自行串联（`exec` 前加调原 hook）。用户不选就跳过并列入收尾报告。
 
-### docs/ 八个产物目录
+### docs/ 九个产物目录
 
 **不创建**。留待第一个产物落盘时由对应技能创建，不留 .gitkeep。
 
 ### 多仓工作区模式（仅 SKILL §0 判定进入该模式时执行）
 
-- **工作区仓库**：根目录 `git init -b main`（分支 2 前提即根非仓库，无需防重）。随后按本节以上各目标在根落全套：check.sh、l4-guard、trackers、config.sh（仅缺失时生成）、METHOD.md、GLOSSARY、CODING_STANDARDS、AGENTS.md 哨兵（§2）、根 commit-msg/pre-push 转发，语义与单仓完全一致；docs/ 八个产物目录照旧懒创建。根不装成员源码：CODE_DIRS 与 CHECK_* 探测不到即留空；fresh init 无 origin/HEAD，BASE_REF 落 `main` 默认值。
+- **工作区仓库**：根目录 `git init -b main`（分支 2 前提即根非仓库，无需防重）。随后按本节以上各目标在根落全套：check.sh、l4-guard、trackers、config.sh（仅缺失时生成）、METHOD.md、GLOSSARY、CODING_STANDARDS、AGENTS.md 哨兵（§2）、根 commit-msg/pre-push 转发，语义与单仓完全一致；docs/ 九个产物目录照旧懒创建。根不装成员源码：CODE_DIRS 与 CHECK_* 探测不到即留空；fresh init 无 origin/HEAD，BASE_REF 落 `main` 默认值。
 - **成员清单 `.sdlc/members.list`**：决策 4 确认后落盘，逐行一个成员目录名（相对根、无斜杠、按扫描顺序）；归 setup 所有权，重跑按新确认结果**整体重写**。被排除的候选不落行。`.sdlc/` 随写随建。
 - **根 .gitignore 成员标记段**：登记成员目录，防嵌套 git 仓库被误收进工作区仓库索引。段格式（标记行措辞勿改，幂等判定靠 begin/end 标记）：
 

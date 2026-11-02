@@ -209,17 +209,13 @@ spec_residue() {
     tid="$(basename "$f" .md)"; tid="${tid%%-*}"
     tids="$tids$tid "
   done
-  for f in "$DOCS"/acceptance/*.md; do
-    [ -f "$f" ] || continue
-    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
-    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
-    [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
-  done
-  for f in "$DOCS"/overviews/*.md; do
-    [ -f "$f" ] || continue
-    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
-    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
-    [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
+  for dir in acceptance overviews; do
+    for f in "$DOCS"/"$dir"/*.md; do
+      [ -f "$f" ] || continue
+      tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
+      tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+      [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
+    done
   done
   for f in "$DOCS"/reviews/*.md; do
     [ -f "$f" ] || continue
