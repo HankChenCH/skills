@@ -1029,6 +1029,216 @@ t "清扫后 done spec 校验通过" 0 "check.sh validate docs/specs/0001-swept.
 tn "其他 spec 名下工单不误报为残留" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-cart"
 tn "仅指向其他 spec 工单的评审不误报" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-review"
 
+echo "== overview 类型注册六处分支（seam 一，spec 0014）=="
+new_repo
+wfile docs/needs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-11-02
+---
+# 结账流程
+
+## 背景与业务目标
+提高结账转化。
+
+## 干系人与用户
+买家；成功标准：下单转化率不降。
+
+## 系统能力需求
+- FR-1 支持购物车结算
+
+## 场景
+- Given 购物车有商品 When 结算 Then 生成订单
+
+## 假设与风险
+- 假设：优惠码规则稳定
+
+## 范围与非目标
+不含退款。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-02
+---
+# 结账规格
+
+## 问题陈述
+买家结算慢。
+
+## 方案
+一键结算。
+
+## 用户故事
+- 作为买家，我想要一键结算，以便更快下单
+
+## 实现决策
+新增 checkout 模块。
+
+## 测试决策
+在 checkout 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有商品 When 结算 Then 订单生成
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/tickets/0001-cart.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-11-02
+---
+# 0001: 购物车结算
+
+**做什么：** 从购物车一键生成订单
+
+**验收标准：**
+- [ ] 有商品时结算生成订单（测试：checkout_test）
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0001: 结账总览
+
+## 全景一行
+一键结算（来源：spec 0001 方案）。
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 购物车结算 | ticket 0001 |
+
+## 黄金场景走查
+作为买家，我把商品加入购物车并结算，订单生成（剧本：spec 0001 验收场景 FR-1）。
+
+## 样张
+CLI 输出样例：`订单已创建`。
+
+## 差距清单
+- 无
+EOF
+t "phase 扫描出现 overview 行并带 spec 关联" 0 "check.sh phase" "0001-checkout-overview draft spec=0001"
+t "validate overview 五节齐备通过" 0 "check.sh validate docs/overviews/0001-checkout-overview.md" "通过（overview）"
+wfile docs/overviews/0002-missing-sample.md <<'EOF'
+---
+id: 0002
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0002: 缺样张总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 缺必填节点名样张" 1 "check.sh validate docs/overviews/0002-missing-sample.md" "缺必填节：## 样张"
+wfile docs/overviews/0003-ghost-spec.md <<'EOF'
+---
+id: 0003
+spec: 9999
+status: draft
+created: 2026-11-02
+---
+# 0003: 指向不存在 spec 的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview spec 引用不存在拒绝" 1 "check.sh validate docs/overviews/0003-ghost-spec.md" "关联 spec 9999 不存在"
+wfile docs/overviews/0005-nospec.md <<'EOF'
+---
+id: 0005
+status: draft
+created: 2026-11-02
+---
+# 0005: 缺 spec 字段的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 缺 spec 字段拒绝" 1 "check.sh validate docs/overviews/0005-nospec.md" "缺 frontmatter 字段 spec"
+wfile docs/overviews/0004-badstatus.md <<'EOF'
+---
+id: 0004
+spec: 0001
+status: approved
+created: 2026-11-02
+---
+# 0004: 状态非法的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 状态非法（只许 draft reviewed）" 1 "check.sh validate docs/overviews/0004-badstatus.md" "status 非法（overview 允许：draft reviewed）"
+
 echo "== reconstructed 状态（逆向产物零改动兼容）=="
 new_repo
 wfile docs/needs/0001-legacy-rules.md <<'EOF'
