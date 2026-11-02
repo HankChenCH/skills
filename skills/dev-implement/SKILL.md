@@ -24,6 +24,7 @@ description: 按 docs/tickets/ 中的工单实现功能。入口校验工单状�
    - 工单存在且 `status: ready`（或 `in-progress` 重入，见 §5）
    - Blocked by 的所有工单 `status: implemented 或 done`
    - 关联 spec 存在且 `status: approved`
+   - 名下票 ≥2 的 spec 须有 `reviewed` 总览（单票豁免；缺失或 draft 会被拒并指路 /dev-overview）
 3. 任一不满足 → **停止**，转述缺什么、下一步该跑哪个技能
    （例如"spec 0003 还是 draft，先 /dev-spec 完成批准"），不写任何代码。
 

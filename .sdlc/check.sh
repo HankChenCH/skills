@@ -228,6 +228,45 @@ spec_residue() {
   done
 }
 
+# overview_gate SPEC_ID：FR-7 开工门禁——名下票 ≥2 的 spec 须有 reviewed 总览才准开工。
+# 名下关系与 spec_residue 同一定义（票 frontmatter spec 字段指向该 spec）。
+# 单票豁免放行；缺失或 draft 总览 → 非零退出并指路 /dev-overview。仅在 spec approved/done 后调用。
+overview_gate() {
+  local sid own tf tspec of ospec found draft
+  sid="$(pad4 "${1%%-*}")" || return 0
+  own=0
+  for tf in "$DOCS"/tickets/*.md; do
+    [ -f "$tf" ] || continue
+    tspec="$(fm_get "$tf" spec)"; tspec="${tspec%%-*}"
+    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+    [ "$tspec" = "$sid" ] || continue
+    own=$((own+1))
+  done
+  if [ "$own" -le 1 ]; then
+    [ "$own" -eq 1 ] && info "✓ spec $1 单票，免总览门禁"
+    return 0
+  fi
+  found=""; draft=""
+  for of in "$DOCS"/overviews/*.md; do
+    [ -f "$of" ] || continue
+    ospec="$(fm_get "$of" spec)"; ospec="${ospec%%-*}"
+    ospec="$(pad4 "$ospec" 2>/dev/null)" || continue
+    [ "$ospec" = "$sid" ] || continue
+    if [ "$(fm_get "$of" status)" = "reviewed" ]; then found="$of"; break; fi
+    [ -n "$draft" ] || draft="$of"
+  done
+  if [ -n "$found" ]; then
+    info "✓ spec $1 名下 ${own} 张票，总览 $(basename "$found") 已 reviewed"
+    return 0
+  fi
+  if [ -n "$draft" ]; then
+    echo "✗ spec $1 名下 ${own} 张票，总览 $(basename "$draft") 还是 draft——开工前置：在 /dev-overview 完成走查（缝隙归置清零 + 用户显式确认）置 reviewed"
+  else
+    echo "✗ spec $1 名下 ${own} 张票，缺 reviewed 总览（docs/overviews/）——开工前置：先 /dev-overview 合成总览、走查归置并确认后置 reviewed"
+  fi
+  return 1
+}
+
 # ---------- 子命令 ----------
 
 cmd_phase() {
@@ -325,6 +364,10 @@ cmd_ticket() {
         draft)    echo "✗ spec $spec_id 还是 draft，先 /dev-spec 完成批准"; rc=1 ;;
         *)        echo "✗ spec $spec_id 状态非法：$sst"; rc=1 ;;
       esac
+      # FR-7 开工门禁：spec 批准之后校验 reviewed 总览（名下 ≥2 票才触发，单票豁免）
+      if [ "$sst" = "approved" ] || [ "$sst" = "done" ]; then
+        overview_gate "$spec_id" || rc=1
+      fi
     else
       echo "✗ 关联 spec $spec_id 不存在"; rc=1
     fi
@@ -645,7 +688,7 @@ usage() {
 用法：check.sh <子命令> [参数]
   phase                 全库状态总览（九类产物 + frontier）
   frontier              列出阻塞已清、可开工的工单
-  ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved）
+  ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved、多票 spec 须 reviewed 总览）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
   commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行
