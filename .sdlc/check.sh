@@ -195,7 +195,7 @@ ticket_cycles() {
 }
 
 # spec_residue SPECID：输出该 spec 名下仍在盘上的过程档路径（相对仓库根，每行一个）。
-# 名下关系：ticket / acceptance 的 spec 字段指向该 spec；review 的 tickets 与名下工单有交集。
+# 名下关系：ticket / acceptance / overview 的 spec 字段指向该 spec；review 的 tickets 与名下工单有交集。
 # 供 validate 清扫门禁使用：done 的 spec 名下过程档必须为零。
 spec_residue() {
   local sid="$1" f tspec t tids tid
@@ -210,6 +210,12 @@ spec_residue() {
     tids="$tids$tid "
   done
   for f in "$DOCS"/acceptance/*.md; do
+    [ -f "$f" ] || continue
+    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
+    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+    [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
+  done
+  for f in "$DOCS"/overviews/*.md; do
     [ -f "$f" ] || continue
     tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
     tspec="$(pad4 "$tspec" 2>/dev/null)" || continue

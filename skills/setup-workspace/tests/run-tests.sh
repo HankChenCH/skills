@@ -1239,6 +1239,100 @@ x
 EOF
 t "validate overview 状态非法（只许 draft reviewed）" 1 "check.sh validate docs/overviews/0004-badstatus.md" "status 非法（overview 允许：draft reviewed）"
 
+echo "-- overview 纳入 spec_residue 名下关系（AC3，done 清扫门禁）--"
+wfile docs/needs/0002-solo.md <<'EOF'
+---
+id: 0002
+status: confirmed
+created: 2026-11-02
+---
+# 单票流程
+
+## 背景与业务目标
+减少重复操作。
+
+## 干系人与用户
+操作员；成功标准：重复操作清零。
+
+## 系统能力需求
+- FR-1 支持一键归档
+
+## 场景
+- Given 有已完成工单 When 归档 Then 工单入档
+
+## 假设与风险
+- 假设：归档规则稳定
+
+## 范围与非目标
+不含恢复。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0002-solo-swept.md <<'EOF'
+---
+id: 0002
+status: done
+need: 0002
+round: 1
+created: 2026-11-02
+---
+# 已清扫单票规格
+
+## 问题陈述
+重复操作多。
+
+## 方案
+一键归档。
+
+## 用户故事
+- 作为操作员，我想要一键归档，以便减少重复操作
+
+## 实现决策
+新增 archive 模块。
+
+## 测试决策
+在 archive 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有已完成工单 When 归档 Then 工单入档
+
+## 非目标
+不含恢复。
+
+## 备注
+EOF
+wfile docs/overviews/0006-solo-residue.md <<'EOF'
+---
+id: 0006
+spec: 0002
+status: draft
+created: 2026-11-02
+---
+# 0006: 单票总览
+
+## 全景一行
+一键归档（来源：spec 0002 方案）。
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 操作员 | FR-1 | 一键归档 | （无） |
+
+## 黄金场景走查
+作为操作员，我对已完成工单点归档，工单入档（剧本：spec 0002 验收场景 FR-1）。
+
+## 样张
+CLI 输出样例：`已归档 1 项`。
+
+## 差距清单
+- 无
+EOF
+t "done spec 名下总览残留被点名" 1 "check.sh validate docs/specs/0002-solo-swept.md" "docs/overviews/0006-solo-residue.md"
+rm "$TMP/docs/overviews/0006-solo-residue.md"
+t "清扫后 done spec 名下总览为零" 0 "check.sh validate docs/specs/0002-solo-swept.md" "通过"
+tn "指向其他 spec 的总览不误报为残留" 0 "check.sh validate docs/specs/0002-solo-swept.md" "0001-checkout-overview"
+
 echo "== reconstructed 状态（逆向产物零改动兼容）=="
 new_repo
 wfile docs/needs/0001-legacy-rules.md <<'EOF'
