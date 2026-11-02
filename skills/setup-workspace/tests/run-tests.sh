@@ -1333,6 +1333,76 @@ rm "$TMP/docs/overviews/0006-solo-residue.md"
 t "清扫后 done spec 名下总览为零" 0 "check.sh validate docs/specs/0002-solo-swept.md" "通过"
 tn "指向其他 spec 的总览不误报为残留" 0 "check.sh validate docs/specs/0002-solo-swept.md" "0001-checkout-overview"
 
+echo "-- .gitignore 忽略行与 publish 投影（AC2，FR-6）--"
+printf 'docs/tickets/\ndocs/reviews/\ndocs/acceptance/\ndocs/overviews/\n' > "$TMP/.gitignore"
+git -C "$TMP" add .gitignore docs
+git -C "$TMP" commit -qm "[trivial] fixture 基线（知识档进库，过程档与总览被忽略）"
+wfile docs/overviews/0007-post-ignore.md <<'EOF'
+---
+id: 0007
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0007: 忽略行为对照总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+wfile docs/needs/0003-post-ignore.md <<'EOF'
+---
+id: 0003
+status: draft
+created: 2026-11-02
+---
+# 忽略行为对照 need（新建）
+
+## 背景与业务目标
+测试夹具。
+EOF
+tn "总览落盘后 git status 干净" 0 "git status --porcelain" "docs/overviews"
+t "check-ignore 命中 docs/overviews" 0 "git check-ignore -q docs/overviews" ""
+t "知识档新建文件照常入 git status（对照控制）" 0 "git status --porcelain" "docs/needs"
+GITHUB_ADAPTER="$HERE/../assets/trackers/github.sh"
+cp "$GITHUB_ADAPTER" "$TMP/.sdlc/trackers/github.sh" && chmod +x "$TMP/.sdlc/trackers/github.sh"
+sed -i.bak 's/^TRACKER=.*/TRACKER=github/; s/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+fake_cmd gh <<'EOF'
+#!/bin/sh
+[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_LOG"
+if [ "$1" = "auth" ]; then exit "${FAKE_AUTH:-0}"; fi
+if [ "$1" = "issue" ]; then
+  case "$2" in
+    create|edit) ;;
+    *) exit 0 ;;
+  esac
+  prev=""
+  for a in "$@"; do
+    if { [ "$prev" = "-F" ] || [ "$prev" = "--body-file" ]; } && [ -f "$a" ]; then cat "$a" >> "$FAKE_LOG"; fi
+    prev="$a"
+  done
+  if [ "$2" = "create" ]; then printf '%s\n' "${FAKE_URL:-https://github.com/acme/widget/issues/77}"; fi
+fi
+exit 0
+EOF
+t "publish 总览投影成功" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/gh-ov1.log\" check.sh publish docs/overviews/0001-checkout-overview.md" "投影"
+t "总览投影正文首行带盘上指针" 0 "grep -q '盘上产物：docs/overviews/0001-checkout-overview.md' \"$TMP/gh-ov1.log\"" ""
+t "总览映射落行（路径与编号与URL）" 0 "grep -q 'docs/overviews/0001-checkout-overview.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/77' \"$TMP/.sdlc/trackers/github.map\"" ""
+rm "$TMP/docs/overviews/0001-checkout-overview.md"
+t "总览清扫删除后 tracker 映射不回删" 0 "grep -q 'docs/overviews/0001-checkout-overview.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/77' \"$TMP/.sdlc/trackers/github.map\"" ""
+sed -i.bak 's/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+
 echo "== reconstructed 状态（逆向产物零改动兼容）=="
 new_repo
 wfile docs/needs/0001-legacy-rules.md <<'EOF'
@@ -2516,14 +2586,16 @@ t "generation.md 含 .gitignore 节" 0 "test -s \"$TMP/txt/gen-gitignore.md\"" "
 t "忽略行 docs/tickets/ 确切写法成文" 0 "grep -qx 'docs/tickets/' \"$TMP/txt/gen-gitignore.md\"" ""
 t "忽略行 docs/reviews/ 确切写法成文" 0 "grep -qx 'docs/reviews/' \"$TMP/txt/gen-gitignore.md\"" ""
 t "忽略行 docs/acceptance/ 确切写法成文" 0 "grep -qx 'docs/acceptance/' \"$TMP/txt/gen-gitignore.md\"" ""
+t "忽略行 docs/overviews/ 确切写法成文" 0 "grep -qx 'docs/overviews/' \"$TMP/txt/gen-gitignore.md\"" ""
 oseq ".gitignore 节按序成文：确切写法在前、每行先 grep 后追加、已有内容一行不动、不设标记块在后" "$TMP/txt/gen-gitignore.md" "docs/tickets/" "grep" "一行不动" "标记块"
 t "幂等语义锚定 spec 措辞：每行先 grep 后追加" 0 "grep -q '先 grep 后追加' \"$TMP/txt/gen-gitignore.md\"" ""
 awk '/^## 4\. /{f=1} f' "$GEN" > "$TMP/txt/report.md"
-t "收尾报告模板含 .gitignore 行（三条落点齐备）" 0 "grep -q '\.gitignore' \"$TMP/txt/report.md\" && grep -q 'docs/tickets/' \"$TMP/txt/report.md\" && grep -q 'docs/acceptance/' \"$TMP/txt/report.md\"" ""
+t "收尾报告模板含 .gitignore 行（四条落点齐备）" 0 "grep -q '\.gitignore' \"$TMP/txt/report.md\" && grep -q 'docs/tickets/' \"$TMP/txt/report.md\" && grep -q 'docs/acceptance/' \"$TMP/txt/report.md\" && grep -q 'docs/overviews/' \"$TMP/txt/report.md\"" ""
 awk '/^\| `\.gitignore\`/{f=1} f' "$SKILL" > "$TMP/txt/skill-gitignore-row.md"
 t "SKILL §3 生成表含 .gitignore 行（幂等追加、已有内容不动、指向 generation.md）" 0 "grep -q '幂等追加' \"$TMP/txt/skill-gitignore-row.md\" && grep -q '一行不动' \"$TMP/txt/skill-gitignore-row.md\" && grep -q 'generation.md' \"$TMP/txt/skill-gitignore-row.md\"" ""
+t "SKILL §3 .gitignore 行含总览忽略行（四条齐列）" 0 "grep -q 'docs/overviews/' \"$TMP/txt/skill-gitignore-row.md\"" ""
 awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/skill-forbidden.md"
-t "禁止事项改为只禁三行以外内容（新表述成文，成员标记段例外保留）" 0 "grep -q '过程档忽略三行以外的任何内容' \"$TMP/txt/skill-forbidden.md\" && grep -q '唯一例外' \"$TMP/txt/skill-forbidden.md\"" ""
+t "禁止事项改为只禁四行以外内容（新表述成文，成员标记段例外保留）" 0 "grep -q '过程档忽略四行以外的任何内容' \"$TMP/txt/skill-forbidden.md\" && grep -q '唯一例外' \"$TMP/txt/skill-forbidden.md\"" ""
 tn "SKILL.md 全文不再含旧句「往 .gitignore 加任何流程产物」" 0 "cat \"$SKILL\"" "往 .gitignore 加任何流程产物"
 
 echo
