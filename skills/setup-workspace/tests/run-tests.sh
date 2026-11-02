@@ -3565,7 +3565,12 @@ IMPL="$HERE/../../dev-implement/SKILL.md"
 echo "-- dev-accept 清扫清单纳入总览，与 validate 残留扫描“名下”定义一致 --"
 t "dev-accept 清扫清单含 overviews（tickets、overviews、reviews 同列）" 0 "grep -q 'tickets、overviews、reviews' \"$ACC\"" ""
 t "dev-accept 清扫“名下”定义仍锚定 validate 残留校验（不被稀释）" 0 "grep -q 'validate 残留校验同一定义' \"$ACC\"" ""
-echo "-- dev-plan 出口：frontier 呈现后建议多票 spec 先走查再开工（断言随下一提交恢复）--"
+echo "-- dev-plan 出口：frontier 呈现后建议多票 spec 先走查再开工 --"
+t "dev-plan 出口含 /dev-overview 走查指路" 0 "grep -q '/dev-overview' \"$PLAN\" && grep -q '走查再开工' \"$PLAN\"" ""
+oseq "dev-plan 指路在 frontier 呈现之后（出口门禁节内）" "$PLAN" "从哪张开工" "走查再开工"
+echo "-- dev-implement 入口校验说明补总览项（门禁本体在 check.sh，改文案不改语义）--"
+t "dev-implement 入口校验说明含 reviewed 总览与指路" 0 "grep -q 'reviewed' \"$IMPL\" && grep -q '/dev-overview' \"$IMPL\"" ""
+oseq "dev-implement 校验清单：spec approved 项之后是总览项" "$IMPL" "status: approved" "reviewed"
 
 echo
 echo "通过 $PASS / 失败 $FAIL"

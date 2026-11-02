@@ -94,7 +94,8 @@ created: <date>
    每张都必须通过；不过 → 修复后重跑。
 3. 逐张运行 `.sdlc/check.sh publish docs/tickets/NNNN-slug.md`。
 4. 运行 `.sdlc/check.sh frontier` 并展示，抛出决策问题："从哪张开工？默认建议
-   <最小编号>。"工单由用户点名，本技能不代挑、不自动开工。
+   <最小编号>。"工单由用户点名，本技能不代挑、不自动开工。名下票 ≥2 的 spec，
+   建议先 /dev-overview 走查再开工。
 
 ## 5. 中断与交接
 
