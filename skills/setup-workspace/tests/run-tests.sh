@@ -3343,6 +3343,47 @@ t "缺口进差距清单且点名 FR-2 与名下无票" 0 "grep -q 'FR-2' \"$SCR
 t "差距未清零：孤儿总览不推进（保持 draft）" 0 "grep -q '^status: draft' docs/overviews/0001-inventory-overview.md" ""
 rm -rf "$SCRATCH"
 
+echo "== FR-5 三路归置回路演练（seam ③，spec 0014）：缝隙→对应工单更新→差距清零→显式确认才 reviewed =="
+echo "-- 归置路：回 dev-plan 补票重切（差距清单的建议落点）；对应工单更新 = 补票 0002 落盘 --"
+wfile docs/tickets/0002-stock-alert.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0002: 库存预警
+
+**做什么：** 现存量低于预警线时提示补货
+
+**改动面：** stock 预警提示
+
+**验收标准：**
+- [ ] [FR-2] Given 现存量低于预警线 When 查询 Then 提示补货
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+t "归置动作：补票 0002 过 validate（对应工单更新）" 0 "check.sh validate docs/tickets/0002-stock-alert.md" "通过（ticket）"
+t "归置前门禁联动：名下两票 + draft 总览拒绝开工（指路 /dev-overview）" 1 "check.sh ticket 0001" "/dev-overview"
+echo "-- 走查后更新总览：矩阵 FR-2 行指回票 0002，差距清单清零（先更新产物、再更新总览）--"
+OVINV="$TMP/docs/overviews/0001-inventory-overview.md"
+sed -i.bak -e 's/| 库房管理员 | FR-2 | 低于预警线提示补货（spec 0001 验收场景 FR-2） | 缺口：指不回任何票 |/| 库房管理员 | FR-2 | 低于预警线提示补货（spec 0001 验收场景 FR-2） | ticket 0002 |/' \
+  -e 's/^- FR-2 库存预警：spec 0001 验收场景有覆盖、名下无票指回（缺口）→ 归置建议：回 dev-plan 补票重切，由用户拍板，本总览不代拍。（来源：need 0001 FR-2；spec 0001 验收场景 FR-2）/- 无（来源：need 0001 FR-2 经归置补票 ticket 0002 指回，差距清零；spec 0001 验收场景 FR-2）/' \
+  -e 's/库房按商品查现存量；预警线场景尚无票承接。/库房按商品查现存量，低于预警线提示补货。/' \
+  "$OVINV" && rm -f "$OVINV.bak"
+t "差距清单清零（无缺口字样、含「无」）" 0 "! grep -q '指不回' \"$OVINV\" && ! grep -q '缺口' \"$OVINV\" && grep -q '^- 无' \"$OVINV\"" ""
+t "差距清零但未获显式确认：总览仍 draft（沉默不算）" 0 "grep -q '^status: draft' \"$OVINV\"" ""
+echo "-- 用户显式确认（本演练：套件代行确认动作）→ 置 reviewed 并追加 reviewed 日期 --"
+setfm docs/overviews/0001-inventory-overview.md status reviewed
+awk '{print} /^created:/{print "reviewed: 2026-11-03"}' "$OVINV" > "$OVINV.new" && mv "$OVINV.new" "$OVINV"
+t "确认后总览过 validate（reviewed）" 0 "check.sh validate docs/overviews/0001-inventory-overview.md" "通过（overview）"
+t "归置清零且确认后：名下两票的 spec 开工放行（门禁解锁）" 0 "check.sh ticket 0001" "已 reviewed"
+rm -rf "$SCRATCH"
 
 echo "== FR-7 开工门禁四态演练（seam ①，spec 0014）：多票无总览拒 / draft 拒 / 单票放行 / reviewed 放行 =="
 new_repo
