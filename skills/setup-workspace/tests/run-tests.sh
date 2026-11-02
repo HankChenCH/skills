@@ -2612,7 +2612,7 @@ t "GLOSSARY 流程状态章含 overview 两态（推进者 dev-overview）" 0 "g
 
 echo "== 终态断言：spec 0011 零改动面（check.sh 机械层与 dev-accept 蒸馏清扫序列不动）=="
 t "零改动面：check.sh 与生成资产 diff 为空" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$HERE/../assets/check.sh\""
-t "零改动面：dev-accept 清扫范围句原样" 0 "grep -qF \"删除该 spec 名下全部 tickets、reviews 与本次验收报告文件\" \"$ROOT/skills/dev-accept/SKILL.md\""
+t "零改动面：dev-accept 清扫范围句原样（spec 0014 票 0030 授权纳入 overviews 后的形态）" 0 "grep -qF \"删除该 spec 名下全部 tickets、overviews、reviews 与本次验收报告文件\" \"$ROOT/skills/dev-accept/SKILL.md\""
 t "零改动面：dev-accept 原子提交序列句原样" 0 "grep -qF \"蒸馏编辑 + 清扫删除 + 置 done 合为恰一个\" \"$ROOT/skills/dev-accept/SKILL.md\""
 
 echo "== 过程档 gitignore 生成面文本契约（seam 2）=="
@@ -3557,6 +3557,15 @@ setfm docs/overviews/0001-checkout-overview.md status reviewed
 t "总览 reviewed：放行（非零→零）" 0 "check.sh ticket 0001" "已 reviewed"
 t "总览 reviewed：放行文案点名总览文件" 0 "check.sh ticket 0001" "0001-checkout-overview.md"
 t "单票 spec 不受 reviewed 总览缺失影响（继续放行）" 0 "check.sh ticket 0003" "免总览"
+
+echo "== 生态接线文本契约（FR-5/FR-7 生态：dev-accept 清扫、dev-plan 出口、dev-implement 入口）=="
+ACC="$HERE/../../dev-accept/SKILL.md"
+PLAN="$HERE/../../dev-plan/SKILL.md"
+IMPL="$HERE/../../dev-implement/SKILL.md"
+echo "-- dev-accept 清扫清单纳入总览，与 validate 残留扫描“名下”定义一致 --"
+t "dev-accept 清扫清单含 overviews（tickets、overviews、reviews 同列）" 0 "grep -q 'tickets、overviews、reviews' \"$ACC\"" ""
+t "dev-accept 清扫“名下”定义仍锚定 validate 残留校验（不被稀释）" 0 "grep -q 'validate 残留校验同一定义' \"$ACC\"" ""
+echo "-- dev-plan 出口：frontier 呈现后建议多票 spec 先走查再开工（断言随下一提交恢复）--"
 
 echo
 echo "通过 $PASS / 失败 $FAIL"
