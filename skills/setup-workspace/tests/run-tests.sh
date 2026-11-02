@@ -1029,6 +1029,380 @@ t "清扫后 done spec 校验通过" 0 "check.sh validate docs/specs/0001-swept.
 tn "其他 spec 名下工单不误报为残留" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-cart"
 tn "仅指向其他 spec 工单的评审不误报" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-review"
 
+echo "== overview 类型注册六处分支（seam 一，spec 0014）=="
+new_repo
+wfile docs/needs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-11-02
+---
+# 结账流程
+
+## 背景与业务目标
+提高结账转化。
+
+## 干系人与用户
+买家；成功标准：下单转化率不降。
+
+## 系统能力需求
+- FR-1 支持购物车结算
+
+## 场景
+- Given 购物车有商品 When 结算 Then 生成订单
+
+## 假设与风险
+- 假设：优惠码规则稳定
+
+## 范围与非目标
+不含退款。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-02
+---
+# 结账规格
+
+## 问题陈述
+买家结算慢。
+
+## 方案
+一键结算。
+
+## 用户故事
+- 作为买家，我想要一键结算，以便更快下单
+
+## 实现决策
+新增 checkout 模块。
+
+## 测试决策
+在 checkout 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有商品 When 结算 Then 订单生成
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/tickets/0001-cart.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-11-02
+---
+# 0001: 购物车结算
+
+**做什么：** 从购物车一键生成订单
+
+**验收标准：**
+- [ ] 有商品时结算生成订单（测试：checkout_test）
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0001: 结账总览
+
+## 全景一行
+一键结算（来源：spec 0001 方案）。
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 购物车结算 | ticket 0001 |
+
+## 黄金场景走查
+作为买家，我把商品加入购物车并结算，订单生成（剧本：spec 0001 验收场景 FR-1）。
+
+## 样张
+CLI 输出样例：`订单已创建`。
+
+## 差距清单
+- 无
+EOF
+t "phase 扫描出现 overview 行并带 spec 关联" 0 "check.sh phase" "0001-checkout-overview draft spec=0001"
+t "validate overview 五节齐备通过" 0 "check.sh validate docs/overviews/0001-checkout-overview.md" "通过（overview）"
+wfile docs/overviews/0002-missing-sample.md <<'EOF'
+---
+id: 0002
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0002: 缺样张总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 缺必填节点名样张" 1 "check.sh validate docs/overviews/0002-missing-sample.md" "缺必填节：## 样张"
+wfile docs/overviews/0003-ghost-spec.md <<'EOF'
+---
+id: 0003
+spec: 9999
+status: draft
+created: 2026-11-02
+---
+# 0003: 指向不存在 spec 的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview spec 引用不存在拒绝" 1 "check.sh validate docs/overviews/0003-ghost-spec.md" "关联 spec 9999 不存在"
+wfile docs/overviews/0005-nospec.md <<'EOF'
+---
+id: 0005
+status: draft
+created: 2026-11-02
+---
+# 0005: 缺 spec 字段的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 缺 spec 字段拒绝" 1 "check.sh validate docs/overviews/0005-nospec.md" "缺 frontmatter 字段 spec"
+wfile docs/overviews/0004-badstatus.md <<'EOF'
+---
+id: 0004
+spec: 0001
+status: approved
+created: 2026-11-02
+---
+# 0004: 状态非法的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 状态非法（只许 draft reviewed）" 1 "check.sh validate docs/overviews/0004-badstatus.md" "status 非法（overview 允许：draft reviewed）"
+
+echo "-- overview 纳入 spec_residue 名下关系（AC3，done 清扫门禁）--"
+wfile docs/needs/0002-solo.md <<'EOF'
+---
+id: 0002
+status: confirmed
+created: 2026-11-02
+---
+# 单票流程
+
+## 背景与业务目标
+减少重复操作。
+
+## 干系人与用户
+操作员；成功标准：重复操作清零。
+
+## 系统能力需求
+- FR-1 支持一键归档
+
+## 场景
+- Given 有已完成工单 When 归档 Then 工单入档
+
+## 假设与风险
+- 假设：归档规则稳定
+
+## 范围与非目标
+不含恢复。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0002-solo-swept.md <<'EOF'
+---
+id: 0002
+status: done
+need: 0002
+round: 1
+created: 2026-11-02
+---
+# 已清扫单票规格
+
+## 问题陈述
+重复操作多。
+
+## 方案
+一键归档。
+
+## 用户故事
+- 作为操作员，我想要一键归档，以便减少重复操作
+
+## 实现决策
+新增 archive 模块。
+
+## 测试决策
+在 archive 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有已完成工单 When 归档 Then 工单入档
+
+## 非目标
+不含恢复。
+
+## 备注
+EOF
+wfile docs/overviews/0006-solo-residue.md <<'EOF'
+---
+id: 0006
+spec: 0002
+status: draft
+created: 2026-11-02
+---
+# 0006: 单票总览
+
+## 全景一行
+一键归档（来源：spec 0002 方案）。
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 操作员 | FR-1 | 一键归档 | （无） |
+
+## 黄金场景走查
+作为操作员，我对已完成工单点归档，工单入档（剧本：spec 0002 验收场景 FR-1）。
+
+## 样张
+CLI 输出样例：`已归档 1 项`。
+
+## 差距清单
+- 无
+EOF
+t "done spec 名下总览残留被点名" 1 "check.sh validate docs/specs/0002-solo-swept.md" "docs/overviews/0006-solo-residue.md"
+rm "$TMP/docs/overviews/0006-solo-residue.md"
+t "清扫后 done spec 名下总览为零" 0 "check.sh validate docs/specs/0002-solo-swept.md" "通过"
+tn "指向其他 spec 的总览不误报为残留" 0 "check.sh validate docs/specs/0002-solo-swept.md" "0001-checkout-overview"
+
+echo "-- .gitignore 忽略行与 publish 投影（AC2，FR-6）--"
+printf 'docs/tickets/\ndocs/reviews/\ndocs/acceptance/\ndocs/overviews/\n' > "$TMP/.gitignore"
+git -C "$TMP" add .gitignore docs
+git -C "$TMP" commit -qm "[trivial] fixture 基线（知识档进库，过程档与总览被忽略）"
+wfile docs/overviews/0007-post-ignore.md <<'EOF'
+---
+id: 0007
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0007: 忽略行为对照总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+wfile docs/needs/0003-post-ignore.md <<'EOF'
+---
+id: 0003
+status: draft
+created: 2026-11-02
+---
+# 忽略行为对照 need（新建）
+
+## 背景与业务目标
+测试夹具。
+EOF
+tn "总览落盘后 git status 干净" 0 "git status --porcelain" "docs/overviews"
+t "check-ignore 命中 docs/overviews" 0 "git check-ignore -q docs/overviews" ""
+t "知识档新建文件照常入 git status（对照控制）" 0 "git status --porcelain" "docs/needs"
+GITHUB_ADAPTER="$HERE/../assets/trackers/github.sh"
+cp "$GITHUB_ADAPTER" "$TMP/.sdlc/trackers/github.sh" && chmod +x "$TMP/.sdlc/trackers/github.sh"
+sed -i.bak 's/^TRACKER=.*/TRACKER=github/; s/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+fake_cmd gh <<'EOF'
+#!/bin/sh
+[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_LOG"
+if [ "$1" = "auth" ]; then exit "${FAKE_AUTH:-0}"; fi
+if [ "$1" = "issue" ]; then
+  case "$2" in
+    create|edit) ;;
+    *) exit 0 ;;
+  esac
+  prev=""
+  for a in "$@"; do
+    if { [ "$prev" = "-F" ] || [ "$prev" = "--body-file" ]; } && [ -f "$a" ]; then cat "$a" >> "$FAKE_LOG"; fi
+    prev="$a"
+  done
+  if [ "$2" = "create" ]; then printf '%s\n' "${FAKE_URL:-https://github.com/acme/widget/issues/77}"; fi
+fi
+exit 0
+EOF
+t "publish 总览投影成功" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/gh-ov1.log\" check.sh publish docs/overviews/0001-checkout-overview.md" "投影"
+t "总览投影正文首行带盘上指针" 0 "grep -q '盘上产物：docs/overviews/0001-checkout-overview.md' \"$TMP/gh-ov1.log\"" ""
+t "总览映射落行（路径与编号与URL）" 0 "grep -q 'docs/overviews/0001-checkout-overview.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/77' \"$TMP/.sdlc/trackers/github.map\"" ""
+rm "$TMP/docs/overviews/0001-checkout-overview.md"
+t "总览清扫删除后 tracker 映射不回删" 0 "grep -q 'docs/overviews/0001-checkout-overview.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/77' \"$TMP/.sdlc/trackers/github.map\"" ""
+sed -i.bak 's/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+
 echo "== reconstructed 状态（逆向产物零改动兼容）=="
 new_repo
 wfile docs/needs/0001-legacy-rules.md <<'EOF'
@@ -2196,6 +2570,11 @@ ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
 t "两份 GLOSSARY.md 逐字一致" 0 "diff \"$ROOT/GLOSSARY.md\" \"$HERE/../assets/GLOSSARY.md\""
 t "两份 check.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$CHECK\""
+t "METHOD 产物表含 overview 行（draft→reviewed，dev-overview 推进）" 0 "grep -qF 'draft →reviewed（dev-overview，须用户显式确认）' \"$ROOT/docs/METHOD.md\"" ""
+t "METHOD 过程档枚举含 overview（总览随过程档归置）" 0 "grep -qF '（ticket、review、acceptance、overview）' \"$ROOT/docs/METHOD.md\"" ""
+t "METHOD 目录树含 overviews/ 且目录计数为九" 0 "grep -qF 'tickets/ overviews/ reviews/' \"$ROOT/docs/METHOD.md\" && grep -qF '九个产物目录' \"$ROOT/docs/METHOD.md\"" ""
+t "METHOD validate 描述含总览五节校验" 0 "grep -qF '总览五节' \"$ROOT/docs/METHOD.md\"" ""
+t "GLOSSARY 流程状态章含 overview 两态（推进者 dev-overview）" 0 "grep -qF 'overview.draft / reviewed' \"$ROOT/GLOSSARY.md\" && grep -qF 'dev-overview' \"$ROOT/GLOSSARY.md\"" ""
 
 echo "== 终态断言：spec 0011 零改动面（check.sh 机械层与 dev-accept 蒸馏清扫序列不动）=="
 t "零改动面：check.sh 与生成资产 diff 为空" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$HERE/../assets/check.sh\""
@@ -2212,14 +2591,16 @@ t "generation.md 含 .gitignore 节" 0 "test -s \"$TMP/txt/gen-gitignore.md\"" "
 t "忽略行 docs/tickets/ 确切写法成文" 0 "grep -qx 'docs/tickets/' \"$TMP/txt/gen-gitignore.md\"" ""
 t "忽略行 docs/reviews/ 确切写法成文" 0 "grep -qx 'docs/reviews/' \"$TMP/txt/gen-gitignore.md\"" ""
 t "忽略行 docs/acceptance/ 确切写法成文" 0 "grep -qx 'docs/acceptance/' \"$TMP/txt/gen-gitignore.md\"" ""
+t "忽略行 docs/overviews/ 确切写法成文" 0 "grep -qx 'docs/overviews/' \"$TMP/txt/gen-gitignore.md\"" ""
 oseq ".gitignore 节按序成文：确切写法在前、每行先 grep 后追加、已有内容一行不动、不设标记块在后" "$TMP/txt/gen-gitignore.md" "docs/tickets/" "grep" "一行不动" "标记块"
 t "幂等语义锚定 spec 措辞：每行先 grep 后追加" 0 "grep -q '先 grep 后追加' \"$TMP/txt/gen-gitignore.md\"" ""
 awk '/^## 4\. /{f=1} f' "$GEN" > "$TMP/txt/report.md"
-t "收尾报告模板含 .gitignore 行（三条落点齐备）" 0 "grep -q '\.gitignore' \"$TMP/txt/report.md\" && grep -q 'docs/tickets/' \"$TMP/txt/report.md\" && grep -q 'docs/acceptance/' \"$TMP/txt/report.md\"" ""
+t "收尾报告模板含 .gitignore 行（四条落点齐备）" 0 "grep -q '\.gitignore' \"$TMP/txt/report.md\" && grep -q 'docs/tickets/' \"$TMP/txt/report.md\" && grep -q 'docs/acceptance/' \"$TMP/txt/report.md\" && grep -q 'docs/overviews/' \"$TMP/txt/report.md\"" ""
 awk '/^\| `\.gitignore\`/{f=1} f' "$SKILL" > "$TMP/txt/skill-gitignore-row.md"
 t "SKILL §3 生成表含 .gitignore 行（幂等追加、已有内容不动、指向 generation.md）" 0 "grep -q '幂等追加' \"$TMP/txt/skill-gitignore-row.md\" && grep -q '一行不动' \"$TMP/txt/skill-gitignore-row.md\" && grep -q 'generation.md' \"$TMP/txt/skill-gitignore-row.md\"" ""
+t "SKILL §3 .gitignore 行含总览忽略行（四条齐列）" 0 "grep -q 'docs/overviews/' \"$TMP/txt/skill-gitignore-row.md\"" ""
 awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/skill-forbidden.md"
-t "禁止事项改为只禁三行以外内容（新表述成文，成员标记段例外保留）" 0 "grep -q '过程档忽略三行以外的任何内容' \"$TMP/txt/skill-forbidden.md\" && grep -q '唯一例外' \"$TMP/txt/skill-forbidden.md\"" ""
+t "禁止事项改为只禁四行以外内容（新表述成文，成员标记段例外保留）" 0 "grep -q '过程档忽略四行以外的任何内容' \"$TMP/txt/skill-forbidden.md\" && grep -q '唯一例外' \"$TMP/txt/skill-forbidden.md\"" ""
 tn "SKILL.md 全文不再含旧句「往 .gitignore 加任何流程产物」" 0 "cat \"$SKILL\"" "往 .gitignore 加任何流程产物"
 
 echo

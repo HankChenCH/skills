@@ -12,6 +12,7 @@
 | spec | 规格：用户视角的问题陈述、方案、用户故事、实现与测试决策、验收场景。改源码前的必要产物。 |
 | design | 技术方案：模块划分、数据流、seam（测试边界）。配合 ADR 记录架构决策。 |
 | ticket | 工单：一张可独立开工、可独立验收的实现单元，分 feature / fix 两类，同池编号。 |
+| overview | 总览：开工前对单张 spec 名下产物的纯读合成文档，固定五节（全景一行、全景矩阵、黄金场景走查、样张、差距清单）；过程档归置，详见项目术语章。 |
 | review | 评审报告：双轴（标准轴 + Spec 轴）findings 汇总，`tickets: []` 声明覆盖面。 |
 | acceptance | 验收报告：集成后逐条运行集成级场景、逐 FR 核销、风险复审的结果。 |
 | adr | 架构决策记录：难逆转、无上下文会困惑、真实权衡的决策，accepted → superseded。 |
@@ -33,6 +34,7 @@
 | ticket.in-progress | 开工中，进展写进 ## Progress | dev-implement |
 | ticket.implemented | 实现完成、全量检查绿，待评审 | dev-implement |
 | ticket.done | 已合并（终态） | dev-ship |
+| overview.draft / reviewed | 总览合成中 / 走查完成（用户显式确认后推进，沉默不算） | dev-overview |
 | review.draft / approved | 评审中 / 两轴阻断清零 | dev-review |
 | acceptance.draft / passed / rejected | 验收中 / 通过 / 不通过 | dev-accept |
 | adr.accepted / superseded | 生效中 / 被新 ADR 取代 | dev-design |
