@@ -343,6 +343,40 @@ t "validate acceptance" 0 "check.sh validate docs/acceptance/0001-checkout-round
 t "validate adr" 0 "check.sh validate docs/adr/0001-local-tracker.md" "通过"
 t "validate research" 0 "check.sh validate docs/research/0001-gateway.md" "通过"
 
+# FR-7 开工门禁的既有断言前置：spec 0001 名下 ≥2 票，ticket 就绪/slug/重入放行须有 reviewed 总览
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: reviewed
+created: 2026-10-26
+reviewed: 2026-10-26
+---
+# 0001: 结账规格总览
+
+## 全景一行
+一键结算 + 优惠码 + 电子发票。（来源：spec 0001 方案；need 0001 FR-1–FR-2、FR-10）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 一键结算生成订单（spec 0001 验收场景 FR-1） | ticket 0001 |
+| 买家 | FR-2 | 优惠码减免（spec 0001 验收场景 FR-2） | ticket 0002 |
+| 买家 | FR-10 | 开票到达邮箱（spec 0001 验收场景 FR-10） | 集成级：dev-accept |
+
+## 黄金场景走查
+
+### 走查一（正常流）：一键结算
+你把商品加入购物车点结算，订单生成。剧本逐句：Given 有商品 When 结算 Then 订单生成。（来源：spec 0001 验收场景 FR-1）
+
+## 样张
+CLI 类 → 输出样例：`$ checkout` → `订单已生成`。（来源：spec 0001 实现决策；ticket 0001 验收标准）
+
+## 差距清单
+- 无（来源：need 0001 FR-1/FR-2/FR-10 经全景矩阵逐行指回，无缺口）
+EOF
+t "validate overview（夹具总览，五节齐备）" 0 "check.sh validate docs/overviews/0001-checkout-overview.md" "通过（overview）"
+
 echo "== frontier 随状态推进 =="
 setfm docs/tickets/0003-order-api.md status implemented
 t "阻塞实现后 0001 进入 frontier" 0 "check.sh frontier" "0001"
@@ -3308,6 +3342,180 @@ awk '/^## 差距清单/{f=1;next} /^## /{f=0} f' "$TMP/docs/overviews/0001-inven
 t "缺口进差距清单且点名 FR-2 与名下无票" 0 "grep -q 'FR-2' \"$SCRATCH/orphan-gap.md\" && grep -q '无票' \"$SCRATCH/orphan-gap.md\"" ""
 t "差距未清零：孤儿总览不推进（保持 draft）" 0 "grep -q '^status: draft' docs/overviews/0001-inventory-overview.md" ""
 rm -rf "$SCRATCH"
+
+
+echo "== FR-7 开工门禁四态演练（seam ①，spec 0014）：多票无总览拒 / draft 拒 / 单票放行 / reviewed 放行 =="
+new_repo
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-03
+---
+# 多票结账规格
+
+## 问题陈述
+买家结算慢。
+
+## 方案
+一键结算 + 优惠码。
+
+## 用户故事
+- 作为买家，我想要一键结算，以便更快下单
+
+## 实现决策
+新增 checkout 模块。
+
+## 测试决策
+在 checkout 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有商品 When 结算 Then 订单生成
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/specs/0002-inventory.md <<'EOF'
+---
+id: 0002
+status: approved
+need: 0001
+round: 1
+created: 2026-11-03
+---
+# 单票库存规格
+
+## 问题陈述
+库房盘点慢。
+
+## 方案
+库存查询。
+
+## 用户故事
+- 作为库房管理员，我想查现存量，以便及时补货
+
+## 实现决策
+CLI 查询命令。
+
+## 测试决策
+CLI 集成测试断言输出。
+
+## 验收场景
+- [FR-1 | 工单级] Given 商品在库 When 查询 Then 返回现存量
+
+## 非目标
+不含自动采购。
+
+## 备注
+EOF
+wfile docs/tickets/0001-cart.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0001: 一键结算
+
+**做什么：** 一键结算生成订单
+
+**验收标准：**
+- [ ] 有商品时结算生成订单
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/tickets/0002-promo.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0002: 优惠码
+
+**做什么：** 优惠码应用与金额减免
+
+**验收标准：**
+- [ ] 有效优惠码应用后金额减免
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/tickets/0003-stock.md <<'EOF'
+---
+id: 0003
+type: feature
+spec: 0002
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0003: 库存查询
+
+**做什么：** 按商品查询现存量
+
+**验收标准：**
+- [ ] 商品在库时查询返回现存量
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+echo "-- 态一：多票（spec 0001 名下 0001/0002）无总览 → 拒绝并指路 --"
+t "多票无总览：非零退出并指路 /dev-overview" 1 "check.sh ticket 0001" "/dev-overview"
+t "多票无总览：文案点名缺 reviewed 总览" 1 "check.sh ticket 0002" "reviewed 总览"
+echo "-- 态二：总览 draft → 拒绝 --"
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: draft
+created: 2026-11-03
+---
+# 0001: 多票结账总览
+
+## 全景一行
+一键结算 + 优惠码。（来源：spec 0001 方案）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 一键结算（spec 0001 验收场景 FR-1） | ticket 0001 |
+| 买家 | FR-1 | 优惠码减免（need 0001 FR-1 延伸） | ticket 0002 |
+
+## 黄金场景走查
+### 走查一（正常流）：一键结算
+你点结算，订单生成。剧本逐句：Given 有商品 When 结算 Then 订单生成。（来源：spec 0001 验收场景 FR-1）
+
+## 样张
+CLI 类 → 输出样例：`$ checkout` → `订单已生成`。（来源：spec 0001 实现决策）
+
+## 差距清单
+- 无
+EOF
+t "总览 draft：拒绝（非零退出）" 1 "check.sh ticket 0001" "draft"
+t "总览 draft：拒绝文案同样指路 /dev-overview" 1 "check.sh ticket 0001" "/dev-overview"
+echo "-- 态三：单票（spec 0002 名下 0003）无总览 → 豁免放行 --"
+t "单票无总览：放行并标明豁免" 0 "check.sh ticket 0003" "免总览"
+echo "-- 态四：总览 reviewed → 放行 --"
+setfm docs/overviews/0001-checkout-overview.md status reviewed
+t "总览 reviewed：放行（非零→零）" 0 "check.sh ticket 0001" "已 reviewed"
+t "总览 reviewed：放行文案点名总览文件" 0 "check.sh ticket 0001" "0001-checkout-overview.md"
+t "单票 spec 不受 reviewed 总览缺失影响（继续放行）" 0 "check.sh ticket 0003" "免总览"
 
 echo
 echo "通过 $PASS / 失败 $FAIL"
