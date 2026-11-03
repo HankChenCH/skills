@@ -1,10 +1,11 @@
 ---
 id: 0014
-status: approved
+status: done
 need: 0012
 round: 1
 created: 2026-11-02
 approved: 2026-11-02
+done: 2026-11-03
 ---
 # dev-overview：开工前总览评审——五节合成、走查归置与多票开工门禁
 
