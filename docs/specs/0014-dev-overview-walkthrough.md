@@ -71,3 +71,4 @@ approved: 2026-11-02
 - 同步面：check.sh 模板资产与工作区副本、setup-workspace 模板（.gitignore / METHOD / GLOSSARY）、dev-accept / dev-plan / dev-implement 文案——全部随实现工票落。
 - design 判据预期不命中：集成点全部机械枚举（六处分支 + 三处文案 + 模板同步），无架构权衡、模块划分显而易见 → 批准后直进 dev-plan；实现中若暴露设计级问题再回 dev-design。
 - dogfood：本 spec 名下工单 ≥2 时，自身的开工即受 FR-7 门禁约束——总览的首次实战就是总览技能自己的实现。
+- 总览走查记录（2026-11-03）：overview 0001-dev-overview-walkthrough.md 经用户走查并显式确认置 reviewed；走查暴露缝隙 0 处，三路归置清单为空（无 spec/工单修订被触发）；`check.sh ticket 0031` 被拦（缺 reviewed 总览 exit 1 → draft 拒绝 exit 1）→ 置 reviewed 后放行（exit 0）全链实测留档，供 [FR-1/5/7 | 集成级] A1 靶心验收核销（暴露缝隙按实际 0 处留档核销）。
