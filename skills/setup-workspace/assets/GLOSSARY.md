@@ -29,7 +29,7 @@
 | spec.draft | 规格起草中 | dev-spec |
 | spec.approved | 用户已显式批准，可拆工单 | dev-spec |
 | spec.done | 验收通过，且名下过程档已清扫（终态） | dev-accept |
-| design.draft / approved | 技术方案起草 / 定稿 | dev-design |
+| design.draft / approved | 技术方案起草 / 定稿 | dev-design / design-deliver |
 | ticket.ready | 阻塞已清、可开工 | dev-plan |
 | ticket.in-progress | 开工中，进展写进 ## Progress | dev-implement |
 | ticket.implemented | 实现完成、全量检查绿，待评审 | dev-implement |
@@ -83,3 +83,5 @@
 - **总览（overview）** —— 开工前对单张 spec 名下产物的纯读合成文档，固定五节：全景一行 / 全景矩阵 / 黄金场景走查 / 样张 / 差距清单；不产新决策、正文每段可溯源到既有产物，过程档生命周期（首次出现：need 0012）。
 - **走查** —— 评审人以用户视角沿黄金场景叙事与样张过一遍总览、把暴露的缝隙三路归置（回 dev-spec / 回 dev-plan / 非目标）的评审动作；走查完成总览置 reviewed，是名下多票 spec 的开工前置条件（首次出现：need 0012）。
 - **样张** —— 总览中按对象类型选媒介的具象样例：UI→三态（正常/空/错误）可点 HTML 原型（落系统临时目录不进仓库）、CLI→输出样例、API→调用序列+请求/响应样例（首次出现：need 0012）。
+- **述标** —— design-* 套件向验收方呈现设计的方式：在 design 产物「界面设计」节写明设计意图与取舍，配套可点 HTML 界面原型（落 docs/designs/assets/）供评审；design 的 approved 门即述标评审门，比喻源自建筑设计院述标（首次出现：need 0013）。
+- **设计基线** —— 项目级设计语言标准：落 docs/standards/ 设计标准分册（按平台分文件）并登记 CODING_STANDARDS.md 索引，由 design-baseline 技能建立与跟随；存在时界面设计须先读基线，偏离须逐条声明理由（首次出现：need 0013）。
