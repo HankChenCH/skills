@@ -12,6 +12,7 @@
 | spec | 规格：用户视角的问题陈述、方案、用户故事、实现与测试决策、验收场景。改源码前的必要产物。 |
 | design | 技术方案：模块划分、数据流、seam（测试边界）。配合 ADR 记录架构决策。 |
 | ticket | 工单：一张可独立开工、可独立验收的实现单元，分 feature / fix 两类，同池编号。 |
+| overview | 总览：开工前对单张 spec 名下产物的纯读合成文档，固定五节（全景一行、全景矩阵、黄金场景走查、样张、差距清单）；过程档归置，详见项目术语章。 |
 | review | 评审报告：双轴（标准轴 + Spec 轴）findings 汇总，`tickets: []` 声明覆盖面。 |
 | acceptance | 验收报告：集成后逐条运行集成级场景、逐 FR 核销、风险复审的结果。 |
 | adr | 架构决策记录：难逆转、无上下文会困惑、真实权衡的决策，accepted → superseded。 |
@@ -33,6 +34,7 @@
 | ticket.in-progress | 开工中，进展写进 ## Progress | dev-implement |
 | ticket.implemented | 实现完成、全量检查绿，待评审 | dev-implement |
 | ticket.done | 已合并（终态） | dev-ship |
+| overview.draft / reviewed | 总览合成中 / 走查完成（用户显式确认后推进，沉默不算） | dev-overview |
 | review.draft / approved | 评审中 / 两轴阻断清零 | dev-review |
 | acceptance.draft / passed / rejected | 验收中 / 通过 / 不通过 | dev-accept |
 | adr.accepted / superseded | 生效中 / 被新 ADR 取代 | dev-design |
@@ -78,3 +80,6 @@
 - **层屏障** —— dev-execute 既有的层推进节奏：当前层全部票合回且预演绿才调度下一层；与流水线合回相对，need 0010 以流水线合回替代它（首次出现：need 0010）。
 - **流水线合回** —— dev-execute 的目标推进节奏：票评审 approved 且依赖满足即合回运行分支并预演，不等同层其余票完成；前提是同层票满足改动面互斥（首次出现：need 0010）。
 - **整图单运行** —— dev-execute 档 1（声明式工作流）的派发形态：整张运行依赖顺序图声明为一个工作流运行，同层并行与跨层依赖由脚本控制流表达（fan-out/join），预演走脚本确定性门、人工门走升级提问/洞穴；与逐票派发形态（每票一个工作流运行，档 2–4 同构基线）相对（首次出现：need 0011）。
+- **总览（overview）** —— 开工前对单张 spec 名下产物的纯读合成文档，固定五节：全景一行 / 全景矩阵 / 黄金场景走查 / 样张 / 差距清单；不产新决策、正文每段可溯源到既有产物，过程档生命周期（首次出现：need 0012）。
+- **走查** —— 评审人以用户视角沿黄金场景叙事与样张过一遍总览、把暴露的缝隙三路归置（回 dev-spec / 回 dev-plan / 非目标）的评审动作；走查完成总览置 reviewed，是名下多票 spec 的开工前置条件（首次出现：need 0012）。
+- **样张** —— 总览中按对象类型选媒介的具象样例：UI→三态（正常/空/错误）可点 HTML 原型（落系统临时目录不进仓库）、CLI→输出样例、API→调用序列+请求/响应样例（首次出现：need 0012）。

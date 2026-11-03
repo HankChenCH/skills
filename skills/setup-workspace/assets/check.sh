@@ -88,6 +88,7 @@ dir_of_type() {
   case "$1" in
     need) echo needs ;;        spec) echo specs ;;
     design) echo designs ;;    ticket) echo tickets ;;
+    overview) echo overviews ;;
     review) echo reviews ;;    acceptance) echo acceptance ;;
     adr) echo adr ;;           research) echo research ;;
     *) return 1 ;;
@@ -98,6 +99,7 @@ type_of() {
   case "$1" in
     "$DOCS"/needs/*) echo need ;;          "$DOCS"/specs/*) echo spec ;;
     "$DOCS"/designs/*) echo design ;;      "$DOCS"/tickets/*) echo ticket ;;
+    "$DOCS"/overviews/*) echo overview ;;
     "$DOCS"/reviews/*) echo review ;;      "$DOCS"/acceptance/*) echo acceptance ;;
     "$DOCS"/adr/*) echo adr ;;             "$DOCS"/research/*) echo research ;;
     *) return 1 ;;
@@ -110,6 +112,7 @@ allowed_list() {
     spec) echo "draft approved done reconstructed" ;;
     design) echo "draft approved" ;;
     ticket) echo "ready in-progress implemented done" ;;
+    overview) echo "draft reviewed" ;;
     review) echo "draft approved" ;;
     acceptance) echo "draft passed rejected" ;;
     adr) echo "accepted superseded" ;;
@@ -192,7 +195,7 @@ ticket_cycles() {
 }
 
 # spec_residue SPECID：输出该 spec 名下仍在盘上的过程档路径（相对仓库根，每行一个）。
-# 名下关系：ticket / acceptance 的 spec 字段指向该 spec；review 的 tickets 与名下工单有交集。
+# 名下关系：ticket / acceptance / overview 的 spec 字段指向该 spec；review 的 tickets 与名下工单有交集。
 # 供 validate 清扫门禁使用：done 的 spec 名下过程档必须为零。
 spec_residue() {
   local sid="$1" f tspec t tids tid
@@ -206,11 +209,13 @@ spec_residue() {
     tid="$(basename "$f" .md)"; tid="${tid%%-*}"
     tids="$tids$tid "
   done
-  for f in "$DOCS"/acceptance/*.md; do
-    [ -f "$f" ] || continue
-    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
-    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
-    [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
+  for dir in acceptance overviews; do
+    for f in "$DOCS"/"$dir"/*.md; do
+      [ -f "$f" ] || continue
+      tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
+      tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+      [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
+    done
   done
   for f in "$DOCS"/reviews/*.md; do
     [ -f "$f" ] || continue
@@ -223,12 +228,51 @@ spec_residue() {
   done
 }
 
+# overview_gate SPEC_ID：FR-7 开工门禁——名下票 ≥2 的 spec 须有 reviewed 总览才准开工。
+# 名下关系与 spec_residue 同一定义（票 frontmatter spec 字段指向该 spec）。
+# 单票豁免放行；缺失或 draft 总览 → 非零退出并指路 /dev-overview。仅在 spec approved/done 后调用。
+overview_gate() {
+  local sid own tf tspec of ospec found draft
+  sid="$(pad4 "${1%%-*}")" || return 0
+  own=0
+  for tf in "$DOCS"/tickets/*.md; do
+    [ -f "$tf" ] || continue
+    tspec="$(fm_get "$tf" spec)"; tspec="${tspec%%-*}"
+    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+    [ "$tspec" = "$sid" ] || continue
+    own=$((own+1))
+  done
+  if [ "$own" -le 1 ]; then
+    [ "$own" -eq 1 ] && info "✓ spec $1 单票，免总览门禁"
+    return 0
+  fi
+  found=""; draft=""
+  for of in "$DOCS"/overviews/*.md; do
+    [ -f "$of" ] || continue
+    ospec="$(fm_get "$of" spec)"; ospec="${ospec%%-*}"
+    ospec="$(pad4 "$ospec" 2>/dev/null)" || continue
+    [ "$ospec" = "$sid" ] || continue
+    if [ "$(fm_get "$of" status)" = "reviewed" ]; then found="$of"; break; fi
+    [ -n "$draft" ] || draft="$of"
+  done
+  if [ -n "$found" ]; then
+    info "✓ spec $1 名下 ${own} 张票，总览 $(basename "$found") 已 reviewed"
+    return 0
+  fi
+  if [ -n "$draft" ]; then
+    echo "✗ spec $1 名下 ${own} 张票，总览 $(basename "$draft") 还是 draft——开工前置：在 /dev-overview 完成走查（缝隙归置清零 + 用户显式确认）置 reviewed"
+  else
+    echo "✗ spec $1 名下 ${own} 张票，缺 reviewed 总览（docs/overviews/）——开工前置：先 /dev-overview 合成总览、走查归置并确认后置 reviewed"
+  fi
+  return 1
+}
+
 # ---------- 子命令 ----------
 
 cmd_phase() {
   info "== SDLC 状态总览（${ROOT}）=="
   local t dir f any extra v
-  for t in need spec design ticket review acceptance adr research; do
+  for t in need spec design ticket overview review acceptance adr research; do
     dir="$(dir_of_type "$t")"
     any=0
     for f in "$DOCS/$dir"/*.md; do
@@ -238,7 +282,7 @@ cmd_phase() {
         spec)
           v="$(fm_get "$f" need)";   [ -n "$v" ] && extra="$extra need=$v"
           v="$(fm_get "$f" round)";  [ -n "$v" ] && extra="$extra round=$v" ;;
-        design|ticket|acceptance)
+        design|ticket|acceptance|overview)
           v="$(fm_get "$f" spec)";   [ -n "$v" ] && extra="$extra spec=$v" ;;
       esac
       printf '%-11s %s %s%s\n' "$t" "$(basename "$f" .md)" "$(fm_get "$f" status)" "$extra"
@@ -320,6 +364,10 @@ cmd_ticket() {
         draft)    echo "✗ spec $spec_id 还是 draft，先 /dev-spec 完成批准"; rc=1 ;;
         *)        echo "✗ spec $spec_id 状态非法：$sst"; rc=1 ;;
       esac
+      # FR-7 开工门禁：spec 批准之后校验 reviewed 总览（名下 ≥2 票才触发，单票豁免）
+      if [ "$sst" = "approved" ] || [ "$sst" = "done" ]; then
+        overview_gate "$spec_id" || rc=1
+      fi
     else
       echo "✗ 关联 spec $spec_id 不存在"; rc=1
     fi
@@ -508,7 +556,7 @@ cmd_validate() {
   file="$(abs_path "$1")"
   [ -f "$file" ] || die "找不到文件：$file"
   local type
-  type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 八个产物目录内）：$file"
+  type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 九个产物目录内）：$file"
   local ERRORS=0
   err() { echo "  ✗ $*"; ERRORS=$((ERRORS+1)); }
   local base id status pad spec_id need_id need_file frs covered missing round dep t any residue r
@@ -592,6 +640,15 @@ cmd_validate() {
       done
       ticket_cycles >/dev/null 2>&1 || err "工单依赖存在环：$(ticket_cycles | sed 's/^CYCLE //')"
       ;;
+    overview)
+      check_sections "$file" "全景一行|全景矩阵|黄金场景走查|样张|差距清单"
+      spec_id="$(fm_get "$file" spec)"
+      if [ -n "$spec_id" ]; then
+        artifact_file spec "$spec_id" >/dev/null 2>&1 || err "关联 spec $spec_id 不存在"
+      else
+        err "缺 frontmatter 字段 spec"
+      fi
+      ;;
     review)
       check_sections "$file" "标准轴 findings|Spec 轴 findings|汇总"
       fm_bare_key "$file" "tickets" && err "tickets 须单行书写：[0007, 0008]"
@@ -629,9 +686,9 @@ cmd_validate() {
 usage() {
   cat <<'EOF'
 用法：check.sh <子命令> [参数]
-  phase                 全库状态总览（八类产物 + frontier）
+  phase                 全库状态总览（九类产物 + frontier）
   frontier              列出阻塞已清、可开工的工单
-  ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved）
+  ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved、多票 spec 须 reviewed 总览）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
   commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行

@@ -57,17 +57,18 @@ CHECK_TEST="<同上>"
 
 ### .gitignore
 
-逐行幂等追加三条过程档忽略行，确切写法（逐字落盘）：
+逐行幂等追加四条过程档忽略行，确切写法（逐字落盘）：
 
 ```
 docs/tickets/
 docs/reviews/
 docs/acceptance/
+docs/overviews/
 ```
 
-- 幂等语义：每行先 grep 后追加——缺哪行补哪行，三行齐备即跳过，重跑零变化。目录级条目，产物目录懒创建，对不存在目录无副作用。
+- 幂等语义：每行先 grep 后追加——缺哪行补哪行，四行齐备即跳过，重跑零变化。目录级条目，产物目录懒创建，对不存在目录无副作用。
 - 用户已有 .gitignore 内容一行不动：只追加缺失行，不改写、不重排、不删任何已有行。
-- 不设标记块：三行内容固定、追加去重即幂等，无需标记判定（标记段只有多仓工作区模式的成员登记在用，见「多仓工作区模式」）。
+- 不设标记块：四行内容固定、追加去重即幂等，无需标记判定（标记段只有多仓工作区模式的成员登记在用，见「多仓工作区模式」）。
 
 ### .git/hooks/commit-msg、pre-push
 
@@ -84,13 +85,13 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 
 **外来 hook 处置**：已存在且不含 `sdlc-managed` → **不覆盖**；读出其内容摘要告知用户，给两个选项：把原有逻辑并进 check.sh 后重装，或用户自行串联（`exec` 前加调原 hook）。用户不选就跳过并列入收尾报告。
 
-### docs/ 八个产物目录
+### docs/ 九个产物目录
 
 **不创建**。留待第一个产物落盘时由对应技能创建，不留 .gitkeep。
 
 ### 多仓工作区模式（仅 SKILL §0 判定进入该模式时执行）
 
-- **工作区仓库**：根目录 `git init -b main`（分支 2 前提即根非仓库，无需防重）。随后按本节以上各目标在根落全套：check.sh、l4-guard、trackers、config.sh（仅缺失时生成）、METHOD.md、GLOSSARY、CODING_STANDARDS、AGENTS.md 哨兵（§2）、根 commit-msg/pre-push 转发，语义与单仓完全一致；docs/ 八个产物目录照旧懒创建。根不装成员源码：CODE_DIRS 与 CHECK_* 探测不到即留空；fresh init 无 origin/HEAD，BASE_REF 落 `main` 默认值。
+- **工作区仓库**：根目录 `git init -b main`（分支 2 前提即根非仓库，无需防重）。随后按本节以上各目标在根落全套：check.sh、l4-guard、trackers、config.sh（仅缺失时生成）、METHOD.md、GLOSSARY、CODING_STANDARDS、AGENTS.md 哨兵（§2）、根 commit-msg/pre-push 转发，语义与单仓完全一致；docs/ 九个产物目录照旧懒创建。根不装成员源码：CODE_DIRS 与 CHECK_* 探测不到即留空；fresh init 无 origin/HEAD，BASE_REF 落 `main` 默认值。
 - **成员清单 `.sdlc/members.list`**：决策 4 确认后落盘，逐行一个成员目录名（相对根、无斜杠、按扫描顺序）；归 setup 所有权，重跑按新确认结果**整体重写**。被排除的候选不落行。`.sdlc/` 随写随建。
 - **根 .gitignore 成员标记段**：登记成员目录，防嵌套 git 仓库被误收进工作区仓库索引。段格式（标记行措辞勿改，幂等判定靠 begin/end 标记）：
 
@@ -179,7 +180,7 @@ pre-push 同理，子命令换为 `pre-push`（无参数转发）。写完 `chmo
 **本次动作**（覆盖/保留逐项）：
 - 覆盖 .sdlc/check.sh；生成 .sdlc/config.sh（模板）；生成 .sdlc/trackers/local.sh
 - 覆盖 docs/METHOD.md；GLOSSARY.md 补"流程术语与状态"章
-- .gitignore <幂等追加过程档忽略三行 | 三行已齐备跳过>（docs/tickets/、docs/reviews/、docs/acceptance/）
+- .gitignore <幂等追加过程档忽略四行 | 四行已齐备跳过>（docs/tickets/、docs/reviews/、docs/acceptance/、docs/overviews/）
 - AGENTS.md <创建|追加哨兵块|替换块内内容>；hooks <安装 commit-msg/pre-push|发现外来 hook：说明>；L4 hook <已装（guard 脚本 + .zcode/config.json hooks 块，ZCode 会话）|未识别 ZCode 会话，未装平台接线，guard 脚本仍就位>
 - 编码标准：<导入 N 份到 docs/standards/ | 引入 <lang> starter | 跳过>
 - 识别智能体：<name|未识别，走通用流程>；仓库类型：<单仓库|monorepo（N 包）|多仓工作区（N 成员）>

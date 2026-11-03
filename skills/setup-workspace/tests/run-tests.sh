@@ -343,6 +343,40 @@ t "validate acceptance" 0 "check.sh validate docs/acceptance/0001-checkout-round
 t "validate adr" 0 "check.sh validate docs/adr/0001-local-tracker.md" "通过"
 t "validate research" 0 "check.sh validate docs/research/0001-gateway.md" "通过"
 
+# FR-7 开工门禁的既有断言前置：spec 0001 名下 ≥2 票，ticket 就绪/slug/重入放行须有 reviewed 总览
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: reviewed
+created: 2026-10-26
+reviewed: 2026-10-26
+---
+# 0001: 结账规格总览
+
+## 全景一行
+一键结算 + 优惠码 + 电子发票。（来源：spec 0001 方案；need 0001 FR-1–FR-2、FR-10）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 一键结算生成订单（spec 0001 验收场景 FR-1） | ticket 0001 |
+| 买家 | FR-2 | 优惠码减免（spec 0001 验收场景 FR-2） | ticket 0002 |
+| 买家 | FR-10 | 开票到达邮箱（spec 0001 验收场景 FR-10） | 集成级：dev-accept |
+
+## 黄金场景走查
+
+### 走查一（正常流）：一键结算
+你把商品加入购物车点结算，订单生成。剧本逐句：Given 有商品 When 结算 Then 订单生成。（来源：spec 0001 验收场景 FR-1）
+
+## 样张
+CLI 类 → 输出样例：`$ checkout` → `订单已生成`。（来源：spec 0001 实现决策；ticket 0001 验收标准）
+
+## 差距清单
+- 无（来源：need 0001 FR-1/FR-2/FR-10 经全景矩阵逐行指回，无缺口）
+EOF
+t "validate overview（夹具总览，五节齐备）" 0 "check.sh validate docs/overviews/0001-checkout-overview.md" "通过（overview）"
+
 echo "== frontier 随状态推进 =="
 setfm docs/tickets/0003-order-api.md status implemented
 t "阻塞实现后 0001 进入 frontier" 0 "check.sh frontier" "0001"
@@ -1028,6 +1062,380 @@ rm "$TMP/docs/tickets/0001-old-cart.md" "$TMP/docs/reviews/0001-old-review.md" "
 t "清扫后 done spec 校验通过" 0 "check.sh validate docs/specs/0001-swept.md" "通过"
 tn "其他 spec 名下工单不误报为残留" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-cart"
 tn "仅指向其他 spec 工单的评审不误报" 0 "check.sh validate docs/specs/0001-swept.md" "0002-new-review"
+
+echo "== overview 类型注册六处分支（seam 一，spec 0014）=="
+new_repo
+wfile docs/needs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-11-02
+---
+# 结账流程
+
+## 背景与业务目标
+提高结账转化。
+
+## 干系人与用户
+买家；成功标准：下单转化率不降。
+
+## 系统能力需求
+- FR-1 支持购物车结算
+
+## 场景
+- Given 购物车有商品 When 结算 Then 生成订单
+
+## 假设与风险
+- 假设：优惠码规则稳定
+
+## 范围与非目标
+不含退款。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-02
+---
+# 结账规格
+
+## 问题陈述
+买家结算慢。
+
+## 方案
+一键结算。
+
+## 用户故事
+- 作为买家，我想要一键结算，以便更快下单
+
+## 实现决策
+新增 checkout 模块。
+
+## 测试决策
+在 checkout 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有商品 When 结算 Then 订单生成
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/tickets/0001-cart.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-11-02
+---
+# 0001: 购物车结算
+
+**做什么：** 从购物车一键生成订单
+
+**验收标准：**
+- [ ] 有商品时结算生成订单（测试：checkout_test）
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0001: 结账总览
+
+## 全景一行
+一键结算（来源：spec 0001 方案）。
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 购物车结算 | ticket 0001 |
+
+## 黄金场景走查
+作为买家，我把商品加入购物车并结算，订单生成（剧本：spec 0001 验收场景 FR-1）。
+
+## 样张
+CLI 输出样例：`订单已创建`。
+
+## 差距清单
+- 无
+EOF
+t "phase 扫描出现 overview 行并带 spec 关联" 0 "check.sh phase" "0001-checkout-overview draft spec=0001"
+t "validate overview 五节齐备通过" 0 "check.sh validate docs/overviews/0001-checkout-overview.md" "通过（overview）"
+wfile docs/overviews/0002-missing-sample.md <<'EOF'
+---
+id: 0002
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0002: 缺样张总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 缺必填节点名样张" 1 "check.sh validate docs/overviews/0002-missing-sample.md" "缺必填节：## 样张"
+wfile docs/overviews/0003-ghost-spec.md <<'EOF'
+---
+id: 0003
+spec: 9999
+status: draft
+created: 2026-11-02
+---
+# 0003: 指向不存在 spec 的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview spec 引用不存在拒绝" 1 "check.sh validate docs/overviews/0003-ghost-spec.md" "关联 spec 9999 不存在"
+wfile docs/overviews/0005-nospec.md <<'EOF'
+---
+id: 0005
+status: draft
+created: 2026-11-02
+---
+# 0005: 缺 spec 字段的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 缺 spec 字段拒绝" 1 "check.sh validate docs/overviews/0005-nospec.md" "缺 frontmatter 字段 spec"
+wfile docs/overviews/0004-badstatus.md <<'EOF'
+---
+id: 0004
+spec: 0001
+status: approved
+created: 2026-11-02
+---
+# 0004: 状态非法的总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+t "validate overview 状态非法（只许 draft reviewed）" 1 "check.sh validate docs/overviews/0004-badstatus.md" "status 非法（overview 允许：draft reviewed）"
+
+echo "-- overview 纳入 spec_residue 名下关系（AC3，done 清扫门禁）--"
+wfile docs/needs/0002-solo.md <<'EOF'
+---
+id: 0002
+status: confirmed
+created: 2026-11-02
+---
+# 单票流程
+
+## 背景与业务目标
+减少重复操作。
+
+## 干系人与用户
+操作员；成功标准：重复操作清零。
+
+## 系统能力需求
+- FR-1 支持一键归档
+
+## 场景
+- Given 有已完成工单 When 归档 Then 工单入档
+
+## 假设与风险
+- 假设：归档规则稳定
+
+## 范围与非目标
+不含恢复。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0002-solo-swept.md <<'EOF'
+---
+id: 0002
+status: done
+need: 0002
+round: 1
+created: 2026-11-02
+---
+# 已清扫单票规格
+
+## 问题陈述
+重复操作多。
+
+## 方案
+一键归档。
+
+## 用户故事
+- 作为操作员，我想要一键归档，以便减少重复操作
+
+## 实现决策
+新增 archive 模块。
+
+## 测试决策
+在 archive 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有已完成工单 When 归档 Then 工单入档
+
+## 非目标
+不含恢复。
+
+## 备注
+EOF
+wfile docs/overviews/0006-solo-residue.md <<'EOF'
+---
+id: 0006
+spec: 0002
+status: draft
+created: 2026-11-02
+---
+# 0006: 单票总览
+
+## 全景一行
+一键归档（来源：spec 0002 方案）。
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 操作员 | FR-1 | 一键归档 | （无） |
+
+## 黄金场景走查
+作为操作员，我对已完成工单点归档，工单入档（剧本：spec 0002 验收场景 FR-1）。
+
+## 样张
+CLI 输出样例：`已归档 1 项`。
+
+## 差距清单
+- 无
+EOF
+t "done spec 名下总览残留被点名" 1 "check.sh validate docs/specs/0002-solo-swept.md" "docs/overviews/0006-solo-residue.md"
+rm "$TMP/docs/overviews/0006-solo-residue.md"
+t "清扫后 done spec 名下总览为零" 0 "check.sh validate docs/specs/0002-solo-swept.md" "通过"
+tn "指向其他 spec 的总览不误报为残留" 0 "check.sh validate docs/specs/0002-solo-swept.md" "0001-checkout-overview"
+
+echo "-- .gitignore 忽略行与 publish 投影（AC2，FR-6）--"
+printf 'docs/tickets/\ndocs/reviews/\ndocs/acceptance/\ndocs/overviews/\n' > "$TMP/.gitignore"
+git -C "$TMP" add .gitignore docs
+git -C "$TMP" commit -qm "[trivial] fixture 基线（知识档进库，过程档与总览被忽略）"
+wfile docs/overviews/0007-post-ignore.md <<'EOF'
+---
+id: 0007
+spec: 0001
+status: draft
+created: 2026-11-02
+---
+# 0007: 忽略行为对照总览
+
+## 全景一行
+x
+
+## 全景矩阵
+x
+
+## 黄金场景走查
+x
+
+## 样张
+x
+
+## 差距清单
+x
+EOF
+wfile docs/needs/0003-post-ignore.md <<'EOF'
+---
+id: 0003
+status: draft
+created: 2026-11-02
+---
+# 忽略行为对照 need（新建）
+
+## 背景与业务目标
+测试夹具。
+EOF
+tn "总览落盘后 git status 干净" 0 "git status --porcelain" "docs/overviews"
+t "check-ignore 命中 docs/overviews" 0 "git check-ignore -q docs/overviews" ""
+t "知识档新建文件照常入 git status（对照控制）" 0 "git status --porcelain" "docs/needs"
+GITHUB_ADAPTER="$HERE/../assets/trackers/github.sh"
+cp "$GITHUB_ADAPTER" "$TMP/.sdlc/trackers/github.sh" && chmod +x "$TMP/.sdlc/trackers/github.sh"
+sed -i.bak 's/^TRACKER=.*/TRACKER=github/; s/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
+fake_cmd gh <<'EOF'
+#!/bin/sh
+[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$*" >> "$FAKE_LOG"
+if [ "$1" = "auth" ]; then exit "${FAKE_AUTH:-0}"; fi
+if [ "$1" = "issue" ]; then
+  case "$2" in
+    create|edit) ;;
+    *) exit 0 ;;
+  esac
+  prev=""
+  for a in "$@"; do
+    if { [ "$prev" = "-F" ] || [ "$prev" = "--body-file" ]; } && [ -f "$a" ]; then cat "$a" >> "$FAKE_LOG"; fi
+    prev="$a"
+  done
+  if [ "$2" = "create" ]; then printf '%s\n' "${FAKE_URL:-https://github.com/acme/widget/issues/77}"; fi
+fi
+exit 0
+EOF
+t "publish 总览投影成功" 0 "PATH=\"$TMP/fakebin:\$PATH\" FAKE_LOG=\"$TMP/gh-ov1.log\" check.sh publish docs/overviews/0001-checkout-overview.md" "投影"
+t "总览投影正文首行带盘上指针" 0 "grep -q '盘上产物：docs/overviews/0001-checkout-overview.md' \"$TMP/gh-ov1.log\"" ""
+t "总览映射落行（路径与编号与URL）" 0 "grep -q 'docs/overviews/0001-checkout-overview.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/77' \"$TMP/.sdlc/trackers/github.map\"" ""
+rm "$TMP/docs/overviews/0001-checkout-overview.md"
+t "总览清扫删除后 tracker 映射不回删" 0 "grep -q 'docs/overviews/0001-checkout-overview.md' \"$TMP/.sdlc/trackers/github.map\" && grep -q 'issues/77' \"$TMP/.sdlc/trackers/github.map\"" ""
+sed -i.bak 's/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== reconstructed 状态（逆向产物零改动兼容）=="
 new_repo
@@ -2196,10 +2604,15 @@ ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
 t "两份 GLOSSARY.md 逐字一致" 0 "diff \"$ROOT/GLOSSARY.md\" \"$HERE/../assets/GLOSSARY.md\""
 t "两份 check.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$CHECK\""
+t "METHOD 产物表含 overview 行（draft→reviewed，dev-overview 推进）" 0 "grep -qF 'draft →reviewed（dev-overview，须用户显式确认）' \"$ROOT/docs/METHOD.md\"" ""
+t "METHOD 过程档枚举含 overview（总览随过程档归置）" 0 "grep -qF '（ticket、review、acceptance、overview）' \"$ROOT/docs/METHOD.md\"" ""
+t "METHOD 目录树含 overviews/ 且目录计数为九" 0 "grep -qF 'tickets/ overviews/ reviews/' \"$ROOT/docs/METHOD.md\" && grep -qF '九个产物目录' \"$ROOT/docs/METHOD.md\"" ""
+t "METHOD validate 描述含总览五节校验" 0 "grep -qF '总览五节' \"$ROOT/docs/METHOD.md\"" ""
+t "GLOSSARY 流程状态章含 overview 两态（推进者 dev-overview）" 0 "grep -qF 'overview.draft / reviewed' \"$ROOT/GLOSSARY.md\" && grep -qF 'dev-overview' \"$ROOT/GLOSSARY.md\"" ""
 
 echo "== 终态断言：spec 0011 零改动面（check.sh 机械层与 dev-accept 蒸馏清扫序列不动）=="
 t "零改动面：check.sh 与生成资产 diff 为空" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$HERE/../assets/check.sh\""
-t "零改动面：dev-accept 清扫范围句原样" 0 "grep -qF \"删除该 spec 名下全部 tickets、reviews 与本次验收报告文件\" \"$ROOT/skills/dev-accept/SKILL.md\""
+t "零改动面：dev-accept 清扫范围句原样（spec 0014 票 0030 授权纳入 overviews 后的形态）" 0 "grep -qF \"删除该 spec 名下全部 tickets、overviews、reviews 与本次验收报告文件\" \"$ROOT/skills/dev-accept/SKILL.md\""
 t "零改动面：dev-accept 原子提交序列句原样" 0 "grep -qF \"蒸馏编辑 + 清扫删除 + 置 done 合为恰一个\" \"$ROOT/skills/dev-accept/SKILL.md\""
 
 echo "== 过程档 gitignore 生成面文本契约（seam 2）=="
@@ -2212,15 +2625,952 @@ t "generation.md 含 .gitignore 节" 0 "test -s \"$TMP/txt/gen-gitignore.md\"" "
 t "忽略行 docs/tickets/ 确切写法成文" 0 "grep -qx 'docs/tickets/' \"$TMP/txt/gen-gitignore.md\"" ""
 t "忽略行 docs/reviews/ 确切写法成文" 0 "grep -qx 'docs/reviews/' \"$TMP/txt/gen-gitignore.md\"" ""
 t "忽略行 docs/acceptance/ 确切写法成文" 0 "grep -qx 'docs/acceptance/' \"$TMP/txt/gen-gitignore.md\"" ""
+t "忽略行 docs/overviews/ 确切写法成文" 0 "grep -qx 'docs/overviews/' \"$TMP/txt/gen-gitignore.md\"" ""
 oseq ".gitignore 节按序成文：确切写法在前、每行先 grep 后追加、已有内容一行不动、不设标记块在后" "$TMP/txt/gen-gitignore.md" "docs/tickets/" "grep" "一行不动" "标记块"
 t "幂等语义锚定 spec 措辞：每行先 grep 后追加" 0 "grep -q '先 grep 后追加' \"$TMP/txt/gen-gitignore.md\"" ""
 awk '/^## 4\. /{f=1} f' "$GEN" > "$TMP/txt/report.md"
-t "收尾报告模板含 .gitignore 行（三条落点齐备）" 0 "grep -q '\.gitignore' \"$TMP/txt/report.md\" && grep -q 'docs/tickets/' \"$TMP/txt/report.md\" && grep -q 'docs/acceptance/' \"$TMP/txt/report.md\"" ""
+t "收尾报告模板含 .gitignore 行（四条落点齐备）" 0 "grep -q '\.gitignore' \"$TMP/txt/report.md\" && grep -q 'docs/tickets/' \"$TMP/txt/report.md\" && grep -q 'docs/acceptance/' \"$TMP/txt/report.md\" && grep -q 'docs/overviews/' \"$TMP/txt/report.md\"" ""
 awk '/^\| `\.gitignore\`/{f=1} f' "$SKILL" > "$TMP/txt/skill-gitignore-row.md"
 t "SKILL §3 生成表含 .gitignore 行（幂等追加、已有内容不动、指向 generation.md）" 0 "grep -q '幂等追加' \"$TMP/txt/skill-gitignore-row.md\" && grep -q '一行不动' \"$TMP/txt/skill-gitignore-row.md\" && grep -q 'generation.md' \"$TMP/txt/skill-gitignore-row.md\"" ""
+t "SKILL §3 .gitignore 行含总览忽略行（四条齐列）" 0 "grep -q 'docs/overviews/' \"$TMP/txt/skill-gitignore-row.md\"" ""
 awk '/^## 禁止事项/{f=1} f' "$SKILL" > "$TMP/txt/skill-forbidden.md"
-t "禁止事项改为只禁三行以外内容（新表述成文，成员标记段例外保留）" 0 "grep -q '过程档忽略三行以外的任何内容' \"$TMP/txt/skill-forbidden.md\" && grep -q '唯一例外' \"$TMP/txt/skill-forbidden.md\"" ""
+t "禁止事项改为只禁四行以外内容（新表述成文，成员标记段例外保留）" 0 "grep -q '过程档忽略四行以外的任何内容' \"$TMP/txt/skill-forbidden.md\" && grep -q '唯一例外' \"$TMP/txt/skill-forbidden.md\"" ""
 tn "SKILL.md 全文不再含旧句「往 .gitignore 加任何流程产物」" 0 "cat \"$SKILL\"" "往 .gitignore 加任何流程产物"
+
+echo "== dev-overview 技能本体与五节合成演练（seam 二，spec 0014）=="
+new_repo
+SKILL="$HERE/../../dev-overview/SKILL.md"
+SCRATCH="$(mktemp -d)"  # 套件草稿目录，放 fixture 仓库外，不污染 git status 断言
+
+echo "-- 技能文本契约：三条硬纪律、媒介判定、三路归置与状态推进纪律写入技能文本（FR-5）--"
+t "技能本体存在：SKILL.md 单文件（五节模板内嵌技能，先例 dev-plan 固定模板）" 0 "test -f \"$SKILL\"" ""
+t "frontmatter 定位：dev-overview，总览合成与走查" 0 "grep -qE '^name: dev-overview' \"$SKILL\" && grep -q '总览' \"$SKILL\" && grep -q '走查' \"$SKILL\"" ""
+oseq "五节名按序成文（全景一行/全景矩阵/黄金场景走查/样张/差距清单）" "$SKILL" "全景一行" "全景矩阵" "黄金场景走查" "样张" "差距清单"
+awk '/^## 1\. /{f=1;next} /^## 2\. /{f=0} f' "$SKILL" > "$SCRATCH/ov-gate.md"
+oseq "FR-1 入口门禁：spec approved 在前、名下 ≥1 票 ready 在后" "$SCRATCH/ov-gate.md" "approved" "ready"
+t "重入分支成文：已有 draft 总览从走查续接，不重新合成" 0 "grep -q '重新合成' \"$SCRATCH/ov-gate.md\" && grep -q '重入' \"$SCRATCH/ov-gate.md\"" ""
+awk '/^## 2\. /{f=1;next} /^## 3\. /{f=0} f' "$SKILL" > "$SCRATCH/ov-load.md"
+oseq "装载顺序：need 全文→spec 全文→design→名下全部工单，全程纯读" "$SCRATCH/ov-load.md" "need 全文" "spec 全文" "design" "名下全部工单"
+t "合成是纯读动作" 0 "grep -q '纯读' \"$SCRATCH/ov-load.md\"" ""
+awk '/^## 3\. /{f=1;next} /^## 4\. /{f=0} f' "$SKILL" > "$SCRATCH/ov-synth.md"
+oseq "硬纪律① 溯源：可溯源标注在前、不产新决策在后" "$SCRATCH/ov-synth.md" "可溯源" "不产新决策"
+oseq "硬纪律② 写不出的格子进差距清单、不现场拍板" "$SCRATCH/ov-synth.md" "差距清单" "不现场拍板"
+oseq "硬纪律③ JBGE：样张只做状态可见性，三态=正常/空/错误" "$SCRATCH/ov-synth.md" "JBGE" "三态" "正常" "空" "错误"
+oseq "媒介判定：UI 三态 HTML 原型落系统临时目录 / CLI 输出样例 / API 请求响应 / 混合分节各出 / 拿不准不猜" "$SCRATCH/ov-synth.md" "UI" "HTML 原型" "系统临时目录" "CLI" "输出样例" "API" "请求/响应" "混合" "分节各出" "不猜"
+t "UI 原型规格沿 dev-clarify prototype.md（零依赖/不进仓库/用完即弃/拍板要点）" 0 "grep -q 'references/prototype.md' \"$SCRATCH/ov-synth.md\" && grep -q '零依赖' \"$SCRATCH/ov-synth.md\" && grep -q '不进仓库' \"$SCRATCH/ov-synth.md\" && grep -q '用完即弃' \"$SCRATCH/ov-synth.md\" && grep -q '拍板要点' \"$SCRATCH/ov-synth.md\"" ""
+oseq "走查纪律：第二人称叙事、异常流至少一条、剧本取 spec 验收场景（集成级优先）" "$SCRATCH/ov-synth.md" "第二人称" "异常流" "集成级优先"
+t "总览落盘位置成文：docs/overviews/" 0 "grep -q 'docs/overviews/' \"$SCRATCH/ov-synth.md\"" ""
+awk '/^## 4\. /{f=1;next} /^## 5\. /{f=0} f' "$SKILL" > "$SCRATCH/ov-walk.md"
+oseq "三路归置成文：回 dev-spec / 回 dev-plan / 非目标" "$SCRATCH/ov-walk.md" "回 dev-spec" "回 dev-plan" "非目标"
+oseq "归置次序：先更新产物、再更新总览" "$SCRATCH/ov-walk.md" "先更新产物" "再更新总览"
+oseq "状态推进：须用户显式确认（沉默不算），确认后置 reviewed 并追加 reviewed: 日期" "$SCRATCH/ov-walk.md" "显式确认" "沉默不算" "reviewed" "reviewed: <日期>"
+t "总览不替用户拍板" 0 "grep -q '不替用户拍板' \"$SCRATCH/ov-walk.md\"" ""
+t "出口过 validate" 0 "grep -q 'validate' \"$SKILL\"" ""
+
+echo "-- FR-1 真实 spec 演练：五节齐备、validate 通过、每节含可溯源引用（grep 可核）--"
+wfile .gitignore <<'EOF'
+docs/tickets/
+docs/reviews/
+docs/acceptance/
+docs/overviews/
+EOF
+wfile docs/needs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-11-02
+---
+# 结账流程
+
+## 背景与业务目标
+提高结账转化，缩短下单路径。
+
+## 干系人与用户
+买家；成功标准：下单转化率不降。
+
+## 系统能力需求
+- FR-1 支持购物车一键结算
+- FR-2 支持优惠码核销，过期时提示并保留购物车
+- FR-3 购物车为空时给出引导
+
+## 场景
+- Given 购物车有商品 When 一键结算 Then 生成订单并跳转完成页
+- Given 优惠码已过期 When 提交订单 Then 提示已过期且购物车保留
+- Given 购物车为空 When 打开结算页 Then 显示空态与去逛逛入口
+
+## 假设与风险
+- 假设：优惠码规则稳定
+
+## 范围与非目标
+不含退款。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-02
+---
+# 结账单页规格
+
+## 问题陈述
+买家结算步骤多，优惠码过期无反馈，空车进入结算页无所适从。
+
+## 方案
+做一个结账单页（Web 界面）：一键结算、优惠码核销、空态引导。
+
+## 用户故事
+- 作为买家，我想一键结算，以便更快下单
+- 作为买家，我想在优惠码过期时立即知道，以便改用有效码
+- 作为买家，我想在空车时被引导去逛，以便继续选购
+
+## 实现决策
+结账页面组件（UI）：结算按钮、优惠码输入与提示区、空态占位。
+
+## 测试决策
+UI 组件三态测试 + API 契约测试。
+
+## 验收场景
+- [FR-1 | 工单级] Given 购物车有商品 When 一键结算 Then 生成订单并跳转完成页
+- [FR-2 | 工单级] Given 优惠码已过期 When 提交订单 Then 提示已过期且购物车保留
+- [FR-3 | 工单级] Given 购物车为空 When 打开结算页 Then 显示空态与去逛逛入口
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/tickets/0001-cart-checkout.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-02
+---
+# 0001: 一键结算
+
+**做什么：** 购物车有商品时一键结算生成订单
+
+**改动面：** checkout 页面组件
+
+**验收标准：**
+- [ ] [FR-1] Given 购物车有商品 When 一键结算 Then 生成订单并跳转完成页
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/tickets/0002-promo-expired.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-02
+---
+# 0002: 优惠码过期提示
+
+**做什么：** 过期优惠码提交时提示并保留购物车
+
+**改动面：** checkout 页面组件
+
+**验收标准：**
+- [ ] [FR-2] Given 优惠码已过期 When 提交订单 Then 提示已过期且购物车保留
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/tickets/0003-empty-cart.md <<'EOF'
+---
+id: 0003
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-02
+---
+# 0003: 空购物车引导
+
+**做什么：** 空车打开结算页时显示空态与去逛逛入口
+
+**改动面：** checkout 页面组件
+
+**验收标准：**
+- [ ] [FR-3] Given 购物车为空 When 打开结算页 Then 显示空态与去逛逛入口
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: draft
+created: 2026-11-03
+---
+# 0001: 结账单页总览
+
+## 全景一行
+买家在结账单页完成一键结算、优惠码核销与空车引导，三张票各交付一条验收场景。（来源：spec 0001 方案；need 0001 FR-1–FR-3）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 一键结算生成订单（spec 0001 验收场景 FR-1） | ticket 0001 |
+| 买家 | FR-2 | 优惠码过期提示并保留购物车（spec 0001 验收场景 FR-2） | ticket 0002 |
+| 买家 | FR-3 | 空车显示空态与去逛逛入口（spec 0001 验收场景 FR-3） | ticket 0003 |
+
+## 黄金场景走查
+
+### 走查一（正常流）：一键结算
+你把商品加入购物车，点「一键结算」，订单生成并跳到完成页。剧本逐句：Given 购物车有商品 When 一键结算 Then 生成订单并跳转完成页。（来源：spec 0001 验收场景 FR-1）
+
+### 走查二（异常流）：优惠码过期
+你输入已过期的优惠码提交订单，页面提示已过期，购物车原样保留，可改码后重新提交。剧本逐句：Given 优惠码已过期 When 提交订单 Then 提示已过期且购物车保留。（来源：spec 0001 验收场景 FR-2）
+
+### 走查三（空态）：空车引导
+你没加商品直接打开结算页，看到空态和「去逛逛」入口，而不是报错。剧本逐句：Given 购物车为空 When 打开结算页 Then 显示空态与去逛逛入口。（来源：spec 0001 验收场景 FR-3）
+
+## 样张
+UI 类 → 三态可点 HTML 原型，已落系统临时目录（单文件零依赖，不进仓库，用完即弃）：正常态=结算成功，空态=空车引导，错误态=优惠码过期提示，三态切换钮可点。打开命令：`open <系统临时目录>/spec-0001-mock.html`。拍板要点：空态引导文案与错误提示措辞请走查时拍板。（来源：spec 0001 实现决策；ticket 0001–0003 验收标准）
+
+## 差距清单
+- 无（来源：need 0001 FR-1–FR-3 经全景矩阵逐行指回 ticket 0001–0003，无缺口）
+EOF
+git -C "$TMP" add .gitignore .sdlc docs/needs docs/specs
+git -C "$TMP" commit -qm "[trivial] fixture"
+t "phase 出现主演练总览（draft spec=0001）" 0 "check.sh phase" "0001-checkout-overview draft spec=0001"
+t "FR-1 总览过 validate（五节齐备）" 0 "check.sh validate docs/overviews/0001-checkout-overview.md" "通过（overview）"
+OV="$TMP/docs/overviews/0001-checkout-overview.md"
+# 计数先在套件侧算好再断言（bash 3.2 的 t/eval 内嵌 $() 嵌套引号会破坏路径）
+WALK_N="$(grep -c '^### 走查' "$OV")"
+awk '/^## 全景一行/{f=1;next} /^## /{f=0} f' "$OV" > "$SCRATCH/sec-line.md"
+awk '/^## 全景矩阵/{f=1;next} /^## /{f=0} f' "$OV" > "$SCRATCH/sec-matrix.md"
+awk '/^## 黄金场景走查/{f=1;next} /^## /{f=0} f' "$OV" > "$SCRATCH/sec-walk.md"
+awk '/^## 样张/{f=1;next} /^## /{f=0} f' "$OV" > "$SCRATCH/sec-sample.md"
+awk '/^## 差距清单/{f=1;next} /^## /{f=0} f' "$OV" > "$SCRATCH/sec-gap.md"
+t "全景一行含可溯源引用（need FR-N / spec / ticket NNNN）" 0 "grep -qE 'need 000|spec 000|FR-[0-9]|ticket 000' \"$SCRATCH/sec-line.md\"" ""
+t "全景矩阵含可溯源引用" 0 "grep -qE 'spec 000|ticket 000' \"$SCRATCH/sec-matrix.md\"" ""
+t "走查含可溯源引用" 0 "grep -qE 'spec 000 验收场景|FR-[0-9]' \"$SCRATCH/sec-walk.md\"" ""
+t "样张含可溯源引用" 0 "grep -qE 'spec 000|ticket 000' \"$SCRATCH/sec-sample.md\"" ""
+t "差距清单含可溯源引用" 0 "grep -qE 'need 000|spec 000|FR-[0-9]|ticket 000' \"$SCRATCH/sec-gap.md\"" ""
+t "矩阵三行 FR 均指回票（FR-1/2/3 → ticket 0001/0002/0003）" 0 "grep -q 'FR-1' \"$SCRATCH/sec-matrix.md\" && grep -q 'FR-2' \"$SCRATCH/sec-matrix.md\" && grep -q 'FR-3' \"$SCRATCH/sec-matrix.md\" && grep -q 'ticket 0001' \"$SCRATCH/sec-matrix.md\" && grep -q 'ticket 0002' \"$SCRATCH/sec-matrix.md\" && grep -q 'ticket 0003' \"$SCRATCH/sec-matrix.md\"" ""
+
+echo "-- FR-3 走查叙事：2–3 条第二人称叙事 + 至少一条异常流，剧本逐句取自 spec 验收场景 --"
+t "走查条数 2–3" 0 "test \"$WALK_N\" -ge 2 -a \"$WALK_N\" -le 3" ""
+t "走查为第二人称叙事（你开头）" 0 "grep -q '^你' \"$SCRATCH/sec-walk.md\"" ""
+t "至少一条异常流" 0 "grep -q '异常流' \"$SCRATCH/sec-walk.md\"" ""
+oseq "走查一正常流剧本逐句对上 spec 验收场景 FR-1" "$SCRATCH/sec-walk.md" "Given 购物车有商品" "一键结算" "生成订单并跳转完成页"
+oseq "走查二异常流剧本逐句对上 spec 验收场景 FR-2" "$SCRATCH/sec-walk.md" "Given 优惠码已过期" "提示已过期" "购物车保留"
+
+echo "-- FR-4 媒介一 UI：三态可点 HTML 原型落系统临时目录、仓库 git status 干净 --"
+PROTO="$(mktemp -d "${TMPDIR:-/tmp}/dev-overview-drill.XXXXXX")"
+cat > "$PROTO/spec-0001-mock.html" <<'EOF'
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>spec 0001 结账单页 · 三态样张</title>
+<style>
+  body{font-family:sans-serif;max-width:420px;margin:24px auto;padding:0 12px}
+  .state{display:none;border:1px solid #ccc;border-radius:8px;padding:16px}
+  .state.on{display:block}
+  button{margin-right:8px;padding:6px 12px}
+  .btn-main{width:100%;padding:10px;margin-top:12px}
+  .err{color:#b00}
+</style>
+</head>
+<body>
+<h1>结账单页（spec 0001 样张）</h1>
+<p>
+  <button onclick="show('ok')">正常</button>
+  <button onclick="show('empty')">空</button>
+  <button onclick="show('error')">错误</button>
+</p>
+<div id="ok" class="state on">
+  <p>商品 ×2　合计 ¥198.00</p>
+  <input placeholder="优惠码">
+  <button class="btn-main" onclick="done()">一键结算</button>
+  <p id="done" class="err"></p>
+</div>
+<div id="empty" class="state">
+  <p>购物车是空的。</p>
+  <button class="btn-main" onclick="show('ok')">去逛逛</button>
+</div>
+<div id="error" class="state">
+  <p class="err">优惠码已过期，请更换后重试。</p>
+  <p>购物车已保留：商品 ×2　合计 ¥198.00</p>
+  <button class="btn-main" onclick="show('ok')">返回结算</button>
+</div>
+<script>
+function show(id){
+  document.querySelectorAll('.state').forEach(function(s){s.classList.remove('on')});
+  document.getElementById(id).classList.add('on');
+}
+function done(){
+  document.getElementById('done').textContent='订单已生成，跳转完成页…';
+}
+</script>
+</body>
+</html>
+EOF
+t "原型落在系统临时目录（不在仓库内）" 0 "test -f \"$PROTO/spec-0001-mock.html\"" ""
+HTML_LINES="$(wc -l < "$PROTO/spec-0001-mock.html" | tr -d ' ')"
+BTN_N="$(grep -c '<button' "$PROTO/spec-0001-mock.html")"
+t "原型不超过 200 行（prototype.md 规格）" 0 "test \"$HTML_LINES\" -le 200" ""
+t "三态切换钮齐备（正常/空/错误各一）" 0 "grep -q '正常' "$PROTO/spec-0001-mock.html" && grep -q '空' "$PROTO/spec-0001-mock.html" && grep -q '错误' "$PROTO/spec-0001-mock.html" && test "$BTN_N" -ge 5" ""
+t "主流程可点通（有点击行为）" 0 "grep -q 'onclick' \"$PROTO/spec-0001-mock.html\"" ""
+t "原型零外部依赖（不引 CDN/外链）" 0 "! grep -qE 'src=\"http|href=\"http|@import|cdn\\.' "$PROTO/spec-0001-mock.html"" ""
+t "仓库 git status 干净（原型不进仓库）" 0 'test -z "$(git status --porcelain)"' ""
+t "总览样张节留打开命令与拍板要点" 0 "grep -q '临时目录' "$SCRATCH/sec-sample.md" && grep -q 'open ' "$SCRATCH/sec-sample.md" && grep -q '拍板要点' "$SCRATCH/sec-sample.md"" ""
+rm -rf "$PROTO"
+
+echo "-- FR-4 媒介二 CLI：输出样例三态（输出即线框）--"
+wfile docs/needs/0002-export.md <<'EOF'
+---
+id: 0002
+status: confirmed
+created: 2026-11-02
+---
+# 订单导出
+
+## 背景与业务目标
+运营定期导出订单做对账。
+
+## 干系人与用户
+运营；成功标准：导出文件可直接打开。
+
+## 系统能力需求
+- FR-1 支持把订单导出为 CSV
+
+## 场景
+- Given 有订单 When 运行导出命令 Then 生成 CSV 文件
+
+## 假设与风险
+- 假设：字段集稳定
+
+## 范围与非目标
+不含定时导出。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0002-export.md <<'EOF'
+---
+id: 0002
+status: approved
+need: 0002
+round: 1
+created: 2026-11-02
+---
+# 订单导出命令规格
+
+## 问题陈述
+运营手工复制订单易漏易错。
+
+## 方案
+命令行工具 export-csv，一条命令导出订单 CSV。
+
+## 用户故事
+- 作为运营，我想一条命令导出订单，以便对账
+
+## 实现决策
+CLI 命令 export-csv（纯命令行界面，无图形界面）：参数为目标路径，导出结果输出到终端。
+
+## 测试决策
+CLI 集成测试断言退出码与输出。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有订单 When 运行 export-csv Then 生成 CSV 文件并输出行数
+
+## 非目标
+不含定时导出。
+
+## 备注
+EOF
+wfile docs/tickets/0004-export-cmd.md <<'EOF'
+---
+id: 0004
+type: feature
+spec: 0002
+status: ready
+blocked-by: []
+created: 2026-11-02
+---
+# 0004: 导出命令
+
+**做什么：** export-csv 一条命令导出订单 CSV
+
+**改动面：** export 命令
+
+**验收标准：**
+- [ ] [FR-1] Given 有订单 When 运行 export-csv Then 生成 CSV 文件并输出行数
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/overviews/0002-export-overview.md <<'EOF'
+---
+id: 0002
+spec: 0002
+status: draft
+created: 2026-11-03
+---
+# 0002: 订单导出命令总览
+
+## 全景一行
+运营用一条命令把订单导出为 CSV 并看到行数。（来源：spec 0002 方案；need 0002 FR-1）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 运营 | FR-1 | 运行 export-csv 生成 CSV（spec 0002 验收场景 FR-1） | ticket 0004 |
+
+## 黄金场景走查
+### 走查一（正常流）：导出
+你在终端运行 export-csv，命令生成 orders.csv 并输出「导出 128 行到 orders.csv」。剧本逐句：Given 有订单 When 运行 export-csv Then 生成 CSV 文件并输出行数。（来源：spec 0002 验收场景 FR-1）
+
+## 样张
+CLI 类 → 输出样例（输出即线框），三态：
+
+正常：
+
+```
+$ export-csv orders.csv
+导出 128 行到 orders.csv
+```
+
+空：
+
+```
+$ export-csv empty-month.csv
+未查询到记录，已生成空文件 empty-month.csv
+```
+
+错误：
+
+```
+$ export-csv /no-such-dir/orders.csv
+错误：目标目录不存在
+```
+
+（来源：spec 0002 实现决策；ticket 0004 验收标准）
+
+## 差距清单
+- 无（来源：need 0002 FR-1 经全景矩阵指回 ticket 0004，无缺口）
+EOF
+t "CLI 总览过 validate" 0 "check.sh validate docs/overviews/0002-export-overview.md" "通过（overview）"
+awk '/^## 样张/{f=1;next} /^## /{f=0} f' "$TMP/docs/overviews/0002-export-overview.md" > "$SCRATCH/sec-cli.md"
+t "CLI 输出样例三态齐备（正常/空/错误）" 0 "grep -q '正常' "$SCRATCH/sec-cli.md" && grep -q '空' "$SCRATCH/sec-cli.md" && grep -q '错误' "$SCRATCH/sec-cli.md"" ""
+FENCE_N="$(grep -c '^```' "$SCRATCH/sec-cli.md")"
+t "CLI 样例以输出即线框呈现（≥3 个代码样例块）" 0 "test \"$FENCE_N\" -ge 6" ""
+t "CLI 样例含可溯源引用" 0 "grep -qE 'spec 000|ticket 000' \"$SCRATCH/sec-cli.md\"" ""
+
+echo "-- FR-4 媒介三 API：调用序列 + 请求/响应样例 --"
+wfile docs/needs/0003-orders-api.md <<'EOF'
+---
+id: 0003
+status: confirmed
+created: 2026-11-02
+---
+# 下单 API
+
+## 背景与业务目标
+客户端程序化下单。
+
+## 干系人与用户
+客户端开发者；成功标准：下单接口可用。
+
+## 系统能力需求
+- FR-1 提供创建订单 API
+
+## 场景
+- Given 有效购物车 When 调用下单 API Then 返回订单号
+
+## 假设与风险
+- 假设：JSON 契约稳定
+
+## 范围与非目标
+不含支付。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0003-orders-api.md <<'EOF'
+---
+id: 0003
+status: approved
+need: 0003
+round: 1
+created: 2026-11-02
+---
+# 下单 API 规格
+
+## 问题陈述
+客户端无法程序化下单。
+
+## 方案
+REST API：POST /api/orders 创建订单。
+
+## 用户故事
+- 作为客户端开发者，我想调用下单 API，以便程序化下单
+
+## 实现决策
+API 契约（REST，JSON）：POST /api/orders，请求带 cartId，响应返回 orderId。
+
+## 测试决策
+API 契约测试断言状态码与响应体。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有效购物车 When POST /api/orders Then 返回 201 与订单号
+
+## 非目标
+不含支付。
+
+## 备注
+EOF
+wfile docs/tickets/0005-orders-api.md <<'EOF'
+---
+id: 0005
+type: feature
+spec: 0003
+status: ready
+blocked-by: []
+created: 2026-11-02
+---
+# 0005: 下单 API
+
+**做什么：** POST /api/orders 创建订单返回订单号
+
+**改动面：** orders API
+
+**验收标准：**
+- [ ] [FR-1] Given 有效购物车 When POST /api/orders Then 返回 201 与订单号
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/overviews/0003-orders-api-overview.md <<'EOF'
+---
+id: 0003
+spec: 0003
+status: draft
+created: 2026-11-03
+---
+# 0003: 下单 API 总览
+
+## 全景一行
+客户端调 POST /api/orders 下单并拿回订单号。（来源：spec 0003 方案；need 0003 FR-1）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 客户端 | FR-1 | 调用下单 API 返回订单号（spec 0003 验收场景 FR-1） | ticket 0005 |
+
+## 黄金场景走查
+### 走查一（正常流）：下单
+你的客户端带购物车编号调用下单 API，拿到 201 与订单号。剧本逐句：Given 有效购物车 When POST /api/orders Then 返回 201 与订单号。（来源：spec 0003 验收场景 FR-1）
+
+## 样张
+API 类 → 调用序列 + 请求/响应样例：
+
+1. 正常：POST /api/orders，请求 {"cartId":"c1"} → 响应 201 {"orderId":"o1"}
+2. 空：POST /api/orders，请求 {"cartId":"empty"} → 响应 422 {"error":"EMPTY_CART"}
+3. 错误：POST /api/orders，请求 {"cartId":""} → 响应 400 {"error":"BAD_REQUEST"}
+
+（来源：spec 0003 实现决策；ticket 0005 验收标准）
+
+## 差距清单
+- 无（来源：need 0003 FR-1 经全景矩阵指回 ticket 0005，无缺口）
+EOF
+t "API 总览过 validate" 0 "check.sh validate docs/overviews/0003-orders-api-overview.md" "通过（overview）"
+awk '/^## 样张/{f=1;next} /^## /{f=0} f' "$TMP/docs/overviews/0003-orders-api-overview.md" > "$SCRATCH/sec-api.md"
+t "API 样例含调用序列与请求/响应" 0 "grep -q 'POST /api/orders' "$SCRATCH/sec-api.md" && grep -q '请求' "$SCRATCH/sec-api.md" && grep -q '响应' "$SCRATCH/sec-api.md"" ""
+t "API 样例含可溯源引用" 0 "grep -qE 'spec 000|ticket 000' \"$SCRATCH/sec-api.md\"" ""
+
+echo "-- FR-5 状态推进演练（缺口已清零的主演练总览上）：未显式确认保持 draft，显式确认后置 reviewed --"
+t "未获显式确认：总览保持 draft（沉默不算）" 0 "grep -q '^status: draft' docs/overviews/0001-checkout-overview.md" ""
+setfm docs/overviews/0001-checkout-overview.md status reviewed
+awk '{print} /^created:/{print "reviewed: 2026-11-03"}' "$OV" > "$OV.new" && mv "$OV.new" "$OV"
+t "显式确认后 phase 显示 reviewed" 0 "check.sh phase" "0001-checkout-overview reviewed spec=0001"
+t "reviewed 状态过 validate" 0 "check.sh validate docs/overviews/0001-checkout-overview.md" "通过（overview）"
+
+echo "-- FR-2 孤儿 FR 演练：指不回票的格子按缺口暴露进差距清单，不被静默略过 --"
+new_repo
+wfile .gitignore <<'EOF'
+docs/tickets/
+docs/reviews/
+docs/acceptance/
+docs/overviews/
+EOF
+wfile docs/needs/0001-inventory.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-11-02
+---
+# 库存查询与预警
+
+## 背景与业务目标
+库房实时掌握现存量，低于预警线及时补货。
+
+## 干系人与用户
+库房管理员；成功标准：缺货零突发。
+
+## 系统能力需求
+- FR-1 支持按商品查询现存量
+- FR-2 低于预警线时提示补货
+
+## 场景
+- Given 商品在库 When 查询 Then 返回现存量
+- Given 现存量低于预警线 When 查询 Then 提示补货
+
+## 假设与风险
+- 假设：预警线可配置
+
+## 范围与非目标
+不含自动采购。
+
+## 开放问题
+无
+EOF
+wfile docs/specs/0001-inventory.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-02
+---
+# 库存查询规格
+
+## 问题陈述
+库房靠手工盘点，缺货发现晚。
+
+## 方案
+库存查询工具：按商品查现存量，低于预警线提示补货。
+
+## 用户故事
+- 作为库房管理员，我想按商品查现存量，以便及时补货
+
+## 实现决策
+CLI 查询命令，输出现存量与预警提示。
+
+## 测试决策
+CLI 集成测试断言输出。
+
+## 验收场景
+- [FR-1 | 工单级] Given 商品在库 When 查询 Then 返回现存量
+- [FR-2 | 工单级] Given 现存量低于预警线 When 查询 Then 提示补货
+
+## 非目标
+不含自动采购。
+
+## 备注
+EOF
+wfile docs/tickets/0001-stock-query.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-02
+---
+# 0001: 库存查询
+
+**做什么：** 按商品查询现存量
+
+**改动面：** stock 查询命令
+
+**验收标准：**
+- [ ] [FR-1] Given 商品在库 When 查询 Then 返回现存量
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/overviews/0001-inventory-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: draft
+created: 2026-11-03
+---
+# 0001: 库存查询总览
+
+## 全景一行
+库房按商品查现存量；预警线场景尚无票承接。（来源：spec 0001 方案；need 0001 FR-1–FR-2）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 库房管理员 | FR-1 | 查询现存量（spec 0001 验收场景 FR-1） | ticket 0001 |
+| 库房管理员 | FR-2 | 低于预警线提示补货（spec 0001 验收场景 FR-2） | 缺口：指不回任何票 |
+
+## 黄金场景走查
+### 走查一（正常流）：查询现存量
+你输入商品编号查询，页面返回现存量。剧本逐句：Given 商品在库 When 查询 Then 返回现存量。（来源：spec 0001 验收场景 FR-1）
+
+## 样张
+CLI 类 → 输出样例：`$ stock-query SKU-1` → `SKU-1 现存 42`。（来源：spec 0001 实现决策；ticket 0001 验收标准）
+
+## 差距清单
+- FR-2 库存预警：spec 0001 验收场景有覆盖、名下无票指回（缺口）→ 归置建议：回 dev-plan 补票重切，由用户拍板，本总览不代拍。（来源：need 0001 FR-2；spec 0001 验收场景 FR-2）
+EOF
+t "孤儿演练总览过 validate" 0 "check.sh validate docs/overviews/0001-inventory-overview.md" "通过（overview）"
+awk '/^## 全景矩阵/{f=1;next} /^## /{f=0} f' "$TMP/docs/overviews/0001-inventory-overview.md" > "$SCRATCH/orphan-matrix.md"
+oseq "矩阵 FR-2 行按缺口标出（指不回任何票，不被静默略过）" "$SCRATCH/orphan-matrix.md" "FR-2" "缺口" "指不回任何票"
+awk '/^## 差距清单/{f=1;next} /^## /{f=0} f' "$TMP/docs/overviews/0001-inventory-overview.md" > "$SCRATCH/orphan-gap.md"
+t "缺口进差距清单且点名 FR-2 与名下无票" 0 "grep -q 'FR-2' \"$SCRATCH/orphan-gap.md\" && grep -q '无票' \"$SCRATCH/orphan-gap.md\"" ""
+t "差距未清零：孤儿总览不推进（保持 draft）" 0 "grep -q '^status: draft' docs/overviews/0001-inventory-overview.md" ""
+rm -rf "$SCRATCH"
+
+echo "== FR-5 三路归置回路演练（seam ③，spec 0014）：缝隙→对应工单更新→差距清零→显式确认才 reviewed =="
+echo "-- 归置路：回 dev-plan 补票重切（差距清单的建议落点）；对应工单更新 = 补票 0002 落盘 --"
+wfile docs/tickets/0002-stock-alert.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0002: 库存预警
+
+**做什么：** 现存量低于预警线时提示补货
+
+**改动面：** stock 预警提示
+
+**验收标准：**
+- [ ] [FR-2] Given 现存量低于预警线 When 查询 Then 提示补货
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+t "归置动作：补票 0002 过 validate（对应工单更新）" 0 "check.sh validate docs/tickets/0002-stock-alert.md" "通过（ticket）"
+t "归置前门禁联动：名下两票 + draft 总览拒绝开工（指路 /dev-overview）" 1 "check.sh ticket 0001" "/dev-overview"
+echo "-- 走查后更新总览：矩阵 FR-2 行指回票 0002，差距清单清零（先更新产物、再更新总览）--"
+OVINV="$TMP/docs/overviews/0001-inventory-overview.md"
+sed -i.bak -e 's/| 库房管理员 | FR-2 | 低于预警线提示补货（spec 0001 验收场景 FR-2） | 缺口：指不回任何票 |/| 库房管理员 | FR-2 | 低于预警线提示补货（spec 0001 验收场景 FR-2） | ticket 0002 |/' \
+  -e 's/^- FR-2 库存预警：spec 0001 验收场景有覆盖、名下无票指回（缺口）→ 归置建议：回 dev-plan 补票重切，由用户拍板，本总览不代拍。（来源：need 0001 FR-2；spec 0001 验收场景 FR-2）/- 无（来源：need 0001 FR-2 经归置补票 ticket 0002 指回，差距清零；spec 0001 验收场景 FR-2）/' \
+  -e 's/库房按商品查现存量；预警线场景尚无票承接。/库房按商品查现存量，低于预警线提示补货。/' \
+  "$OVINV" && rm -f "$OVINV.bak"
+t "差距清单清零（无缺口字样、含「无」）" 0 "! grep -q '指不回' \"$OVINV\" && ! grep -q '缺口' \"$OVINV\" && grep -q '^- 无' \"$OVINV\"" ""
+t "差距清零但未获显式确认：总览仍 draft（沉默不算）" 0 "grep -q '^status: draft' \"$OVINV\"" ""
+echo "-- 用户显式确认（本演练：套件代行确认动作）→ 置 reviewed 并追加 reviewed 日期 --"
+setfm docs/overviews/0001-inventory-overview.md status reviewed
+awk '{print} /^created:/{print "reviewed: 2026-11-03"}' "$OVINV" > "$OVINV.new" && mv "$OVINV.new" "$OVINV"
+t "确认后总览过 validate（reviewed）" 0 "check.sh validate docs/overviews/0001-inventory-overview.md" "通过（overview）"
+t "归置清零且确认后：名下两票的 spec 开工放行（门禁解锁）" 0 "check.sh ticket 0001" "已 reviewed"
+rm -rf "$SCRATCH"
+
+echo "== FR-7 开工门禁四态演练（seam ①，spec 0014）：多票无总览拒 / draft 拒 / 单票放行 / reviewed 放行 =="
+new_repo
+wfile docs/specs/0001-checkout.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-03
+---
+# 多票结账规格
+
+## 问题陈述
+买家结算慢。
+
+## 方案
+一键结算 + 优惠码。
+
+## 用户故事
+- 作为买家，我想要一键结算，以便更快下单
+
+## 实现决策
+新增 checkout 模块。
+
+## 测试决策
+在 checkout 服务 API 边界测。
+
+## 验收场景
+- [FR-1 | 工单级] Given 有商品 When 结算 Then 订单生成
+
+## 非目标
+不退额度。
+
+## 备注
+EOF
+wfile docs/specs/0002-inventory.md <<'EOF'
+---
+id: 0002
+status: approved
+need: 0001
+round: 1
+created: 2026-11-03
+---
+# 单票库存规格
+
+## 问题陈述
+库房盘点慢。
+
+## 方案
+库存查询。
+
+## 用户故事
+- 作为库房管理员，我想查现存量，以便及时补货
+
+## 实现决策
+CLI 查询命令。
+
+## 测试决策
+CLI 集成测试断言输出。
+
+## 验收场景
+- [FR-1 | 工单级] Given 商品在库 When 查询 Then 返回现存量
+
+## 非目标
+不含自动采购。
+
+## 备注
+EOF
+wfile docs/tickets/0001-cart.md <<'EOF'
+---
+id: 0001
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0001: 一键结算
+
+**做什么：** 一键结算生成订单
+
+**验收标准：**
+- [ ] 有商品时结算生成订单
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/tickets/0002-promo.md <<'EOF'
+---
+id: 0002
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0002: 优惠码
+
+**做什么：** 优惠码应用与金额减免
+
+**验收标准：**
+- [ ] 有效优惠码应用后金额减免
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+wfile docs/tickets/0003-stock.md <<'EOF'
+---
+id: 0003
+type: feature
+spec: 0002
+status: ready
+blocked-by: []
+created: 2026-11-03
+---
+# 0003: 库存查询
+
+**做什么：** 按商品查询现存量
+
+**验收标准：**
+- [ ] 商品在库时查询返回现存量
+
+**Blocked by：** 无
+
+## Progress
+（实现过程中追加）
+EOF
+echo "-- 态一：多票（spec 0001 名下 0001/0002）无总览 → 拒绝并指路 --"
+t "多票无总览：非零退出并指路 /dev-overview" 1 "check.sh ticket 0001" "/dev-overview"
+t "多票无总览：文案点名缺 reviewed 总览" 1 "check.sh ticket 0002" "reviewed 总览"
+echo "-- 态二：总览 draft → 拒绝 --"
+wfile docs/overviews/0001-checkout-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: draft
+created: 2026-11-03
+---
+# 0001: 多票结账总览
+
+## 全景一行
+一键结算 + 优惠码。（来源：spec 0001 方案）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | 一键结算（spec 0001 验收场景 FR-1） | ticket 0001 |
+| 买家 | FR-1 | 优惠码减免（need 0001 FR-1 延伸） | ticket 0002 |
+
+## 黄金场景走查
+### 走查一（正常流）：一键结算
+你点结算，订单生成。剧本逐句：Given 有商品 When 结算 Then 订单生成。（来源：spec 0001 验收场景 FR-1）
+
+## 样张
+CLI 类 → 输出样例：`$ checkout` → `订单已生成`。（来源：spec 0001 实现决策）
+
+## 差距清单
+- 无
+EOF
+t "总览 draft：拒绝（非零退出）" 1 "check.sh ticket 0001" "draft"
+t "总览 draft：拒绝文案同样指路 /dev-overview" 1 "check.sh ticket 0001" "/dev-overview"
+echo "-- 态三：单票（spec 0002 名下 0003）无总览 → 豁免放行 --"
+t "单票无总览：放行并标明豁免" 0 "check.sh ticket 0003" "免总览"
+echo "-- 态四：总览 reviewed → 放行 --"
+setfm docs/overviews/0001-checkout-overview.md status reviewed
+t "总览 reviewed：放行（非零→零）" 0 "check.sh ticket 0001" "已 reviewed"
+t "总览 reviewed：放行文案点名总览文件" 0 "check.sh ticket 0001" "0001-checkout-overview.md"
+t "单票 spec 不受 reviewed 总览缺失影响（继续放行）" 0 "check.sh ticket 0003" "免总览"
+
+echo "== 生态接线文本契约（FR-5/FR-7 生态：dev-accept 清扫、dev-plan 出口、dev-implement 入口）=="
+ACC="$HERE/../../dev-accept/SKILL.md"
+PLAN="$HERE/../../dev-plan/SKILL.md"
+IMPL="$HERE/../../dev-implement/SKILL.md"
+echo "-- dev-accept 清扫清单纳入总览，与 validate 残留扫描“名下”定义一致 --"
+t "dev-accept 清扫清单含 overviews（tickets、overviews、reviews 同列）" 0 "grep -q 'tickets、overviews、reviews' \"$ACC\"" ""
+t "dev-accept 清扫“名下”定义仍锚定 validate 残留校验（不被稀释）" 0 "grep -q 'validate 残留校验同一定义' \"$ACC\"" ""
+echo "-- dev-plan 出口：frontier 呈现后建议多票 spec 先走查再开工 --"
+t "dev-plan 出口含 /dev-overview 走查指路" 0 "grep -q '/dev-overview' \"$PLAN\" && grep -q '走查再开工' \"$PLAN\"" ""
+oseq "dev-plan 指路在 frontier 呈现之后（出口门禁节内）" "$PLAN" "从哪张开工" "走查再开工"
+echo "-- dev-implement 入口校验说明补总览项（门禁本体在 check.sh，改文案不改语义）--"
+t "dev-implement 入口校验说明含 reviewed 总览与指路" 0 "grep -q 'reviewed' \"$IMPL\" && grep -q '/dev-overview' \"$IMPL\"" ""
+oseq "dev-implement 校验清单：spec approved 项之后是总览项" "$IMPL" "status: approved" "reviewed"
 
 echo
 echo "通过 $PASS / 失败 $FAIL"
