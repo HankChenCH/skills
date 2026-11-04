@@ -2728,7 +2728,7 @@ t "新格式引用精确定位（点名 hex 段，不误取同日期异段工单
 t "新格式引用带 slug 尾同样定位" 0 "check.sh ticket 20261104-b7c1-beta" "重入"
 t "旧格式四位引用定位仍命中（在途旧票不断链）" 0 "check.sh ticket 0023" "重入"
 t "不存在的 hex 段引用拒绝" 1 "check.sh ticket 20261104-c0de" "不存在"
-t "裸日期串（缺 hex 段）不走旧路径误配" 1 "check.sh ticket 20261104" "不存在"
+t "裸日期串（缺 hex 段）不走旧路径误配" 1 "check.sh ticket 20261104" "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex"
 t "新格式无前缀文件名过 validate" 0 "check.sh validate docs/tickets/20261104-b7c1-beta.md" "通过（ticket）"
 wfile docs/tickets/spec0002-20261104-a1b2-derived.md <<'EOF'
 ---

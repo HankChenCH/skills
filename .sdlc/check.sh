@@ -132,9 +132,10 @@ pad4() {
   printf '%04d' "$((10#$1))"
 }
 
-# ref_key REF：双格式引用规整键（spec 0017）——新时间戳 ID（YYYYMMDD-4hex，可带 -slug 尾）
-# 取完整 ID 段原样返回；旧纯数字（可带 -slug 尾）截号段补零四位，超四位数字（裸日期串
-# 等非法引用形态）不透传。供关联字段等值比较、依赖图键与文件名 ID 段提取用；无法规整返回 1。
+# ref_key REF：双格式引用规整键（spec 0017），ID 形态判定与截段的唯一落点——
+# 新时间戳 ID（YYYYMMDD-4hex，可带 -slug 尾）取完整 ID 段原样返回；旧纯数字
+# （可带 -slug 尾）截号段补零四位，超四位数字（裸日期串等非法引用形态）不透传。
+# 供关联字段等值比较、依赖图键、定位分派与文件名 ID 段提取用；无法规整返回 1。
 ref_key() {
   local r="$1"
   case "$r" in
@@ -147,53 +148,46 @@ ref_key() {
   pad4 "$r"
 }
 
+# id_hits DIR ID：列出同目录下 ID 段相同的产物文件——ID 在文件名中的位置只有两种：
+# 无前缀时居首（ID-*），有前缀时居父前缀之后（*-ID-*）；每行一个。
+# 供占号查重与新格式定位共用（票 0038 评审核销：两种位置的知识只落这一处）。
+id_hits() {
+  local f
+  for f in "$1/${2}"-*.md "$1/"*-"${2}"-*.md; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+}
+
 # artifact_file TYPE REF：按 NNNN（旧，可带 -slug 尾）或 YYYYMMDD-4hex（新，可带 -slug 尾）
-# 定位产物文件；找不到返回 1。新格式先匹配（含谱系前缀文件名 *-<ID>-*.md），未命中再走
-# 旧四位路径（spec 0017 决策 5）；旧路径限 ≤4 位纯数字，防止裸日期串误撞新格式文件。
+# 定位产物文件；找不到返回 1。引用先经 ref_key 规整，按键长分派：>4 位为新格式
+# （含谱系前缀文件名两种位置），≤4 位走旧四位 glob（spec 0017 决策 5）。
 artifact_file() {
-  local dir ref newid pad f
+  local dir key f
   dir="$(dir_of_type "$1")" || return 1
-  ref="$2"
-  case "$ref" in
-    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
-      newid="${ref:0:13}"
-      for f in "$DOCS/$dir/${newid}"-*.md; do
-        [ -f "$f" ] || continue
-        echo "$f"; return 0
-      done
-      for f in "$DOCS/$dir/"*-"${newid}"-*.md; do
-        [ -f "$f" ] || continue
-        echo "$f"; return 0
-      done
-      return 1
-      ;;
-  esac
-  ref="${ref%%-*}"
-  pad="$(ref_key "$ref")" || return 1
-  for f in "$DOCS/$dir/${pad}"-*.md; do
+  key="$(ref_key "$2")" || return 1
+  for f in "$DOCS/$dir/${key}"-*.md; do
     [ -f "$f" ] || continue
     echo "$f"; return 0
   done
+  if [ "${#key}" -gt 4 ]; then
+    f="$(id_hits "$DOCS/$dir" "$key" | head -n 1)"
+    [ -n "$f" ] && { printf '%s\n' "$f"; return 0; }
+  fi
   return 1
 }
 
 # artifact_name_id BASE：解析产物文件名 → 输出「ID段」或「谱系前缀 ID段」（前缀形如
 # <父类型><父ID>，spec 0017 决策 1/4）；识别顺序：带前缀新格式、无前缀新格式、旧四位格式。
-# 不识别返回 1（输出空）。frontmatter id 必须与输出的 ID 段一致。
+# 各分支以单次 sed -En 同时判定并提取（每条正则只写一遍）；不识别返回 1（输出空）。
+# frontmatter id 必须与输出的 ID 段一致。
 artifact_name_id() {
-  local b="${1%.md}"
-  if printf '%s\n' "$b" | grep -qE '^(need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$'; then
-    printf '%s\n' "$b" | sed -E 's/^(need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-([0-9]{8}-[0-9a-f]{4})-.*/\1\2 \3/'
-    return 0
-  fi
-  if printf '%s\n' "$b" | grep -qE '^([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$'; then
-    printf '%s\n' "${b:0:13}"
-    return 0
-  fi
-  if printf '%s\n' "$b" | grep -qE '^[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*$'; then
-    printf '%s\n' "${b%%-*}"
-    return 0
-  fi
+  local b="${1%.md}" out
+  out="$(printf '%s\n' "$b" | sed -En 's/^(need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$/\1\2 \3/p')"
+  [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
+  out="$(printf '%s\n' "$b" | sed -En 's/^([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$/\1/p')"
+  [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
+  out="$(printf '%s\n' "$b" | sed -En 's/^([0-9]{4})-[a-z0-9]+(-[a-z0-9]+)*$/\1/p')"
+  [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
   return 1
 }
 
@@ -391,15 +385,7 @@ cmd_frontier() {
 cmd_ticket() {
   [ -n "${1:-}" ] || die "用法：check.sh ticket NNNN 或 YYYYMMDD-4hex"
   local disp f
-  case "$1" in
-    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
-      disp="${1:0:13}" ;;
-    *)
-      local ref="${1%%-*}"
-      case "$ref" in ''|*[!0-9]*) die "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex：$1" ;; esac
-      disp="$(pad4 "$ref")" || die "非法工单号：$1"
-      ;;
-  esac
+  disp="$(ref_key "$1")" || die "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex：$1"
   f="$(artifact_file ticket "$1")" || die "工单 ${disp} 不存在（docs/tickets/）"
   local rc=0 st dep dep_f dst spec_id spec_f sst
   st="$(fm_get "$f" status)"
@@ -480,7 +466,7 @@ cmd_all() {
 }
 
 commit_refs() { # [MSGFILE]，缺省读 stdin -> 工单号（旧补零四位 / 新 YYYYMMDD-4hex 原样），去重每行一个
-  local src="${1:--}"
+  local src="${1:--}" key
   awk '{
     line=$0
     while (match(line, /\[#[0-9]+(-[0-9a-f]+)?\]/)) {
@@ -488,11 +474,8 @@ commit_refs() { # [MSGFILE]，缺省读 stdin -> 工单号（旧补零四位 / �
       line=substr(line, RSTART+RLENGTH)
     }
   }' "$src" | sort -u | while IFS= read -r r; do
-    case "$r" in
-      [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) printf '%s\n' "$r" ;;
-      *) p="$(pad4 "$r")" || continue
-         printf '%s\n' "$p" ;;
-    esac
+    key="$(ref_key "$r")" || continue
+    printf '%s\n' "$key"
   done
 }
 
@@ -645,22 +628,15 @@ cmd_claim() {
     [ "${#hexseg}" -eq 4 ] || die "随机段异常（${#hexseg} 字符）：$hexseg（检查 od 与系统熵源）"
     id="$(date +%Y%m%d)-$hexseg"
     path="$DOCS/$dir/${prefix}${id}-${slug}.md"
-    # 唯一键是 ID 段而非全路径：同目录已有同 ID 产物（任意 slug、任意前缀位置）即重掷。
-    # ID 在文件名中的位置只有两种：无前缀时居首（ID-*），有前缀时居父前缀之后（*-ID-*）。
-    dup=0
-    for g in "$DOCS/$dir/${id}"-*.md "$DOCS/$dir/"*-"${id}"-*.md; do
-      [ -f "$g" ] || continue
-      dup=1; break
-    done
-    [ "$dup" = 1 ] && continue
+    # 唯一键是 ID 段而非全路径：同目录已有同 ID 产物（任意 slug、任意前缀位置）即重掷
+    if [ -n "$(id_hits "$DOCS/$dir" "$id")" ]; then continue; fi
     if ( set -C; : > "$path" ) 2>/dev/null; then
       # 并发同掷核验：创建后同 ID 异文件在场即删自身重掷（互见者让位，恒至一者存活）
       dup=0
-      for g in "$DOCS/$dir/${id}"-*.md "$DOCS/$dir/"*-"${id}"-*.md; do
-        [ -f "$g" ] || continue
+      while IFS= read -r g; do
         [ "$g" = "$path" ] && continue
         dup=1; break
-      done
+      done < <(id_hits "$DOCS/$dir" "$id")
       if [ "$dup" = 1 ]; then rm "$path"; continue; fi
       printf '%s\n' "${path#"$ROOT"/}"
       return 0
@@ -679,18 +655,17 @@ cmd_validate() {
   type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 九个产物目录内）：$file"
   local ERRORS=0
   err() { echo "  ✗ $*"; ERRORS=$((ERRORS+1)); }
-  local base id status spec_id need_id need_file frs covered missing round dep t any residue r
+  local base id id_key status spec_id need_id need_file frs covered missing round dep t any residue r
   base="$(basename "$file")"
 
   # --- 通用：frontmatter、id、文件名、状态（id 与文件名双格式，spec 0017 决策 1）---
   fm_open "$file"    || err "缺 frontmatter（首行须为 ---）"
   fm_closed "$file"  || err "frontmatter 未闭合（缺第二个 ---）"
   id="$(fm_get "$file" id)"
-  case "$id" in
-    [0-9][0-9][0-9][0-9]) ;;
-    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
-    *) err "frontmatter id 必须是四位数字或 YYYYMMDD-4hex：${id:-（空）}" ;;
-  esac
+  # frontmatter id 须为规整键的不动点（四位数字或完整 YYYYMMDD-4hex，不带尾段）
+  if ! id_key="$(ref_key "$id")" || [ "$id_key" != "$id" ]; then
+    err "frontmatter id 必须是四位数字或 YYYYMMDD-4hex：${id:-（空）}"
+  fi
   local name_parse="" name_id="" name_prefix=""
   name_parse="$(artifact_name_id "$base" 2>/dev/null)" || name_parse=""
   if [ -z "$name_parse" ]; then
