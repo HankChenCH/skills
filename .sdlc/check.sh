@@ -609,6 +609,40 @@ cmd_publish() {
   esac
 }
 
+# cmd_claim TYPE SLUG [PARENT_TYPE PARENT_REF]：原子取号入口（spec 0017）。
+# 一次调用完成：生成 YYYYMMDD-4hex 候选号 → 以排他创建（noclobber）落占位文件占号 →
+# 撞号重掷随机段重试 → 返回最终产物文件名（仓库相对路径，占位由调用会话写正文覆盖）。
+# 父为知识档（need/spec/design/adr/research）必带谱系前缀 <父类型><父ID>-；父为过程档不带。
+cmd_claim() {
+  [ $# -ge 2 ] || die "用法：check.sh claim <type> <slug> [父类型 父ID]"
+  local type="$1" slug="$2" prefix="" ptype pid pfile dir path id hexseg attempt
+  dir="$(dir_of_type "$type")" || die "未知产物类型：${type}（须为九类产物之一）"
+  printf '%s\n' "$slug" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
+    || die "slug 非法（限 ASCII 小写/数字/短横线）：$slug"
+  if [ $# -ge 4 ]; then
+    ptype="$3"; pid="$4"
+    dir_of_type "$ptype" >/dev/null || die "未知父产物类型：${ptype}（须为九类产物之一）"
+    pfile="$(artifact_file "$ptype" "$pid")" || die "父产物 $ptype $pid 不存在（docs/）"
+    pid="$(fm_get "$pfile" id)"   # 前缀取父产物 frontmatter id（唯一事实源）
+    case "$ptype" in
+      need|spec|design|adr|research) prefix="$ptype$pid-" ;;
+    esac
+  fi
+  mkdir -p "$DOCS/$dir"
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+    hexseg="$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"
+    [ "${#hexseg}" -eq 4 ] || die "随机段异常（${#hexseg} 字符）：$hexseg（检查 od 与系统熵源）"
+    id="$(date +%Y%m%d)-$hexseg"
+    path="$DOCS/$dir/${prefix}${id}-${slug}.md"
+    if ( set -C; : > "$path" ) 2>/dev/null; then
+      printf '%s\n' "${path#"$ROOT"/}"
+      return 0
+    fi
+    [ -e "$path" ] || die "占位文件创建失败：$path（目录不可写？）"
+  done
+  die "取号连续 16 次撞号，放弃（${prefix}$(date +%Y%m%d)-* 段拥挤或随机源异常）"
+}
+
 cmd_validate() {
   [ -n "${1:-}" ] || die "用法：check.sh validate <file>"
   local file
@@ -758,6 +792,9 @@ usage() {
 用法：check.sh <子命令> [参数]
   phase                 全库状态总览（九类产物 + frontier）
   frontier              列出阻塞已清、可开工的工单
+  claim <type> <slug> [父类型 父ID]
+                        原子取号：生成 YYYYMMDD-4hex 候选号、排他创建占位、撞号重掷，
+                        返回产物文件名（父为知识档自动带谱系前缀）
   ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved、多票 spec 须 reviewed 总览）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
@@ -774,6 +811,7 @@ main() {
   case "$cmd" in
     phase)      cmd_phase ;;
     frontier)   cmd_frontier ;;
+    claim)      cmd_claim "$@" ;;
     ticket)     cmd_ticket "$@" ;;
     all)        cmd_all ;;
   validate)   cmd_validate "$@" ;;

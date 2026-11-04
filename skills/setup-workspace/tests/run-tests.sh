@@ -2824,6 +2824,93 @@ created: 2026-11-04
 EOF
 t "approved 评审声明双格式覆盖面后 pre-push 通过" 0 "git add -A && git commit -qm '[trivial] 评审夹具' && check.sh pre-push" "pre-push 门禁通过"
 
+echo "== 取号入口 claim（原子占号，spec 0017，票 0038）=="
+new_repo
+wfile docs/specs/0001-anchor.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 锚点规格
+
+## 问题陈述
+x
+
+## 方案
+x
+
+## 用户故事
+- 作为买家
+
+## 实现决策
+x
+
+## 测试决策
+x
+
+## 验收场景
+- [FR-1 | 工单级] Given x When x Then x
+
+## 非目标
+x
+
+## 备注
+x
+EOF
+wfile docs/tickets/0009-anchor-ticket.md <<'EOF'
+---
+id: 0009
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 0009: 锚点工单
+
+**做什么：** 过程档父产物夹具
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+printf 'docs/specs/0001-anchor.md\t41\thttps://github.com/acme/widget/issues/41\ndocs/tickets/0009-anchor-ticket.md\t87\thttps://github.com/acme/widget/issues/87\n' > "$TMP/.sdlc/trackers/github.map"
+t "父为 spec 的取号返回带谱系前缀文件名且占位落盘" 0 "out=\$(check.sh claim ticket dark-mode spec 0001); echo \"\$out\" | grep -qE '^docs/tickets/spec0001-[0-9]{8}-[0-9a-f]{4}-dark-mode\\.md\$' && [ -f \"\$out\" ]" ""
+t "父为工票的取号返回不带前缀文件名" 0 "out=\$(check.sh claim review notes ticket 0009); echo \"\$out\" | grep -qE '^docs/reviews/[0-9]{8}-[0-9a-f]{4}-notes\\.md\$'" ""
+t "无父参数取号返回无前缀文件名" 0 "out=\$(check.sh claim adr cache-note); echo \"\$out\" | grep -qE '^docs/adr/[0-9]{8}-[0-9a-f]{4}-cache-note\\.md\$'" ""
+t "号形如 YYYYMMDD-4hex（FR-1 格式契约）" 0 "out=\$(check.sh claim research gateway-probe); basename \"\$out\" .md | grep -qE '^[0-9]{8}-[0-9a-f]{4}-gateway-probe\$'" ""
+t "父产物不存在时取号报错" 1 "check.sh claim ticket dark-mode spec 9999" "不存在"
+t "父类型未知时取号报错" 1 "check.sh claim ticket dark-mode bogus 0001" "未知"
+t "slug 非法时取号报错" 1 "check.sh claim ticket Bad_Slug" "slug"
+t "产物类型未知时取号报错" 1 "check.sh claim bogus x" "未知"
+fake_cmd od <<'EOF'
+#!/bin/sh
+# 测试替身 od：从 CLAIM_OD_SEQ 逐行弹出随机段；耗尽后恒输出 dead
+seqfile="${CLAIM_OD_SEQ:-}"
+if [ -n "$seqfile" ] && [ -f "$seqfile" ]; then
+  n="$(sed -n '1p' "$seqfile")"
+  if [ -n "$n" ]; then
+    sed -i.bak 1d "$seqfile" && rm -f "$seqfile.bak"
+    printf '%s\n' "$n"
+    exit 0
+  fi
+fi
+printf 'dead\n'
+EOF
+mkdir -p "$TMP/docs/tickets"
+: > "$TMP/docs/tickets/$(date +%Y%m%d)-b7c1-parked-slug.md"
+printf 'b7c1\na1f2\n' > "$TMP/odseq"
+t "候选号占位已存在时重掷随机段返回新号（FR-2 撞号重试）" 0 "CLAIM_OD_SEQ=\"$TMP/odseq\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket parked-slug | grep -qE '^docs/tickets/[0-9]{8}-a1f2-parked-slug\\.md\$'" ""
+t "并发六路取号各得两两互异的号（FR-2 零协调）" 0 "for i in 1 2 3 4 5 6; do check.sh claim ticket fan-out >\"fan\$i.out\" & done; wait; [ \"\$(cat fan1.out fan2.out fan3.out fan4.out fan5.out fan6.out | sort -u | wc -l | tr -d ' ')\" = 6 ] && [ \"\$(cat fan1.out fan2.out fan3.out fan4.out fan5.out fan6.out | wc -l | tr -d ' ')\" = 6 ]" ""
+t "目录与 map 不变时两次取号互异且不入历史号（FR-1 非推导）" 0 "pre=\$(cksum docs/specs/0001-anchor.md docs/tickets/0009-anchor-ticket.md .sdlc/trackers/github.map | cksum); printf 'b7c1\na1f2\n' > \"$TMP/odseq2\"; c1=\$(CLAIM_OD_SEQ=\"$TMP/odseq2\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket probe-a); c2=\$(CLAIM_OD_SEQ=\"$TMP/odseq2\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket probe-b); post=\$(cksum docs/specs/0001-anchor.md docs/tickets/0009-anchor-ticket.md .sdlc/trackers/github.map | cksum); [ \"\$pre\" = \"\$post\" ] && [ \"\$c1\" != \"\$c2\" ] && ! grep -qF \"\$(basename \"\$c1\" .md | grep -oE '[0-9]{8}-[0-9a-f]{4}')\" .sdlc/trackers/github.map && ! grep -qF \"\$(basename \"\$c2\" .md | grep -oE '[0-9]{8}-[0-9a-f]{4}')\" .sdlc/trackers/github.map" ""
+
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
