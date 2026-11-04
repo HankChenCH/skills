@@ -448,7 +448,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
     6. ref-testing、ref-implementation（均 ✅：ref-implementation 2026-10-26；ref-testing 2026-10-27，六类测试参考与场景路由随 v1.4 定稿）
   7. dev-implement ✅ 2026-10-27（规格即 §12 范文，随 v1.5/v1.6 同步开工装载与重入语义；§13.2 自测：拒绝/重入两项经门禁行为实测通过，触发/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物；评审 0004 两轴阻断 0、建议 1 项采纳核销，approved，并核销 review 0003 遗留装载验证项）
   8. ref-review ✅ 2026-10-26
-  9. dev-review ✅ 2026-10-26（依赖的 ref-review / ref-implementation 同日完成；评审轴清单制 + 每轴恰一个独立子代理纪律与自测随票 0024，v1.24）
+  9. dev-review ✅ 2026-10-26（依赖的 ref-review / ref-implementation 同日完成；评审轴清单制 + 每轴恰一个独立子代理纪律与自测随票 0024，v1.24）：演练实测（2026-11-04，临时仓库）——两轴子代理单消息并行派发、各只装本轴材料（标准轴仅 diff + 两份参考技能 Read，零工单材料；Spec 轴仅工单 + spec + diff，零标准材料），轴间纪律双向成立（标准轴拒绝无依据品味项并把函数去留推还 Spec 轴；Spec 轴拒绝风格评判、命中 FR-2 缺失与超范围两条阻断），报告分轴逐字聚合并声明评审形态，过 validate。
   10. dev-ship ✅ 2026-10-27（规格即 §11.8，PR 三节模板内嵌正文，PR 落点跟 config.sh 的 TRACKER 走不预设平台；§13.2 自测：pre-push 复用、重入判定 merge-base --is-ancestor、commit-msg [trivial] 豁免三项经门禁行为实测通过，触发/拒绝/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物）
   11. dev-accept ✅ 2026-10-27（规格即 §11.9，§6.5 模板内嵌正文；passed/rejected 判定机械化，fulfilled 前残余风险须逐条经用户显式接受；§13.2 自测：产物校验经 validate 正反往返实测通过——正例 draft/passed/rejected 三态过 validate，缺节、缺 spec、缺 round、非法状态、悬空 spec 引用五类反例全拦；拒绝依据经 phase 行为实测——工单含 implemented 时无"approved 且全 done"候选；publish 跳过路径实测 exit 0；触发/重入/衔接静态核验通过、行为验证待新会话）
   12. ref-git-commit（规范提交与合并信息；2026-10-27 经 spec 0001 增补）✅ 2026-10-27
