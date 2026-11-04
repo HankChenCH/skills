@@ -615,7 +615,7 @@ cmd_publish() {
 # 父为知识档（need/spec/design/adr/research）必带谱系前缀 <父类型><父ID>-；父为过程档不带。
 cmd_claim() {
   [ $# -ge 2 ] || die "用法：check.sh claim <type> <slug> [父类型 父ID]"
-  local type="$1" slug="$2" prefix="" ptype pid pfile dir path id hexseg attempt
+  local type="$1" slug="$2" prefix="" ptype pid pfile dir path id hexseg attempt dup g
   dir="$(dir_of_type "$type")" || die "未知产物类型：${type}（须为九类产物之一）"
   printf '%s\n' "$slug" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
     || die "slug 非法（限 ASCII 小写/数字/短横线）：$slug"
@@ -634,7 +634,23 @@ cmd_claim() {
     [ "${#hexseg}" -eq 4 ] || die "随机段异常（${#hexseg} 字符）：$hexseg（检查 od 与系统熵源）"
     id="$(date +%Y%m%d)-$hexseg"
     path="$DOCS/$dir/${prefix}${id}-${slug}.md"
+    # 唯一键是 ID 段而非全路径：同目录已有同 ID 产物（任意 slug、任意前缀位置）即重掷。
+    # ID 在文件名中的位置只有两种：无前缀时居首（ID-*），有前缀时居父前缀之后（*-ID-*）。
+    dup=0
+    for g in "$DOCS/$dir/${id}"-*.md "$DOCS/$dir/"*-"${id}"-*.md; do
+      [ -f "$g" ] || continue
+      dup=1; break
+    done
+    [ "$dup" = 1 ] && continue
     if ( set -C; : > "$path" ) 2>/dev/null; then
+      # 并发同掷核验：创建后同 ID 异文件在场即删自身重掷（互见者让位，恒至一者存活）
+      dup=0
+      for g in "$DOCS/$dir/${id}"-*.md "$DOCS/$dir/"*-"${id}"-*.md; do
+        [ -f "$g" ] || continue
+        [ "$g" = "$path" ] && continue
+        dup=1; break
+      done
+      if [ "$dup" = 1 ]; then rm "$path"; continue; fi
       printf '%s\n' "${path#"$ROOT"/}"
       return 0
     fi
