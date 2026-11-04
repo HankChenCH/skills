@@ -2727,6 +2727,8 @@ EOF
 t "新格式引用精确定位（点名 hex 段，不误取同日期异段工单）" 0 "check.sh ticket 20261104-b7c1" "20261104-b7c1"
 t "新格式引用带 slug 尾同样定位" 0 "check.sh ticket 20261104-b7c1-beta" "重入"
 t "旧格式四位引用定位仍命中（在途旧票不断链）" 0 "check.sh ticket 0023" "重入"
+t "5 位 hex 的非法引用被拒，不截段命中错误工单" 1 "check.sh ticket 20261104-b7c11" "工单号必须是"
+t "commit-msg 5 位 hex 引用被拒，不借截段拿错误工单过门" 1 "printf '[#20261104-b7c11] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "既无"
 t "不存在的 hex 段引用拒绝" 1 "check.sh ticket 20261104-c0de" "不存在"
 t "裸日期串（缺 hex 段）不走旧路径误配" 1 "check.sh ticket 20261104" "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex"
 t "新格式无前缀文件名过 validate" 0 "check.sh validate docs/tickets/20261104-b7c1-beta.md" "通过（ticket）"
