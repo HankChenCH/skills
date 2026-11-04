@@ -2599,6 +2599,137 @@ created: 2026-10-29
 EOF
 t "多行 repos 拒绝（单行字段形态，先例 blocked-by）" 1 "check.sh validate docs/tickets/0002-multiline-repos.md" "repos 须单行"
 
+echo "== 双格式产物定位与开工门禁（spec 0017，票 0038）=="
+new_repo
+wfile docs/specs/0002-dual.md <<'EOF'
+---
+id: 0002
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 双格式定位夹具规格
+
+## 问题陈述
+x
+
+## 方案
+x
+
+## 用户故事
+- 作为买家
+
+## 实现决策
+x
+
+## 测试决策
+x
+
+## 验收场景
+- [FR-1 | 工单级] Given x When x Then x
+
+## 非目标
+x
+
+## 备注
+x
+EOF
+wfile docs/overviews/0001-dual-overview.md <<'EOF'
+---
+id: 0001
+spec: 0002
+status: reviewed
+created: 2026-11-04
+---
+# 0001: 双格式定位总览
+
+## 全景一行
+x（来源：spec 0002 方案）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | x | ticket 0023 |
+
+## 黄金场景走查
+x（剧本：spec 0002 验收场景 FR-1）
+
+## 样张
+CLI 输出样例：x
+
+## 差距清单
+- 无
+EOF
+wfile docs/tickets/0023-legacy-inflight.md <<'EOF'
+---
+id: 0023
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 0023: 旧格式在途工单
+
+**做什么：** 在途旧格式票（过渡期不断链夹具）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+wfile docs/tickets/20261104-9f2e-alpha.md <<'EOF'
+---
+id: 20261104-9f2e
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-9f2e-alpha: 同日期异段工单一
+
+**做什么：** 新格式定位判别夹具（hex 段 9f2e）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+wfile docs/tickets/20261104-b7c1-beta.md <<'EOF'
+---
+id: 20261104-b7c1
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-b7c1-beta: 同日期异段工单二
+
+**做什么：** 新格式定位判别夹具（hex 段 b7c1）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+t "新格式引用精确定位（点名 hex 段，不误取同日期异段工单）" 0 "check.sh ticket 20261104-b7c1" "20261104-b7c1"
+t "新格式引用带 slug 尾同样定位" 0 "check.sh ticket 20261104-b7c1-beta" "重入"
+t "旧格式四位引用定位仍命中（在途旧票不断链）" 0 "check.sh ticket 0023" "重入"
+t "不存在的 hex 段引用拒绝" 1 "check.sh ticket 20261104-c0de" "不存在"
+t "裸日期串（缺 hex 段）不走旧路径误配" 1 "check.sh ticket 20261104" "不存在"
+
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""

@@ -132,12 +132,44 @@ pad4() {
   printf '%04d' "$((10#$1))"
 }
 
-# artifact_file TYPE REF：按 NNNN 或 NNNN-slug 定位产物文件；找不到返回 1
+# ref_key REF：双格式引用规整键（spec 0017）——新时间戳 ID（YYYYMMDD-4hex，可带 -slug 尾）
+# 取完整 ID 段原样返回；旧纯数字（可带 -slug 尾）截号段补零四位。
+# 供关联字段等值比较与文件名 ID 段提取用；无法规整返回 1。
+ref_key() {
+  local r="$1"
+  case "$r" in
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
+      printf '%s\n' "${r:0:13}"; return 0 ;;
+  esac
+  r="${r%%-*}"
+  case "$r" in ''|*[!0-9]*) return 1 ;; esac
+  pad4 "$r"
+}
+
+# artifact_file TYPE REF：按 NNNN（旧，可带 -slug 尾）或 YYYYMMDD-4hex（新，可带 -slug 尾）
+# 定位产物文件；找不到返回 1。新格式先匹配（含谱系前缀文件名 *-<ID>-*.md），未命中再走
+# 旧四位路径（spec 0017 决策 5）；旧路径限 ≤4 位纯数字，防止裸日期串误撞新格式文件。
 artifact_file() {
-  local dir ref pad f
+  local dir ref newid pad f
   dir="$(dir_of_type "$1")" || return 1
-  ref="${2%%-*}"
+  ref="$2"
+  case "$ref" in
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
+      newid="${ref:0:13}"
+      for f in "$DOCS/$dir/${newid}"-*.md; do
+        [ -f "$f" ] || continue
+        echo "$f"; return 0
+      done
+      for f in "$DOCS/$dir/"*-"${newid}"-*.md; do
+        [ -f "$f" ] || continue
+        echo "$f"; return 0
+      done
+      return 1
+      ;;
+  esac
+  ref="${ref%%-*}"
   case "$ref" in ''|*[!0-9]*) return 1 ;; esac
+  [ "${#ref}" -le 4 ] || return 1
   pad="$(pad4 "$ref")" || return 1
   for f in "$DOCS/$dir/${pad}"-*.md; do
     [ -f "$f" ] || continue
@@ -156,7 +188,7 @@ ticket_cycles() {
     id="$(basename "$f" .md)"; id="${id%%-*}"
     deps=""
     for d in $(fm_list "$f" blocked-by); do
-      pad="$(pad4 "$d")" && deps="$deps $pad"
+      pad="$(ref_key "$d")" && deps="$deps $pad"
     done
     edges="$edges$id$deps
 "
@@ -196,31 +228,31 @@ ticket_cycles() {
 
 # spec_residue SPECID：输出该 spec 名下仍在盘上的过程档路径（相对仓库根，每行一个）。
 # 名下关系：ticket / acceptance / overview 的 spec 字段指向该 spec；review 的 tickets 与名下工单有交集。
+# SPECID 经 ref_key 规整，新旧双格式等值比较（spec 0017）。
 # 供 validate 清扫门禁使用：done 的 spec 名下过程档必须为零。
 spec_residue() {
-  local sid="$1" f tspec t tids tid
+  local sid f tspec t tids tid
+  sid="$(ref_key "$1" 2>/dev/null)" || return 0
   tids=" "
   for f in "$DOCS"/tickets/*.md; do
     [ -f "$f" ] || continue
-    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
-    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+    tspec="$(ref_key "$(fm_get "$f" spec)" 2>/dev/null)" || continue
     [ "$tspec" = "$sid" ] || continue
     echo "${f#"$ROOT"/}"
-    tid="$(basename "$f" .md)"; tid="${tid%%-*}"
+    tid="$(ref_key "$(basename "$f" .md)")" || continue
     tids="$tids$tid "
   done
   for dir in acceptance overviews; do
     for f in "$DOCS"/"$dir"/*.md; do
       [ -f "$f" ] || continue
-      tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
-      tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+      tspec="$(ref_key "$(fm_get "$f" spec)" 2>/dev/null)" || continue
       [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
     done
   done
   for f in "$DOCS"/reviews/*.md; do
     [ -f "$f" ] || continue
     for t in $(fm_list "$f" tickets); do
-      tid="$(pad4 "${t%%-*}" 2>/dev/null)" || continue
+      tid="$(ref_key "$t" 2>/dev/null)" || continue
       case "$tids" in
         *" $tid "*) echo "${f#"$ROOT"/}"; break ;;
       esac
@@ -233,12 +265,11 @@ spec_residue() {
 # 单票豁免放行；缺失或 draft 总览 → 非零退出并指路 /dev-overview。仅在 spec approved/done 后调用。
 overview_gate() {
   local sid own tf tspec of ospec found draft
-  sid="$(pad4 "${1%%-*}")" || return 0
+  sid="$(ref_key "$1" 2>/dev/null)" || return 0
   own=0
   for tf in "$DOCS"/tickets/*.md; do
     [ -f "$tf" ] || continue
-    tspec="$(fm_get "$tf" spec)"; tspec="${tspec%%-*}"
-    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+    tspec="$(ref_key "$(fm_get "$tf" spec)" 2>/dev/null)" || continue
     [ "$tspec" = "$sid" ] || continue
     own=$((own+1))
   done
@@ -249,8 +280,7 @@ overview_gate() {
   found=""; draft=""
   for of in "$DOCS"/overviews/*.md; do
     [ -f "$of" ] || continue
-    ospec="$(fm_get "$of" spec)"; ospec="${ospec%%-*}"
-    ospec="$(pad4 "$ospec" 2>/dev/null)" || continue
+    ospec="$(ref_key "$(fm_get "$of" spec)" 2>/dev/null)" || continue
     [ "$ospec" = "$sid" ] || continue
     if [ "$(fm_get "$of" status)" = "reviewed" ]; then found="$of"; break; fi
     [ -n "$draft" ] || draft="$of"
@@ -328,20 +358,26 @@ cmd_frontier() {
 }
 
 cmd_ticket() {
-  [ -n "${1:-}" ] || die "用法：check.sh ticket NNNN"
-  local ref="${1%%-*}"
-  case "$ref" in ''|*[!0-9]*) die "工单号必须是数字或 NNNN-slug：$1" ;; esac
-  local pad f
-  pad="$(pad4 "$ref")" || die "非法工单号：$1"
-  f="$(artifact_file ticket "$ref")" || die "工单 $pad 不存在（docs/tickets/${pad}-*.md）"
+  [ -n "${1:-}" ] || die "用法：check.sh ticket NNNN 或 YYYYMMDD-4hex"
+  local disp f
+  case "$1" in
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]*)
+      disp="${1:0:13}" ;;
+    *)
+      local ref="${1%%-*}"
+      case "$ref" in ''|*[!0-9]*) die "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex：$1" ;; esac
+      disp="$(pad4 "$ref")" || die "非法工单号：$1"
+      ;;
+  esac
+  f="$(artifact_file ticket "$1")" || die "工单 ${disp} 不存在（docs/tickets/）"
   local rc=0 st dep dep_f dst spec_id spec_f sst
   st="$(fm_get "$f" status)"
   case "$st" in
-    ready)       info "✓ 工单 $pad 就绪（status: ready，新开工）" ;;
-    in-progress) info "✓ 工单 $pad 重入（status: in-progress，从 ## Progress 续接）" ;;
-    implemented) die "工单 $pad 已 implemented——评审走 /dev-review，不要重复开工" ;;
-    done)        die "工单 $pad 已 done——缺陷请走 /dev-fix 开新工单" ;;
-    *)           die "工单 $pad 状态非法：${st}（先运行 check.sh validate 检查该文件）" ;;
+    ready)       info "✓ 工单 $disp 就绪（status: ready，新开工）" ;;
+    in-progress) info "✓ 工单 $disp 重入（status: in-progress，从 ## Progress 续接）" ;;
+    implemented) die "工单 $disp 已 implemented——评审走 /dev-review，不要重复开工" ;;
+    done)        die "工单 $disp 已 done——缺陷请走 /dev-fix 开新工单" ;;
+    *)           die "工单 $disp 状态非法：${st}（先运行 check.sh validate 检查该文件）" ;;
   esac
   for dep in $(fm_list "$f" blocked-by); do
     dep_f="$(artifact_file ticket "$dep")" \
@@ -376,7 +412,7 @@ cmd_ticket() {
     echo "✗ 工单依赖存在环：$(ticket_cycles | sed 's/^CYCLE //')"
     rc=1
   }
-  if [ "$rc" = 0 ]; then info "ticket ${pad}：入口校验通过"; else info "ticket ${pad}：入口校验未通过（见上）"; fi
+  if [ "$rc" = 0 ]; then info "ticket ${disp}：入口校验通过"; else info "ticket ${disp}：入口校验未通过（见上）"; fi
   return "$rc"
 }
 
@@ -614,7 +650,7 @@ cmd_validate() {
       fi
       # 清扫门禁：done 的 spec 名下必无过程档残留（蒸馏清扫完成后才允许置 done）
       if [ "$status" = "done" ]; then
-        for residue in $(spec_residue "$pad"); do
+        for residue in $(spec_residue "$id"); do
           err "spec 已置 done 但名下过程档未清扫：$residue"
         done
       fi
