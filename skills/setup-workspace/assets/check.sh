@@ -91,6 +91,7 @@ dir_of_type() {
     overview) echo overviews ;;
     review) echo reviews ;;    acceptance) echo acceptance ;;
     adr) echo adr ;;           research) echo research ;;
+    retro) echo retros ;;      # 轻产物（票 0041）：仅 claim 取号落盘入口，type_of/validate 不受理
     *) return 1 ;;
   esac
 }
@@ -611,15 +612,16 @@ cmd_publish() {
 # 一次调用完成：生成 YYYYMMDD-4hex 候选号 → 以排他创建（noclobber）落占位文件占号 →
 # 撞号重掷随机段重试 → 返回最终产物文件名（仓库相对路径，占位由调用会话写正文覆盖）。
 # 父为知识档（need/spec/design/adr/research）必带谱系前缀 <父类型><父ID>-；父为过程档不带。
+# 类型含九类门禁产物与轻产物 retro（retro → docs/retros/，仅取号落盘，validate 不受理，票 0041）。
 cmd_claim() {
   [ $# -eq 2 ] || [ $# -eq 4 ] || die "用法：check.sh claim <type> <slug> [父类型 父ID]"
   local type="$1" slug="$2" prefix="" ptype pid pfile dir path id hexseg attempt dup g
-  dir="$(dir_of_type "$type")" || die "未知产物类型：${type}（须为九类产物之一）"
+  dir="$(dir_of_type "$type")" || die "未知产物类型：${type}（须为九类产物之一，或轻产物 retro）"
   printf '%s\n' "$slug" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
     || die "slug 非法（限 ASCII 小写/数字/短横线）：$slug"
   if [ $# -eq 4 ]; then
     ptype="$3"; pid="$4"
-    dir_of_type "$ptype" >/dev/null || die "未知父产物类型：${ptype}（须为九类产物之一）"
+    dir_of_type "$ptype" >/dev/null || die "未知父产物类型：${ptype}（须为九类产物之一，或轻产物 retro）"
     pfile="$(artifact_file "$ptype" "$pid")" || die "父产物 $ptype $pid 不存在（docs/）"
     pid="$(fm_get "$pfile" id)"   # 前缀取父产物 frontmatter id（唯一事实源）
     # 守卫：id 非空且为规整键不动点，否则拼出的谱系前缀产出过不了自家命名门的文件名
@@ -808,7 +810,7 @@ usage() {
   frontier              列出阻塞已清、可开工的工单
   claim <type> <slug> [父类型 父ID]
                         原子取号：生成 YYYYMMDD-4hex 候选号、排他创建占位、撞号重掷，
-                        返回产物文件名（父为知识档自动带谱系前缀）
+                        返回产物文件名（类型为九类产物或轻产物 retro；父为知识档自动带谱系前缀）
   ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved、多票 spec 须 reviewed 总览）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
