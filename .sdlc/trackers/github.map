@@ -103,8 +103,14 @@ docs/tickets/0038-claim-entry-and-dual-format-gates.md	122	https://github.com/Ha
 docs/tickets/0039-skill-docs-numbering-switch.md	123	https://github.com/HankChenCH/skills/issues/123
 docs/tickets/0040-map-legacy-id-disambiguation.md	124	https://github.com/HankChenCH/skills/issues/124
 # 历史号复用消歧（spec 0017 实现决策 8；need 0014 D2 拍板：map 只增不删，既有三字段数据行原样保留）
-# 旧编号规则「每类独立、目录内最大号 +1」在过程档被蒸馏清扫删除后，会把历史号重新分配；
-# 下方每个复用号逐条对照唯一平台对象。新产物改用时间戳派生 ID（spec 0017），机制上不复用；
+# 旧编号规则「每类独立、目录内最大号 +1」在过程档被蒸馏清扫删除后，会把历史号重新分配。
+# 下方仅逐条对照 need 0014 A4 拍板枚举的复用号（票 0024、验收 0001），非 map 全量：
+# 数据行中另有 16 个旧纪元同类复用号未逐条对照——票 0004、0006–0019、验收 0002。
+# 经 2026-11-04 逐号核对（git log --grep '[#NNNN]' 存活提交对照 map 两行产物）：
+# 14 个号存在存活引用跨产物歧义（票 0004、0006–0010、0012–0019，如 [#0004] 5 条跨
+# #23/#50 时代、[#0019] 8 条跨 #72/#80）；票 0011 存活引用均属单一时代（#7）、验收 0002
+# 无 [#NNNN] 格式存活引用，此二者当前无引用级歧义。上述 16 个号的全量消解须另开工票
+# 补齐，不在本注记拍板面内；新产物改用时间戳派生 ID（spec 0017），机制上不复用，
 # 本段之后新追加的行是常规投影坐标，不属于复用对照。
 # 票 0024（同一号两次分配；git 历史 [#0024] 引用按下列归属区分）：
 #   docs/tickets/0024-blueprint-whole-graph-run.md → issue #87 https://github.com/HankChenCH/skills/issues/87 （spec 0013 整图单运行蓝图票，生命周期 2026-10-31）
