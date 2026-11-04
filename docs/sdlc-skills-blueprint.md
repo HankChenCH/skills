@@ -42,6 +42,7 @@
 > **v1.21 修订记录（dev-execute 并发决策落蓝图，2026-10-31，need 0010 / spec 0012 / 票 0019）**：dev-execute 并发模型改三段式（拆票端消除冲突面、编排端流水线推进、派发端按宿主自适应），先蓝图后技能。① §11.17 dev-execute：层屏障取消，推进节奏改**流水线合回**——票评审 approved 且 blocked-by 满足即合回+预演，不等同层其余票；"全部票 implemented 且预演绿"的全绿判定保留，运行依赖顺序图的"层"保留为展示与依赖满足判定视图，同层票在各自派发时基线上实现、合回后不重放基线；实现子代理**后台异步派发**（宿主支持时）——完成通知驱动编排不轮询、主会话可随时响应用户输入，票 implemented 即先行编排评审（评审在票 worktree 内、不触碰运行分支）；新增**开工预检**——建图后逐层比对同层票"改动面"行并与代码现状粗扫交叉，高重叠对与默认建议并入开工确认，改动面行缺失标"改动面未知"不猜测，不硬拦、无新增人工门；新增**宿主自适应派发回退链**——声明式工作流 > 后台子代理 > 同步子代理 > 串行逐票（末端串行保证任何宿主可运行），探测对象与优先序以四宿主并发原语调研报告为准，开工确认声明本次并发形态与命中原因；合回前 **merge-tree 干跑预检序**——同层取无冲突序合回，候选序全冲突才停机问人（异常流语义不变），预检只排序不自动解冲突内容；done 状态翻转表述对齐 ADR 0003 物化语义（落盘不提交，替换 gitignore 前的"[trivial] 状态提交"旧表述）。② §11.5 dev-plan：拆分纪律增**改动面互斥**——拆票逐票落"改动面"行（口径 = 目录或模块名，不写行级路径），同层票改动面相交 → 并票 / 标 blocked-by 串行 / expand–contract 重切三选一，在既有拆分粒度确认一并确认、不新增人工门；互斥判定不进门禁（validate 不受理票正文行，check.sh 零改动）。③ §8 决策点表 dev-execute / dev-plan 行同步，人工门仍为开工确认 + 合并确认两次；④ §7.2 引用矩阵与 §10.1 技能清单零改动（无新技能、无新引用）。
 > **v1.22 修订记录（dev-execute 档 1 整图单运行，2026-10-31，need 0011 / spec 0013）**：档 1（声明式工作流档）从"每票一个工作流运行"重定义为**整图单运行**（GLOSSARY 项目术语章已登记），旧形态废除、不留档内中间形态，先蓝图后技能。① §11.17 dev-execute：**探测判据升级为四能力齐备**——脚本控制流（fan-out/join 表达依赖）、确定性门（命令门承载预演）、运行内人工门（升级提问/洞穴）、运行记录与恢复（journal 重放 + 脚本修订缓存复用），缺任一顺位落档 2；命中时开工确认后主会话生成一个工作流脚本承载整张运行依赖顺序图（同层 fan-out 并行、blocked-by 边控制流表达，票清单 / 边 / 并行度上限类型化参数传入，并行度默认上限 4 经工作流并发度参数承载，图仍会话内计算不落盘），**票阶段链**（worktree+物化 → 实现子代理 → 评审子代理 → merge-tree 预检序合回 + 翻转副本同步 → 预演确定性门）图内逐票串行、跨票按依赖并行，评审由图内评审子代理承载（报告契约 branch/tickets 不变；机械问题修后图内重跑该票评审阶段——主会话介入须轮询，违背"通知驱动不轮询"约束故弃）；五类异常流与合并确认经升级提问/洞穴**图内停下问人**（语义零回退：沉默不算确认、不自动解冲突、不自动重试、不自动改 spec、合并未执行不清理）；fix 票经**脚本修订补图**并入运行图重算后续、已完成步缓存复用不重做；**收口链全入图**（fresh 全量检查 → PR 准备 → pre-push 门 → 合并确认升级提问 → 执行合并 → done 落盘 → 清理 → 运行结算报告即出口报告）；恰两次人工交互定位不变（开工确认图外 + 合并确认图内）。档 2–4（后台子代理 / 同步子代理 / 串行逐票）形态与行为零变化；DeepSeek harness 工作流预览期无恢复机制落档 3 起步，Claude Code 档 1 定档由实现票按调研 0003 时效条款核验运行内人工门能力后定；开工确认声明本次形态与命中原因，命中档 1 说明与逐票档的编排模型差异；中断续接结合运行记录恢复，已合回票不重做。② §8 决策点表核对：dev-execute 行人工门仍为开工确认 + 合并确认恰两次（合并确认迁移图内承载，单向门语义不变），零改动。③ §7.2 引用矩阵与 §10.1 技能清单零改动（无新技能）；run-mechanics 与 SKILL.md 修订随工票 0025，演练与 GLOSSARY 生成资产副本同步随 0026。
 > **v1.23 修订记录（design-\* 界面设计套件治理先行，2026-11-04，need 0013 / spec 0015 / 票 0032）**：新增 §11.20–§11.23 design-brief / design-baseline / design-ui / design-deliver 四条目——「场景约束 → 基线 → 设计 → 述标」链，四技能同构骨架（前置工作区校验 / 入口门禁 / 装载上下文 / 纪律 / 出口门禁 / 中断交接 / 禁止事项；description 写宽；中断 = 停前以 draft 状态落盘、重入从盘上续接），脊柱三点建议（dev-spec 出口"先述标再拆票" / dev-implement 装载基线分册与设计原则 / dev-accept 对照述标核销）不进本套件条目、随对应实现票同步；§6.5 design 模板补「界面设计」节说明（四小节 = 设计意图 / 角色约束 / 风格跟随声明 / 硬指标自查结果 + assets 约定）；§10.2 台账加批 4 行（治理文档先行，技能实现随后五票，§10.1 清单行随实现票补）。规则文本同步：METHOD（根 + assets 双份）状态表 design 行推进者补 design-deliver、产物目录说明补 designs/assets；GLOSSARY（根 + assets 双份）流程章 design 行同步推进者；README 技能清单 23 → 27、特色段与脊柱三点位各补一句。check.sh 与 hooks 资产零改动——assets 下的 METHOD / GLOSSARY 规则文本模板属双份同步资产，按 docs/standards/dual-copy-assets.md 纪律随改（spec 0015 非目标 3 精确化）。
+> **v1.24 修订记录（dev-review 评审轴清单制，2026-11-04，spec 0016 / 票 0024）**：§11.7 dev-review 双轴句从"两轴可并行子代理执行"的许可措辞升格为**评审轴清单制 + 每轴恰一个独立子代理的强制纪律**（起因：实测 dev-execute 各档评审普遍单代理串双轴，上下文污染致审核偏颇，且轴写死无法按轴并发扩展）。轴 = 轴名 + 判断依据材料清单 + 产出节；每轴派发恰一个子代理、只装本轴材料，并行优先、串行次之、隔离不因串行而破；无子代理原语逐轴亲做、落稿再进下一轴并声明降级；聚合只聚合不重审不改写；加轴 = 清单加项 + 报告加节，派发与聚合条文零改动。§6.1 与 §6.5 出口及报告要点随之"两轴"改"各轴"并补评审形态声明；§7.2 引用矩阵 dev-review 行改随派发传轴子代理（执行体薄上下文）；§10.2 dev-review 交付行自测注记随票 0024 更新；GLOSSARY 登记「评审轴」（双份资产按 dual-copy-assets 纪律同步随票）。dev-execute 各档与 spec 0013 图内链执行纪律全文自动继承，编排文件零改动（spec 0016 非目标）。
 > **用法**：在新会话中实现某个技能时，将本文档（至少 §2–§8 通用规范、目标技能的规格节、§12 文风基准）作为输入提供给 AI。实现过程中发现设计缺陷：**先改本文档，再改技能**，保证文档与实物不漂移。
 
 ## 1. 背景与目标
@@ -240,7 +241,7 @@ CHECK_TEST="npm run test"
 | spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过） |
 | design | `id` `spec` `status` | draft →approved（dev-design） |
 | ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
-| review | `id` `tickets: []` `branch` `status` | draft →approved（dev-review，两轴阻断项清零） |
+| review | `id` `tickets: []` `branch` `status` | draft →approved（dev-review，各轴阻断项清零） |
 | acceptance | `id` `spec` `round` `status` | draft →passed \| rejected（dev-accept） |
 | adr | `id` `status` | accepted →superseded（被新 ADR 取代时） |
 | research | `id` | 无状态，纯参考资料 |
@@ -317,7 +318,7 @@ created: <date>
 
 ### 6.5 review / acceptance / design / adr 模板要点
 
-- review：frontmatter 见 6.1；正文固定 `## 标准轴 findings`、`## Spec 轴 findings`（每条：文件:行 + 怎么改 + 为什么 + 阻断/建议分级）、`## 汇总`（各轴阻断数）。双轴独立报告，不合并重排。
+- review：frontmatter 见 6.1；正文固定 `## 标准轴 findings`、`## Spec 轴 findings`（每条：文件:行 + 怎么改 + 为什么 + 阻断/建议分级）、`## 汇总`（各轴阻断数 + 评审形态：每轴独立子代理（并行 / 串行）| 单上下文逐轴降级）。分轴独立报告，不合并重排；加轴时正文随清单加对应 findings 节（v1.24）。
 - acceptance：正文固定 `## 场景结果`（逐条：场景/FR/证据/结论）、`## 假设验证`、`## 残余风险`、`## 下一轮建议`。
 - design：正文固定 `## 模块划分`（每模块：职责 / 对外接口 / 依赖方向，依赖单向不成环）、`## 数据流`（一条典型路径从入口到存储，写清状态与所有权）、`## seam 清单`（每条：在哪测、测什么；是 spec 测试决策的细化）、`## ADR 索引`（本方案产生的 ADR 与一句话结论；无则写"无"）。不含具体文件路径与代码。含界面交付时在技术节之外另扩 `## 界面设计` 节（design-\* 套件述标交付，§11.20–§11.23；与 dev-design 并存时各写各的节互不覆盖）——四小节 = 设计意图 / 角色约束 / 风格跟随声明 / 硬指标自查结果，配套可点 HTML 界面原型（四态可切换、单文件零依赖）落 `docs/designs/assets/<design-id>/`（知识档进仓库，区别于样张的系统临时目录）；「界面设计」节不进 validate 校验（含界面交付才必填，必填性由 design-\* 技能出口纪律保证），可点原型不落临时目录以外的散落位置。
 - adr：正文固定 `## 背景`（为什么现在决策）、`## 决策`（选了什么、放弃什么）、`## 后果`（正向 / 负向 / 后续约束）；只在 ADR 三条件命中时写。superseded 时追加日期、不删除。
@@ -349,7 +350,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 | dev-clarify / dev-spec / dev-design / dev-research / dev-docs | ref-writing | 落盘前 |
 | dev-implement | ref-implementation + ref-testing + ref-git-commit | 开工装载；写测试前重读 ref-testing |
 | dev-execute | ref-implementation + ref-testing + ref-git-commit | 开工装载；收口 PR 正文与合并信息按 ref-git-commit |
-| dev-review | ref-review + ref-implementation | 评审前 |
+| dev-review | ref-review + ref-implementation | 评审前随派发传各轴子代理装载（执行体薄上下文，v1.24） |
 | dev-ship | ref-git-commit | PR 描述与合并信息落盘前 |
 | dev-release | ref-writing | CHANGELOG 条目落盘前 |
 | dev-fix | ref-testing（经 dev-implement 链装载，dev-fix 正文不重复装载） | 先写失败测试之前 |
@@ -447,7 +448,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
     6. ref-testing、ref-implementation（均 ✅：ref-implementation 2026-10-26；ref-testing 2026-10-27，六类测试参考与场景路由随 v1.4 定稿）
   7. dev-implement ✅ 2026-10-27（规格即 §12 范文，随 v1.5/v1.6 同步开工装载与重入语义；§13.2 自测：拒绝/重入两项经门禁行为实测通过，触发/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物；评审 0004 两轴阻断 0、建议 1 项采纳核销，approved，并核销 review 0003 遗留装载验证项）
   8. ref-review ✅ 2026-10-26
-  9. dev-review ✅ 2026-10-26（依赖的 ref-review / ref-implementation 同日完成；§13.2 端到端自测待 setup-workspace 就绪后补跑）
+  9. dev-review ✅ 2026-10-26（依赖的 ref-review / ref-implementation 同日完成；评审轴清单制 + 每轴恰一个独立子代理纪律与自测随票 0024，v1.24）
   10. dev-ship ✅ 2026-10-27（规格即 §11.8，PR 三节模板内嵌正文，PR 落点跟 config.sh 的 TRACKER 走不预设平台；§13.2 自测：pre-push 复用、重入判定 merge-base --is-ancestor、commit-msg [trivial] 豁免三项经门禁行为实测通过，触发/拒绝/衔接静态核验通过、行为验证待新会话，产物校验不适用——技能文件非八类产物）
   11. dev-accept ✅ 2026-10-27（规格即 §11.9，§6.5 模板内嵌正文；passed/rejected 判定机械化，fulfilled 前残余风险须逐条经用户显式接受；§13.2 自测：产物校验经 validate 正反往返实测通过——正例 draft/passed/rejected 三态过 validate，缺节、缺 spec、缺 round、非法状态、悬空 spec 引用五类反例全拦；拒绝依据经 phase 行为实测——工单含 implemented 时无"approved 且全 done"候选；publish 跳过路径实测 exit 0；触发/重入/衔接静态核验通过、行为验证待新会话）
   12. ref-git-commit（规范提交与合并信息；2026-10-27 经 spec 0001 增补）✅ 2026-10-27
@@ -510,10 +511,11 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 
 ### 11.7 dev-review
 
-- **双轴**：标准轴（CODING_STANDARDS.md + ref-review 的坏味道基线，repo 文档化标准优先、工具已强制的跳过）+ Spec 轴（对照 spec/工单：缺失、走样、超范围）。两轴可并行子代理执行，聚合时分轴报告不合并重排。
-- **出口**：两轴阻断项均为零 → review status: approved → 自动准备 PR（进入 dev-ship 前半）；有阻断项：机械问题自动修复后重审，设计级问题问人（决策点）。
+- **评审轴清单制（v1.24）**：评审轴 = 轴名 + 判断依据（该轴允许装载的材料清单）+ 产出节。当前清单两条：标准轴（判断依据 = CODING_STANDARDS.md + ref-implementation 标准 + ref-review 坏味道基线 + 评审 diff，repo 文档化标准优先、工具已强制的跳过；产出节「标准轴 findings」，回答写得对不对）+ Spec 轴（判断依据 = 每张工单全文 + 其 spec 对应章节 + 评审 diff，只查缺失、走样、超范围；产出节「Spec 轴 findings」，回答做的是不是要的）。
+- **每轴恰一个独立子代理（强制，v1.24）**：具备子代理原语时每轴派发恰一个子代理，子代理只装本轴判断依据所列材料——禁止单一子代理串做两条轴，禁止评审执行体亲做任一轴；并行派发优先，宿主并发受限时串行逐轴派发，隔离靠独立上下文保证、不因串行而破。无子代理原语时逐轴先后亲做：一条轴 findings 全文落稿后才进下一轴，轴间不复用中间结论，评审报告声明降级形态。聚合方只聚合：分轴出具、不合并重排、不互相稀释、不重审不改写。加轴 = 清单加项 + 报告加节，派发与聚合条文零改动。
+- **出口**：各轴阻断项均为零 → review status: approved → 自动准备 PR（进入 dev-ship 前半）；有阻断项：机械问题自动修复后重审，设计级问题问人（决策点）。
 - **编排模式（v1.16，为 dev-execute 而设）**：调用入参显式指定工单编号与 diff 基线（运行分支）时，评审范围只取入参工单、出口止于"报告 approved"，**不自动调 dev-ship**——PR 由编排方在运行末统一准备；无编排入参时单票路径逐字不变。评审报告 `branch` 记票分支、`tickets` 记入参工单，pre-push 在运行分支按覆盖面机械校验。
-- 评审前加载 ref-review + ref-implementation。
+- 评审执行体保持薄上下文（v1.24）：只装派发所需（范围工单清单、spec 指针、diff 概貌），判断依据材料由各轴子代理按清单装载；ref-review + ref-implementation 随派发传轴子代理。
 
 ### 11.8 dev-ship
 
