@@ -49,9 +49,11 @@ description: 把技术调研问题变成 docs/research/ 的带一手来源引用
 ## 4. 出口门禁（全部通过才算完）
 
 1. 落盘前用 Skill 工具装载 ref-writing，一次只载一个。
-2. 用下面的模板落盘 `docs/research/NNNN-slug.md`（id = 目录内最大号 +1，
-   slug 用 ASCII 小写短横线），运行 `.sdlc/check.sh validate` 必须通过；
-   不过 → 修复后重跑。再跑 `.sdlc/check.sh publish`，提交留痕 `[trivial]`。
+2. 运行 `.sdlc/check.sh claim research <slug>` 取号（slug 用 ASCII 小写短横线）——
+   返回占位文件路径，号由入口原子分配、全历史唯一；用下面的模板写正文覆盖占位
+   文件（frontmatter `id` 填文件名的 ID 段），运行 `.sdlc/check.sh validate <占位路径>`
+   必须通过；不过 → 修复后重跑。再跑 `.sdlc/check.sh publish <占位路径>`，
+   提交留痕 `[trivial]`。
 3. **出口（指路，不自动串联）**：给用户念结论速览，然后抛决策问题：
    "报告 NNNN 已落盘——结论可作 /dev-spec 实现决策的依据；要拍方向，
    回 /dev-clarify 决策卡。调研否掉的方案建议进「范围与非目标」。"
@@ -68,7 +70,7 @@ description: 把技术调研问题变成 docs/research/ 的带一手来源引用
 
 ```markdown
 ---
-id: 0002
+id: <ID 段，YYYYMMDD-4hex>
 created: <date>
 ---
 # <主题>调研：<一句话范围>

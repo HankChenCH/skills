@@ -9,6 +9,11 @@ file="${2:-}"
 case "$cmd" in
   publish)
     [ -f "$file" ] || { echo "local: 找不到产物文件 $file" >&2; exit 1; }
+    # 文件名校验（spec 0017 决策 7）：与其他适配器同判——旧四位或新时间戳 ID（可带谱系
+    # 前缀）才认产物；畸形名是调用错误 exit 1，不因 TRACKER=local 而放宽
+    base="$(basename "$file")"
+    printf '%s\n' "$base" | grep -qE '^((need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-[0-9]{8}-[0-9a-f]{4}|[0-9]{8}-[0-9a-f]{4}|[0-9]{4})-[a-z0-9]+(-[a-z0-9]+)*\.md$' \
+      || { echo "local: 文件名不符合产物命名（NNNN-slug.md 或 [父类型父ID-]YYYYMMDD-4hex-slug.md）：$base" >&2; exit 1; }
     echo "local: $(basename "$file") 已在盘上（docs/ 是真相源，无需外发）"
     ;;
   *)

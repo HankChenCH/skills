@@ -57,9 +57,20 @@
 
 ### 4.2 命名与杂项
 
-- 产物文件名 `NNNN-slug.md`：四位零填充、每类产物独立递增、从 0001 起；slug 一律 ASCII 小写短横线（中文标题放正文 H1，slug 用英文词，无合适英文时用拼音）。
-- 正文引用其他产物必须带类型限定（"spec 0003"、"ticket 0007"、"ADR 0002"）；裸编号只允许出现在 frontmatter 字段里。
-- commit message 首行带 `[#NNNN]`（多工单 `[#7][#8]`，按四位编号写）；豁免标记 `[trivial]`。
+- 产物号是**时间戳派生 ID**：`YYYYMMDD-4位小写hex`（如 `20261104-b7c1`），由
+  `.sdlc/check.sh claim` 原子取号分配——排他创建占号、撞号重掷随机段、不与目录现存
+  文件及 tracker map/git 历史中的任何已用号相同；号不依赖目录内最大号推导。在途旧
+  产物的四位数字号走完生命周期，门禁双格式并存识别（spec 0017）。
+- 产物文件名 `[父类型父ID-]ID-slug.md`：父产物为知识档（need/spec/design/adr/research）
+  的取号自动带**谱系前缀**（ticket←spec、overview←spec、acceptance←spec 等），父为
+  过程档（review←ticket）不带；谱系权威记录是产物 frontmatter 的父引用字段（如
+  ticket 的 `spec`），文件名前缀只是可读投影；frontmatter `id` 取 ID 段（不含前缀），
+  `validate` 校验 id 与文件名 ID 段一致。slug 一律 ASCII 小写短横线（中文标题放正文
+  H1，slug 用英文词，无合适英文时用拼音）。
+- 正文引用其他产物必须带类型限定（"spec 0003"、"ticket 0007"、"ADR 0002"；新格式
+  产物同理写作 "spec 20261104-b7c1"）；裸编号只允许出现在 frontmatter 字段里。
+- commit message 首行带工单引用：旧格式 `[#NNNN]`（多工单 `[#7][#8]`，按四位编号写）
+  或新格式 `[#YYYYMMDD-4hex]`；豁免标记 `[trivial]`。
 - 日期只记 `created` 和状态变更日（如 `approved`），不搞修订历史——那是 git 的事。
 - 分支名不做硬门禁，只约定 `feat/<slug>` / `fix/<slug>`。
 

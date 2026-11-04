@@ -48,9 +48,12 @@ description: 为缺陷开 fix 工单并送入实现链。入口先分诊定级�
 
 ## 4. 出口门禁（全部通过才算完）
 
-1. 用下面的固定模板落盘 `docs/tickets/NNNN-slug.md`（id = 目录内最大号 +1，
-   `type: fix`，`spec` 必填），跑 `.sdlc/check.sh validate` 必须通过，再跑
-   `publish`。开票提交带 `[trivial]`（流程产物落盘）。
+1. 运行 `.sdlc/check.sh claim ticket <slug> spec <归属 spec-ID>` 取号落盘
+   （slug 用 ASCII 小写短横线）——返回占位文件路径，号由入口原子分配、全历史唯一，
+   父为 spec（知识档）自动带 `spec<父ID>-` 谱系前缀；用下面的固定模板写正文覆盖
+   占位文件（frontmatter `id` 填文件名的 ID 段，`type: fix`，`spec` 必填），跑
+   `.sdlc/check.sh validate <占位路径>` 必须通过，再跑
+   `publish <占位路径>`。开票提交带 `[trivial]`（流程产物落盘）。
 2. **处置 = 排期或不修** → 票留盘（ready）或把不修理由写进 Progress，停，
    不送实现链。
 3. **处置 = 现在修** → **立即用 Skill 工具调用 dev-implement** 实现这张票：
@@ -62,14 +65,14 @@ description: 为缺陷开 fix 工单并送入实现链。入口先分诊定级�
 
 ```markdown
 ---
-id: 0007
+id: <ID 段，YYYYMMDD-4hex>
 type: fix
 spec: 0001
 status: ready
 blocked-by: []
 created: <date>
 ---
-# 0007: <缺陷一句话>
+# <ID 段>: <缺陷一句话>
 
 **定级：** 阻断 | 重要 | 一般 | 轻微（依据一句话）
 

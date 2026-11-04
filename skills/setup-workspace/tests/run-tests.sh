@@ -723,6 +723,37 @@ t "RUN_PREFIX 包裹执行" 0 "check.sh all" "全量检查通过"
 echo "== publish =="
 t "local 适配器确认在盘" 0 "check.sh publish docs/adr/0001-local-tracker.md" "已在盘上"
 t "publish 缺文件拒绝" 1 "check.sh publish docs/adr/9999-nope.md" "找不到产物文件"
+echo "-- 适配器文件名校验：新旧双格式接受、畸形名拒绝（spec 0017 决策 7 / 票 0039）--"
+wfile docs/adr/20261104-b7c1-cache-note.md <<'EOF'
+---
+id: 20261104-b7c1
+status: accepted
+created: 2026-11-04
+---
+# 新格式产物投影样例
+EOF
+t "新格式文件名（时间戳 ID）publish 放行" 0 "check.sh publish docs/adr/20261104-b7c1-cache-note.md" "已在盘上"
+wfile docs/tickets/spec0001-20261104-d3f2-prefixed-slug.md <<'EOF'
+---
+id: 20261104-d3f2
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-04
+---
+# 谱系前缀产物投影样例
+EOF
+t "带谱系前缀的新格式文件名 publish 放行" 0 "check.sh publish docs/tickets/spec0001-20261104-d3f2-prefixed-slug.md" "已在盘上"
+wfile docs/adr/0001-Bad_Name.md <<'EOF'
+---
+id: 0001
+status: accepted
+created: 2026-11-04
+---
+# 畸形文件名样例（大写与下划线）
+EOF
+t "畸形文件名 publish 拒绝为调用错误（local）" 1 "check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER=.*/TRACKER=github/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 t "适配器未安装警告并放行" 0 "check.sh publish docs/adr/0001-local-tracker.md" "未安装"
 t "未安装警告附重装指引" 0 "check.sh publish docs/adr/0001-local-tracker.md" "setup-workspace"
@@ -768,6 +799,7 @@ t "github：gh 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PATH\
 t "github：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gh3.log\"" ""
 t "github：gh 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "gh 未安装"
 t "github：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+t "github：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== tracker 适配器 gitlab =="
@@ -805,6 +837,7 @@ t "gitlab：glab 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PAT
 t "gitlab：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gl3.log\"" ""
 t "gitlab：glab 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "glab 未安装"
 t "gitlab：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+t "gitlab：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== tracker 适配器 codeup =="
@@ -834,6 +867,7 @@ t "codeup 幂等：二次 publish 仅追加评论" 0 "$CU_ENV PATH=\"$TMP/fakebi
 t "codeup 幂等：评论端点被调用" 0 "grep -q 'workitems/comment' \"$TMP/cu2.log\"" ""
 t "codeup 幂等：无第二次创建调用" 0 "! grep -q 'workitem -H' \"$TMP/cu2.log\"" ""
 t "codeup 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/codeup.map\")\" -eq 1 ]" ""
+t "codeup：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== spec done 残留扫描（清扫门禁）=="
@@ -3245,6 +3279,10 @@ ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
 t "两份 GLOSSARY.md 逐字一致" 0 "diff \"$ROOT/GLOSSARY.md\" \"$HERE/../assets/GLOSSARY.md\""
 t "两份 check.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$CHECK\""
+t "两份 tracker local.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/local.sh\" \"$HERE/../assets/trackers/local.sh\""
+t "两份 tracker github.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/github.sh\" \"$HERE/../assets/trackers/github.sh\""
+t "两份 tracker gitlab.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/gitlab.sh\" \"$HERE/../assets/trackers/gitlab.sh\""
+t "两份 tracker codeup.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/codeup.sh\" \"$HERE/../assets/trackers/codeup.sh\""
 t "METHOD 产物表含 overview 行（draft→reviewed，dev-overview 推进）" 0 "grep -qF 'draft →reviewed（dev-overview，须用户显式确认）' \"$ROOT/docs/METHOD.md\"" ""
 t "METHOD 过程档枚举含 overview（总览随过程档归置）" 0 "grep -qF '（ticket、review、acceptance、overview）' \"$ROOT/docs/METHOD.md\"" ""
 t "METHOD 目录树含 overviews/ 且目录计数为九" 0 "grep -qF 'tickets/ overviews/ reviews/' \"$ROOT/docs/METHOD.md\" && grep -qF '九个产物目录' \"$ROOT/docs/METHOD.md\"" ""
@@ -3307,6 +3345,8 @@ oseq "归置次序：先更新产物、再更新总览" "$SCRATCH/ov-walk.md" "�
 oseq "状态推进：须用户显式确认（沉默不算），确认后置 reviewed 并追加 reviewed: 日期" "$SCRATCH/ov-walk.md" "显式确认" "沉默不算" "reviewed" "reviewed: <日期>"
 t "总览不替用户拍板" 0 "grep -q '不替用户拍板' \"$SCRATCH/ov-walk.md\"" ""
 t "出口过 validate" 0 "grep -q 'validate' \"$SKILL\"" ""
+t "出口 validate 走取号返回的占位路径（claim 占位流闭合）" 0 "grep -qF '.sdlc/check.sh validate <取号返回的路径>' \"$SKILL\"" ""
+t "出口不残留 docs/overviews/NNNN-slug.md 旧格式硬编码路径" 0 "! grep -qF 'validate docs/overviews/NNNN-slug.md' \"$SKILL\"" ""
 
 echo "-- FR-1 真实 spec 演练：五节齐备、validate 通过、每节含可溯源引用（grep 可核）--"
 wfile .gitignore <<'EOF'
