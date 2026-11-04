@@ -2911,6 +2911,181 @@ t "候选号占位已存在时重掷随机段返回新号（FR-2 撞号重试）
 t "并发六路取号各得两两互异的号（FR-2 零协调）" 0 "for i in 1 2 3 4 5 6; do check.sh claim ticket fan-out >\"fan\$i.out\" & done; wait; [ \"\$(cat fan1.out fan2.out fan3.out fan4.out fan5.out fan6.out | sort -u | wc -l | tr -d ' ')\" = 6 ] && [ \"\$(cat fan1.out fan2.out fan3.out fan4.out fan5.out fan6.out | wc -l | tr -d ' ')\" = 6 ]" ""
 t "目录与 map 不变时两次取号互异且不入历史号（FR-1 非推导）" 0 "pre=\$(cksum docs/specs/0001-anchor.md docs/tickets/0009-anchor-ticket.md .sdlc/trackers/github.map | cksum); printf 'b7c1\na1f2\n' > \"$TMP/odseq2\"; c1=\$(CLAIM_OD_SEQ=\"$TMP/odseq2\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket probe-a); c2=\$(CLAIM_OD_SEQ=\"$TMP/odseq2\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket probe-b); post=\$(cksum docs/specs/0001-anchor.md docs/tickets/0009-anchor-ticket.md .sdlc/trackers/github.map | cksum); [ \"\$pre\" = \"\$post\" ] && [ \"\$c1\" != \"\$c2\" ] && ! grep -qF \"\$(basename \"\$c1\" .md | grep -oE '[0-9]{8}-[0-9a-f]{4}')\" .sdlc/trackers/github.map && ! grep -qF \"\$(basename \"\$c2\" .md | grep -oE '[0-9]{8}-[0-9a-f]{4}')\" .sdlc/trackers/github.map" ""
 
+echo "== 新格式依赖环检测（票 0038 评审核销）=="
+new_repo
+wfile docs/specs/0001-cycle.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 环检测夹具规格
+
+## 问题陈述
+x
+
+## 方案
+x
+
+## 用户故事
+- 作为买家
+
+## 实现决策
+x
+
+## 测试决策
+x
+
+## 验收场景
+- [FR-1 | 工单级] Given x When x Then x
+
+## 非目标
+x
+
+## 备注
+x
+EOF
+wfile docs/overviews/0001-cycle-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: reviewed
+created: 2026-11-04
+---
+# 0001: 环检测总览
+
+## 全景一行
+x（来源：spec 0001 方案）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | x | ticket 20261104-cccc |
+
+## 黄金场景走查
+x（剧本：spec 0001 验收场景 FR-1）
+
+## 样张
+CLI 输出样例：x
+
+## 差距清单
+- 无
+EOF
+wfile docs/tickets/20261104-cccc-chain-c.md <<'EOF'
+---
+id: 20261104-cccc
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-dddd-chain-d]
+created: 2026-11-04
+---
+# 20261104-cccc-chain-c: 链式依赖上游
+
+**做什么：** 新格式链式依赖（无环正控夹具）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-dddd-chain-d
+
+## Progress
+实现中
+EOF
+wfile docs/tickets/20261104-dddd-chain-d.md <<'EOF'
+---
+id: 20261104-dddd
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-dddd-chain-d: 链式依赖下游
+
+**做什么：** 新格式链式依赖终点
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+t "新格式链式依赖无环时 validate 放行" 0 "check.sh validate docs/tickets/20261104-cccc-chain-c.md" "通过（ticket）"
+setfm docs/tickets/20261104-dddd-chain-d.md status implemented
+t "新格式链式依赖无环时 ticket 入口放行" 0 "check.sh ticket 20261104-cccc-chain-c" "重入"
+setfm docs/tickets/20261104-dddd-chain-d.md status in-progress
+wfile docs/tickets/20261104-eeee-loop-a.md <<'EOF'
+---
+id: 20261104-eeee
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-ffff-loop-b]
+created: 2026-11-04
+---
+# 20261104-eeee-loop-a: 环上工单 A
+
+**做什么：** 同日新格式互指环（A→B）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-ffff-loop-b
+
+## Progress
+x
+EOF
+wfile docs/tickets/20261104-ffff-loop-b.md <<'EOF'
+---
+id: 20261104-ffff
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-eeee-loop-a]
+created: 2026-11-04
+---
+# 20261104-ffff-loop-b: 环上工单 B
+
+**做什么：** 同日新格式互指环（B→A）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-eeee-loop-a
+
+## Progress
+x
+EOF
+t "同日新格式工单互指 blocked-by 时 validate 报环" 1 "check.sh validate docs/tickets/20261104-eeee-loop-a.md" "环"
+t "同日新格式工单互指 blocked-by 时 ticket 拒绝开工" 1 "check.sh ticket 20261104-eeee-loop-a" "环"
+wfile docs/tickets/20261104-bare-date.md <<'EOF'
+---
+id: 20261104-aaaa
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104]
+created: 2026-11-04
+---
+# 20261104-bare-date: 裸日期串引用
+
+**做什么：** blocked-by 写裸日期串（缺 hex 段的非法引用）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104
+
+## Progress
+x
+EOF
+t "blocked-by 裸日期串被 validate 点名不存在（不做环键透传）" 1 "check.sh validate docs/tickets/20261104-bare-date.md" "不存在"
+
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""

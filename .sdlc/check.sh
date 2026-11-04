@@ -133,8 +133,8 @@ pad4() {
 }
 
 # ref_key REF：双格式引用规整键（spec 0017）——新时间戳 ID（YYYYMMDD-4hex，可带 -slug 尾）
-# 取完整 ID 段原样返回；旧纯数字（可带 -slug 尾）截号段补零四位。
-# 供关联字段等值比较与文件名 ID 段提取用；无法规整返回 1。
+# 取完整 ID 段原样返回；旧纯数字（可带 -slug 尾）截号段补零四位，超四位数字（裸日期串
+# 等非法引用形态）不透传。供关联字段等值比较、依赖图键与文件名 ID 段提取用；无法规整返回 1。
 ref_key() {
   local r="$1"
   case "$r" in
@@ -143,6 +143,7 @@ ref_key() {
   esac
   r="${r%%-*}"
   case "$r" in ''|*[!0-9]*) return 1 ;; esac
+  [ "${#r}" -le 4 ] || return 1
   pad4 "$r"
 }
 
@@ -168,9 +169,7 @@ artifact_file() {
       ;;
   esac
   ref="${ref%%-*}"
-  case "$ref" in ''|*[!0-9]*) return 1 ;; esac
-  [ "${#ref}" -le 4 ] || return 1
-  pad="$(pad4 "$ref")" || return 1
+  pad="$(ref_key "$ref")" || return 1
   for f in "$DOCS/$dir/${pad}"-*.md; do
     [ -f "$f" ] || continue
     echo "$f"; return 0
@@ -200,12 +199,13 @@ artifact_name_id() {
 
 title_of() { head -n 30 "$1" | grep -m1 '^# ' | sed 's/^#[[:space:]]*//'; }
 
-# 依赖环检测：读全部工单的 blocked-by 建图，输出 "CYCLE a -> b -> a" 或无输出
+# 依赖环检测：读全部工单的 blocked-by 建图，输出 "CYCLE a -> b -> a" 或无输出。
+# 节点键与边键同走 ref_key 规整，键空间单一：新格式工单互指环可检出（票 0038 评审核销）。
 ticket_cycles() {
   local f id deps edges="" pad
   for f in "$DOCS/tickets"/*.md; do
     [ -f "$f" ] || return 0
-    id="$(basename "$f" .md)"; id="${id%%-*}"
+    id="$(ref_key "$(basename "$f" .md)")" || continue
     deps=""
     for d in $(fm_list "$f" blocked-by); do
       pad="$(ref_key "$d")" && deps="$deps $pad"
