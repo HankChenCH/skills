@@ -104,7 +104,7 @@ created: <date>
 
 ## 5. 出口门禁（全部通过才算完）
 
-1. 运行 `.sdlc/check.sh validate docs/overviews/NNNN-slug.md`，必须通过；不过 → 修复后重跑。
+1. 运行 `.sdlc/check.sh validate <取号返回的路径>`，必须通过；不过 → 修复后重跑。
 2. 硬纪律自查：每节来源标注齐（grep 可核）；差距清单无未暴露的缺口；样张三态齐。
 3. 总览是过程档：不进任何提交（`.gitignore` 已排除 docs/overviews/），落盘后 `git status` 干净。
 

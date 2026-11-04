@@ -3345,6 +3345,8 @@ oseq "归置次序：先更新产物、再更新总览" "$SCRATCH/ov-walk.md" "�
 oseq "状态推进：须用户显式确认（沉默不算），确认后置 reviewed 并追加 reviewed: 日期" "$SCRATCH/ov-walk.md" "显式确认" "沉默不算" "reviewed" "reviewed: <日期>"
 t "总览不替用户拍板" 0 "grep -q '不替用户拍板' \"$SCRATCH/ov-walk.md\"" ""
 t "出口过 validate" 0 "grep -q 'validate' \"$SKILL\"" ""
+t "出口 validate 走取号返回的占位路径（claim 占位流闭合）" 0 "grep -qF '.sdlc/check.sh validate <取号返回的路径>' \"$SKILL\"" ""
+t "出口不残留 docs/overviews/NNNN-slug.md 旧格式硬编码路径" 0 "! grep -qF 'validate docs/overviews/NNNN-slug.md' \"$SKILL\"" ""
 
 echo "-- FR-1 真实 spec 演练：五节齐备、validate 通过、每节含可溯源引用（grep 可核）--"
 wfile .gitignore <<'EOF'
