@@ -468,17 +468,20 @@ cmd_all() {
   return "$rc"
 }
 
-commit_refs() { # [MSGFILE]，缺省读 stdin -> 四位零填充、去重的工单号（每行一个）
+commit_refs() { # [MSGFILE]，缺省读 stdin -> 工单号（旧补零四位 / 新 YYYYMMDD-4hex 原样），去重每行一个
   local src="${1:--}"
   awk '{
     line=$0
-    while (match(line, /\[#[0-9]+\]/)) {
+    while (match(line, /\[#[0-9]+(-[0-9a-f]+)?\]/)) {
       print substr(line, RSTART+2, RLENGTH-3)
       line=substr(line, RSTART+RLENGTH)
     }
   }' "$src" | sort -u | while IFS= read -r r; do
-    p="$(pad4 "$r")" || continue
-    printf '%s\n' "$p"
+    case "$r" in
+      [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) printf '%s\n' "$r" ;;
+      *) p="$(pad4 "$r")" || continue
+         printf '%s\n' "$p" ;;
+    esac
   done
 }
 
@@ -503,8 +506,8 @@ cmd_commit_msg() {
   refs="$(commit_refs "$msg")"
   if [ -z "$refs" ]; then
     cat >&2 <<'EOT'
-✗ commit message 既无 [#NNNN] 也无 [trivial]。
-  规则：功能/修复提交带 [#NNNN]（对应工单须 in-progress/implemented）；
+✗ commit message 既无 [#NNNN] 也无 [#YYYYMMDD-4hex]，也无 [trivial]。
+  规则：功能/修复提交带 [#NNNN] 或 [#YYYYMMDD-4hex]（对应工单须 in-progress/implemented）；
   小修（typo、纯文档）带 [trivial]（每次豁免留痕，dev-retro 审计）。
 EOT
     return 1
@@ -563,7 +566,7 @@ cmd_pre_push() {
           [ -f "$rv" ] || continue
           [ "$(fm_get "$rv" status)" = "approved" ] || continue
           for t in $(fm_list "$rv" tickets); do
-            [ "$(pad4 "$t")" = "$d" ] && { cov=1; break; }
+            [ "$(ref_key "$t" 2>/dev/null)" = "$d" ] && { cov=1; break; }
           done
           [ "$cov" = 1 ] && break
         done
@@ -758,7 +761,7 @@ usage() {
   ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved、多票 spec 须 reviewed 总览）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
-  commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行
+  commit-msg <msgfile>  轻门禁：[#NNNN] / [#YYYYMMDD-4hex] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行
   pre-push              重门禁：分支上 implemented 工单须被 approved 评审覆盖
   publish <file>        按 TRACKER 发布产物（local=确认在盘）
   help                  本说明

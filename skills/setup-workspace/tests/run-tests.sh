@@ -2796,6 +2796,33 @@ created: 2026-11-04
 x
 EOF
 t "新格式文件名 slug 非法拒绝" 1 "check.sh validate docs/tickets/20261104-e5f6-Bad_Slug.md" "slug 限"
+t "commit-msg 新格式引用放行在途工单" 0 "printf '[#20261104-b7c1] dual gate\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "门禁通过"
+t "commit-msg 旧格式引用放行在途旧票（在途不断链）" 0 "printf '[#0023] legacy inflight\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "门禁通过"
+t "commit-msg 新格式 ready 票拒绝（状态校验逻辑不变）" 1 "sed -i.bak 's/^status: in-progress/status: ready/' docs/tickets/20261104-b7c1-beta.md && rm -f docs/tickets/20261104-b7c1-beta.md.bak && printf '[#20261104-b7c1] wip\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "还是 ready"
+setfm docs/tickets/20261104-b7c1-beta.md status in-progress
+setfm docs/tickets/20261104-b7c1-beta.md status implemented
+setfm docs/tickets/0023-legacy-inflight.md status implemented
+t "pre-push 新旧双格式引用的 implemented 工单须 approved 评审覆盖" 1 "git checkout -q -b feat/dual && git add -A && git commit -qm '[#20261104-b7c1][#0023] dual pair' && check.sh pre-push" "评审覆盖"
+wfile docs/reviews/0001-dual-review.md <<'EOF'
+---
+id: 0001
+status: approved
+tickets: [0023, 20261104-b7c1]
+branch: feat/dual
+created: 2026-11-04
+---
+# 0001: 双格式评审
+
+## 标准轴 findings
+- 无
+
+## Spec 轴 findings
+- 无
+
+## 汇总
+无阻断
+EOF
+t "approved 评审声明双格式覆盖面后 pre-push 通过" 0 "git add -A && git commit -qm '[trivial] 评审夹具' && check.sh pre-push" "pre-push 门禁通过"
 
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
