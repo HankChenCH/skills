@@ -622,6 +622,10 @@ cmd_claim() {
     dir_of_type "$ptype" >/dev/null || die "未知父产物类型：${ptype}（须为九类产物之一）"
     pfile="$(artifact_file "$ptype" "$pid")" || die "父产物 $ptype $pid 不存在（docs/）"
     pid="$(fm_get "$pfile" id)"   # 前缀取父产物 frontmatter id（唯一事实源）
+    # 守卫：id 非空且为规整键不动点，否则拼出的谱系前缀产出过不了自家命名门的文件名
+    if [ -z "$pid" ] || [ "$(ref_key "$pid")" != "$pid" ]; then
+      die "父产物 frontmatter id 缺失或非法：$pfile"
+    fi
     case "$ptype" in
       need|spec|design|adr|research) prefix="$ptype$pid-" ;;
     esac

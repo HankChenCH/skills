@@ -2929,6 +2929,31 @@ t "同日被清扫产物的历史 ID 不复用（map 持久行，FR-1 场景 1�
 git -C "$TMP" add -A && git -C "$TMP" commit -qm "[#$(date +%Y%m%d)-7e2f] 历史引用夹具（产物已清扫，仅存于 git 历史）"
 printf '7e2f\na3c5\n' > "$TMP/odseq7"
 t "仅存于 git 历史引用的 ID 不复用（FR-1 git 历史来源）" 0 "w=\$(CLAIM_OD_SEQ=\"$TMP/odseq7\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket git-hist); case \"\$w\" in *a3c5-git-hist.md) ;; *) exit 8 ;; esac" ""
+wfile docs/specs/0012-noid.md <<'EOF'
+---
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 无 id 夹具规格
+
+frontmatter 缺 id 字段
+EOF
+wfile docs/specs/0013-badid.md <<'EOF'
+---
+id: 0013-swept
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 坏 id 夹具规格
+
+frontmatter id 带尾段（非规整键不动点）
+EOF
+t "父产物 frontmatter id 缺失时取号报错" 1 "check.sh claim ticket no-parent-probe spec 0012" "缺失或非法"
+t "父产物 frontmatter id 非法时取号报错" 1 "check.sh claim ticket bad-parent-probe spec 0013" "缺失或非法"
 
 echo "== 新格式依赖环检测（票 0038 评审核销）=="
 new_repo
