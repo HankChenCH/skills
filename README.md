@@ -2,11 +2,13 @@
 
 **门禁式 SDLC 技能集——把「团队 + AI 协作开发」的流程规矩变成机器门禁。**
 
-23 个技能驱动一条脊柱流水线，八类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
+27 个技能（23 个已实现，design-\* 界面设计套件 4 个随 spec 0015 建设中）驱动一条脊柱流水线，八类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
 
 ```
 need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现）→ review（评审）→ ship（交付）→ accept（验收）
 ```
+
+脊柱三点位另有不强制的设计建议：spec 出口建议「先述标再拆票」、实现时装载设计基线与设计原则、验收时对照述标核销——由 design-\* 界面设计套件承接（见下方技能清单）。
 
 ## 致谢
 
@@ -38,6 +40,7 @@ AI 协作开发的三种常见失控：
 - **整 spec 编排（dev-execute）**：把 V 模型走成自动流水——点名一张 approved spec，按依赖序并行实现、逐票双轴评审，每合回一票就全量验证一次（右臂逐级上行），全绿后一次出 PR，出口指路 dev-accept 做集成验收；全程人只在开工与合并两个点确认。
 - **MVP 分轮循环**：spec 带 `round`，round 1 只覆盖风险最大的最小范围；验收报告的「残余风险 / 下一轮建议」就是回转点，need 终态 fulfilled 有机械化退出条件。
 - **双轴评审**：标准轴查「写得对不对」（编码标准 + 坏味道基线），Spec 轴查「做的是不是要的」（缺失 / 走样 / 超范围）；两轴独立出具、不互相稀释，阻断清零才放行。
+- **界面述标交付**：design-\* 套件让界面设计从使用者角色约束出发、跟随项目设计基线，产出四态完备（正常/空/加载/错误）的布局方案并过硬指标自查；交付时在 design 产物写「界面设计」节（设计意图 / 角色约束 / 风格跟随声明 / 自查结果）并附可点 HTML 原型，design 的 approved 门即述标评审门——像建筑设计院述标那样「听意图、看界面、提意见」。
 
 ## 快速上手
 
@@ -57,7 +60,7 @@ AI 协作开发的三种常见失控：
 /dev-clarify → /dev-spec → /dev-plan → /dev-implement → /dev-review → /dev-ship → /dev-accept
 ```
 
-## 技能清单（23 个）
+## 技能清单（27 个）
 
 **总控与初始化**
 
@@ -97,6 +100,17 @@ AI 协作开发的三种常见失控：
 | [dev-release](./skills/dev-release/SKILL.md) | 语义化版本 + CHANGELOG + 发布检查单（tag 与推送是单向门，必须问人） |
 | [dev-docs](./skills/dev-docs/SKILL.md) | 面向人的文档维护：每条行为断言先核验后落笔 |
 
+**界面设计（design-\* 套件，spec 0015 建设中）**
+
+「场景约束 → 基线 → 设计 → 述标」链；技能文件随后五张实现票落地，届时链接改指各自 SKILL.md，当前规格见[设计蓝图 §11.20–§11.23](./docs/sdlc-skills-blueprint.md)。
+
+| 技能 | 职责 |
+|---|---|
+| [design-brief](./docs/sdlc-skills-blueprint.md) | 使用者角色 → 书面设计约束（信息优先级 / 密度 / 关键操作路径），链起点 |
+| [design-baseline](./docs/sdlc-skills-blueprint.md) | 建立 / 读取项目设计语言基线（docs/standards/ 按平台分册 + 标准索引登记） |
+| [design-ui](./docs/sdlc-skills-blueprint.md) | 约束与基线下的多平台布局视觉决策：四态完备、Web 必含移动端适配决策、硬指标自查 |
+| [design-deliver](./docs/sdlc-skills-blueprint.md) | 述标交付：design 产物「界面设计」节四小节 + 可点 HTML 原型落 designs/assets/，approved 门即述标评审门 |
+
 **参考层（内部参考，被流程技能装载，不独立调用）**
 
 [ref-writing](./skills/ref-writing/SKILL.md)、[ref-implementation](./skills/ref-implementation/SKILL.md)、[ref-review](./skills/ref-review/SKILL.md)、[ref-testing](./skills/ref-testing/SKILL.md)、[ref-git-commit](./skills/ref-git-commit/SKILL.md)——分别定义「什么是好」的文档、实现、评审、测试与提交信息。
@@ -135,4 +149,4 @@ AI 协作开发的三种常见失控：
 
 ## 项目状态
 
-23 个技能已全部实现。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。
+23 个技能已实现；design-\* 界面设计套件 4 个按 spec 0015 建设中，设计真相源见蓝图 §11.20–§11.23。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。

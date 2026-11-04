@@ -51,7 +51,7 @@
 
 三条总原则：机器物与人文物分家（`.sdlc/` vs `docs/`）；流程产物按价值是否越过终态分档归置——知识档（need、spec、design、adr、research、standards）进库永久留存，过程档（ticket、review、acceptance、overview）过程中盘上存在、被 `.gitignore` 排除、不进任何提交，验收通过后随蒸馏清扫删除——审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用；可升级不覆盖（setup 幂等重跑，按所有权表决定覆盖/保留/补缺）。`src/` 或其他源码目录——无论仓库实际布局如何——setup 永不触碰。
 
-**目录懒创建**：setup 只建 `.sdlc/` 与 `docs/`，九个产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
+**目录懒创建**：setup 只建 `.sdlc/` 与 `docs/`，九个产物目录由第一个产物落盘时创建，不留 `.gitkeep`；`designs/` 产物另含界面原型子目录 `designs/assets/<design-id>/`（design-\* 述标交付落点，知识档进仓库）。
 
 `.git/hooks/commit-msg`、`pre-push` 是 setup 安装的一行转发脚本（指向 `.sdlc/check.sh`），本身不进版本库；换机器克隆后重跑 setup-workspace 即恢复。轻门禁挂 commit-msg 而非 pre-commit：git 在 commit-msg 时点才写入 commit message。L4 的平台侧接线同类：setup 在 ZCode 会话中把 PreToolUse hooks 块合并进 `<repo>/.zcode/config.json`（`enabled: true` 必需，hooks 块归 setup、文件其余内容归用户），不进版本库，判定逻辑全在版本化的 `.sdlc/hooks/l4-guard.sh`。
 
@@ -78,7 +78,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 |---|---|---|
 | need | `id` `status` | draft →confirmed（dev-clarify）→fulfilled（dev-accept，末轮通过且成功标准核销、无未接受风险） |
 | spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫） |
-| design | `id` `spec` `status` | draft →approved（dev-design） |
+| design | `id` `spec` `status` | draft →approved（dev-design / design-deliver） |
 | ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `repos?` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
 | overview | `id` `spec` `status` | draft →reviewed（dev-overview，须用户显式确认） |
 | review | `id` `tickets: []` `branch` `status` | draft →approved（dev-review，两轴阻断项清零） |

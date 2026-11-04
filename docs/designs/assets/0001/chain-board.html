@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>design-* 链路看板（述标原型）</title>
+<style>
+  body{margin:0;background:#FFFFFF;color:#1F2328;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:960px;margin:0 auto;padding:24px 16px 48px}
+  h1{font-size:32px;line-height:1.3;margin:0 0 8px}
+  h2{font-size:24px;line-height:1.3;margin:24px 0 8px}
+  h3{font-size:20px;line-height:1.3;margin:0}
+  .sub{color:#59636E;font-size:14px;margin:0 0 16px}
+  nav{position:sticky;top:0;background:#FFFFFF;border-bottom:1px solid #D1D9E0;padding:8px 16px;display:flex;gap:8px;max-width:960px;margin:0 auto}
+  nav button{font-size:14px;padding:8px 16px;border:1px solid #D1D9E0;background:#FFFFFF;color:#1F2328;border-radius:6px;cursor:pointer}
+  nav button[aria-pressed="true"]{border-color:#0969DA;color:#0969DA;font-weight:600;background:#F6F8FA}
+  .verdict{border-left:4px solid #0969DA;padding:4px 12px;margin:0 0 24px}
+  .stage{border:1px solid #D1D9E0;border-radius:6px;padding:16px;margin-bottom:12px;cursor:pointer}
+  .stage:hover{border-color:#0969DA}
+  .stage p{margin:4px 0 0}
+  .num{color:#59636E;font-size:12px;font-family:ui-monospace,SFMono-Regular,monospace}
+  .path{font-family:ui-monospace,SFMono-Regular,monospace;font-size:14px;background:#F6F8FA;padding:4px 8px;border-radius:4px;word-break:break-all}
+  .detail{display:none;border-top:1px solid #D1D9E0;margin-top:12px;padding-top:12px}
+  .stage.open .detail{display:block}
+  .chip{font-weight:600}
+  .ok{color:#1A7F37}.warn{color:#9A6700}.bad{color:#CF222E}
+  .skel{height:16px;border-radius:4px;background:#F6F8FA;margin:12px 0;animation:pulse 1.2s ease-in-out infinite}
+  .skel.w60{width:60%}.skel.w40{width:40%}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+  .panel{border:1px solid #D1D9E0;border-radius:6px;padding:16px}
+  .errbox{border:1px solid #CF222E;border-radius:6px;padding:16px}
+  .errbox h2{color:#CF222E;margin:0 0 8px}
+  [hidden]{display:none}
+</style>
+</head>
+<body>
+<nav id="switcher" aria-label="四态切换">
+  <button data-state="normal" aria-pressed="true">正常</button>
+  <button data-state="empty" aria-pressed="false">空</button>
+  <button data-state="loading" aria-pressed="false">加载</button>
+  <button data-state="error" aria-pressed="false">错误</button>
+</nav>
+<main>
+  <h1>design-* 链路看板</h1>
+  <p class="sub">场景约束 → 基线 → 设计 → 述标 · 述标原型（spec 0015 呈现物）</p>
+
+  <section id="st-normal">
+    <p class="verdict">结论：四技能链已上线 3/4；述标环节随运行 0015 票 0036 交付中（本页即其述标原型）。</p>
+    <div class="stage">
+      <h3>01 design-brief · 场景约束</h3>
+      <p>从使用者角色产出逐角色书面约束（信息优先级 / 密度要求 / 关键操作路径）。</p>
+      <p><span class="num">产物 docs/designs/NNNN-&lt;slug&gt;-brief.md · 运行 0015 票 0033</span></p>
+      <div class="detail">
+        <p><span class="chip ok">已上线</span>　入口：spec 编号或对话描述；出口：约束清单交 design-ui，并查基线分册。</p>
+      </div>
+    </div>
+    <div class="stage">
+      <h3>02 design-baseline · 基线</h3>
+      <p>建立 / 读取项目设计语言基线，无基线经确认建立并登记索引，有基线执行跟随纪律。</p>
+      <p><span class="num">产物 docs/standards/design-&lt;platform&gt;.md · 运行 0015 票 0034</span></p>
+      <div class="detail">
+        <p><span class="chip ok">docs 分册已建立</span>　docs/standards/design-docs.md（CODING_STANDARDS.md 索引已登记）。</p>
+      </div>
+    </div>
+    <div class="stage">
+      <h3>03 design-ui · 设计</h3>
+      <p>在约束与基线下产出多平台布局与视觉决策，原型四态齐备，出口过硬指标自查。</p>
+      <p><span class="num">产物 docs/designs/NNNN-&lt;slug&gt;-ui.md · 运行 0015 票 0035</span></p>
+      <div class="detail">
+        <p><span class="chip ok">已上线</span>　对象路由五分册：web / mobile / desktop / cli / docs；出口指路 design-deliver。</p>
+      </div>
+    </div>
+    <div class="stage">
+      <h3>04 design-deliver · 述标</h3>
+      <p>把界面设计定稿为述标：「界面设计」节四小节 + 可点原型落 docs/designs/assets/；approved 门即述标评审门。</p>
+      <p><span class="num">产物 docs/designs/NNNN-&lt;slug&gt;.md + assets/&lt;design-id&gt;/ · 运行 0015 票 0036</span></p>
+      <div class="detail">
+        <p><span class="chip warn">交付中</span>　本页即其演练述标原型；approved 须用户显式确认，沉默保持 draft。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="st-empty" hidden>
+    <div class="panel">
+      <h2>空：工作区还没有链路产物</h2>
+      <p>docs/designs/ 与 docs/standards/ 均无产物。设计链从约束开始：</p>
+      <p>第一步运行 <span class="path">/design-brief</span>（把使用者角色与任务理成书面约束）。</p>
+      <p><span class="chip warn">四个环节均未落盘</span>——下面是全链预览，落一个亮一个。</p>
+      <div class="stage"><h3>01 design-brief · 场景约束</h3><p><span class="chip warn">未落盘</span></p></div>
+      <div class="stage"><h3>02 design-baseline · 基线</h3><p><span class="chip warn">未落盘</span></p></div>
+      <div class="stage"><h3>03 design-ui · 设计</h3><p><span class="chip warn">未落盘</span></p></div>
+      <div class="stage"><h3>04 design-deliver · 述标</h3><p><span class="chip warn">未落盘</span></p></div>
+    </div>
+  </section>
+
+  <section id="st-loading" hidden>
+    <div class="panel">
+      <h2>加载：正在扫描 docs/ 与 docs/standards/</h2>
+      <p>正在读取九个产物目录与设计基线分册，统计各环节落盘状态……</p>
+      <div class="skel w60"></div>
+      <div class="skel"></div>
+      <div class="skel w40"></div>
+      <p class="sub">本页不发网络请求；加载态示意扫描 docs/ 的等待窗口。</p>
+    </div>
+  </section>
+
+  <section id="st-error" hidden>
+    <div class="errbox">
+      <h2>错误：未检测到 .sdlc/check.sh</h2>
+      <p>当前目录未接入开发流程，链路看板无法读取产物状态。</p>
+      <p>修复路径：回到仓库根目录，先运行 <span class="path">/setup-workspace</span>，再重试本页。</p>
+      <p><span class="chip bad">链路状态不可用</span>　<span class="num">错误态示意：状态不靠颜色单独区分，此处以文字标注。</span></p>
+    </div>
+  </section>
+</main>
+<script>
+  var views={normal:'st-normal',empty:'st-empty',loading:'st-loading',error:'st-error'};
+  var buttons=document.querySelectorAll('#switcher button');
+  buttons.forEach(function(b){
+    b.addEventListener('click',function(){
+      buttons.forEach(function(x){x.setAttribute('aria-pressed',x===b?'true':'false')});
+      Object.keys(views).forEach(function(k){
+        document.getElementById(views[k]).hidden=(k!==b.dataset.state);
+      });
+    });
+  });
+  document.querySelectorAll('#st-normal .stage').forEach(function(c){
+    c.addEventListener('click',function(){c.classList.toggle('open')});
+  });
+</script>
+</body>
+</html>
