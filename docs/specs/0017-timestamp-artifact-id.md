@@ -1,6 +1,7 @@
 ---
 id: 0017
-status: approved
+status: done
+done: 2026-11-05
 need: 0014
 round: 1
 created: 2026-11-04
@@ -112,10 +113,12 @@ accept / overview / research / retro）的「目录内最大号 +1」内联规�
 - [FR-4 | 工单级] Given 提交信息带旧格式引用 `[#0023]`（在途票）When commit-msg
   门禁校验 Then 双格式定位命中在途工单，通过。
 - [FR-4 | 集成级] Given map 已追加历史消歧注记 When 审计读者按注记对照双 0024
-  与九个 0001 Then 每个历史号都能定位到唯一平台对象链接。
+  与十行 acceptance 0001（首次分配 + 复用九次）Then 每个历史号都能定位到唯一平台
+  对象链接。（round 1 实况修订：map 实有 10 行，「九个」为复用次数口径）
 - [FR-5 | 集成级] Given 模拟仓中子代理模拟 ≥3 个并发会话同时取号（含开 spec 与
   开票）When 演练执行完毕 Then 全部产物号两两互异、零重号、零人工协调，演练记录
-  落盘 docs/acceptance/ 且自身符合新命名格式。
+  落盘 docs/acceptance/ 且自身符合新命名格式。（round 1 实况修订：宿主子代理并发
+  上限 2，实际 4 会话分两组并行（B∥C、A∥D），12 次取号零重号）
 - [FR-1 | 集成级] Given 九个产物技能文档 When 逐个检查取号规则 Then 全部改为调用
   单一取号入口，无任何「目录内最大号 +1」残留。
 
