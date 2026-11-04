@@ -55,8 +55,10 @@ docs/reviews/ 中"留档供 retro 参考"的 findings → docs/acceptance/ 报�
    逐条把理由写进报告。
 2. **落实采纳项**：按三分类的治理通道执行，增量不覆盖既有内容。
 3. 落盘前用 Skill 工具装载 ref-writing，报告写法以它为准。
-4. 用下面的固定模板落盘 `docs/retros/NNNN-slug.md`（id = 目录内最大号 +1，
-   slug 用 ASCII 小写短横线），`status: done`。
+4. 运行 `.sdlc/check.sh claim retro <slug>` 取号（slug 用 ASCII 小写短横线）——返回
+   占位文件路径，号由入口原子分配、全历史唯一（轻产物无父，文件名不带谱系前缀）；
+   用下面的固定模板写正文覆盖该占位文件（frontmatter `id` 填文件名的 ID 段，形如
+   `YYYYMMDD-4hex`），`status: done`。
 5. 报告与落实的改动分别提交：流程产物与纯文档走 `[trivial]` 并写明豁免理由，
    其他改动带对应 `[#NNNN]`。不使用 --no-verify。
 6. **无下游自动串联**——复盘是反馈回路的终点，采纳项落实完成即结束；
@@ -64,7 +66,7 @@ docs/reviews/ 中"留档供 retro 参考"的 findings → docs/acceptance/ 报�
 
 ```markdown
 ---
-id: 0001
+id: <ID 段，YYYYMMDD-4hex>
 status: draft
 created: <date>
 ---
