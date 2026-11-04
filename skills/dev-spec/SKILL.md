@@ -77,7 +77,12 @@ created: <date>
    **批准是决策点，必须用户显式确认**，不接受沉默或"都行"。要改 → 回 §3，改完重走本节。
 3. 批准 → frontmatter `status` 改 `approved`、追加 `approved: <今日>`，
    运行 `.sdlc/check.sh publish docs/specs/NNNN-slug.md`。
-4. **立即用 Skill 工具调用 dev-plan**（把 spec 拆成垂直切片工单）。dev-plan 未实现 →
+4. **含界面交付的建议（只建议不强制）**：spec 的用户故事或验收场景提及
+   界面、页面、原型 → 建议用户"先述标再拆票"：走 /design-brief 链（design-brief →
+   design-baseline → design-ui → design-deliver）产出述标说明与可评审的界面原型，
+   再回来拆票。用户不采纳或链上技能未安装 → 照常进下一步，不阻断、不重问。
+   spec 无界面交付 → 跳过本条，不打扰用户。
+5. **立即用 Skill 工具调用 dev-plan**（把 spec 拆成垂直切片工单）。dev-plan 未实现 →
    停下说明"spec NNNN 已 approved，下一步拆工单"，建议运行 /sdlc 查看去向；
    不要自己动手拆工单。
 
