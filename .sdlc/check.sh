@@ -197,15 +197,26 @@ artifact_name_id() {
   return 1
 }
 
+# artifact_id_of_name BASE：产物文件名 → ID 段（artifact_name_id 双字段输出取末字段，
+# 兼容谱系前缀文件名）。供依赖图节点键与清扫覆盖匹配从文件名归约 ID；不识别返回 1。
+artifact_id_of_name() {
+  local parse
+  parse="$(artifact_name_id "$1")" || return 1
+  # shellcheck disable=SC2086
+  set -- $parse
+  if [ $# -ge 2 ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi
+}
+
 title_of() { head -n 30 "$1" | grep -m1 '^# ' | sed 's/^#[[:space:]]*//'; }
 
 # 依赖环检测：读全部工单的 blocked-by 建图，输出 "CYCLE a -> b -> a" 或无输出。
-# 节点键与边键同走 ref_key 规整，键空间单一：新格式工单互指环可检出（票 0038 评审核销）。
+# 节点键经 artifact_id_of_name 从文件名归约 ID 段（兼容谱系前缀文件名），边键走 ref_key
+# 规整引用，两键同处 ID 段空间：新旧格式、带前缀与否的工单互指环均可检出（票 0038 评审核销）。
 ticket_cycles() {
   local f id deps edges="" pad
   for f in "$DOCS/tickets"/*.md; do
     [ -f "$f" ] || return 0
-    id="$(ref_key "$(basename "$f" .md)")" || continue
+    id="$(artifact_id_of_name "$(basename "$f" .md)")" || continue
     deps=""
     for d in $(fm_list "$f" blocked-by); do
       pad="$(ref_key "$d")" && deps="$deps $pad"
@@ -259,7 +270,7 @@ spec_residue() {
     tspec="$(ref_key "$(fm_get "$f" spec)" 2>/dev/null)" || continue
     [ "$tspec" = "$sid" ] || continue
     echo "${f#"$ROOT"/}"
-    tid="$(ref_key "$(basename "$f" .md)")" || continue
+    tid="$(artifact_id_of_name "$(basename "$f" .md)")" || continue
     tids="$tids$tid "
   done
   for dir in acceptance overviews; do

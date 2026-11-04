@@ -3025,6 +3025,50 @@ t "新格式链式依赖无环时 validate 放行" 0 "check.sh validate docs/tic
 setfm docs/tickets/20261104-dddd-chain-d.md status implemented
 t "新格式链式依赖无环时 ticket 入口放行" 0 "check.sh ticket 20261104-cccc-chain-c" "重入"
 setfm docs/tickets/20261104-dddd-chain-d.md status in-progress
+wfile docs/tickets/spec0001-20261104-3f4a-loop-a.md <<'EOF'
+---
+id: 20261104-3f4a
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-5b6c]
+created: 2026-11-04
+---
+# spec0001-20261104-3f4a-loop-a: 谱系前缀环上工单 A
+
+**做什么：** 带前缀文件名互指环（A→B，此时全图唯一环，判别不被无前缀环掩盖）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-5b6c
+
+## Progress
+x
+EOF
+wfile docs/tickets/spec0001-20261104-5b6c-loop-b.md <<'EOF'
+---
+id: 20261104-5b6c
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-3f4a]
+created: 2026-11-04
+---
+# spec0001-20261104-5b6c-loop-b: 谱系前缀环上工单 B
+
+**做什么：** 带前缀文件名互指环（B→A）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-3f4a
+
+## Progress
+x
+EOF
+t "谱系前缀工单互指 blocked-by 时 validate 报环" 1 "check.sh validate docs/tickets/spec0001-20261104-3f4a-loop-a.md" "环"
+t "谱系前缀工单经裸 ID 定位后 ticket 同样报环" 1 "check.sh ticket 20261104-3f4a" "环"
 wfile docs/tickets/20261104-eeee-loop-a.md <<'EOF'
 ---
 id: 20261104-eeee
@@ -3091,6 +3135,57 @@ created: 2026-11-04
 x
 EOF
 t "blocked-by 裸日期串被 validate 点名不存在（不做环键透传）" 1 "check.sh validate docs/tickets/20261104-bare-date.md" "不存在"
+wfile docs/needs/0001-cycle-need.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-11-04
+---
+# 环检测夹具需求
+
+## 背景与业务目标
+x
+
+## 干系人与用户
+买家
+
+## 系统能力需求
+- FR-1 支持 x
+
+## 场景
+- Given x When x Then x
+
+## 假设与风险
+- x
+
+## 范围与非目标
+x
+
+## 开放问题
+无
+EOF
+wfile docs/reviews/0001-prefix-review.md <<'EOF'
+---
+id: 0001
+status: approved
+tickets: [20261104-3f4a]
+branch: feat/prefix-loop
+created: 2026-11-04
+---
+# 0001: 谱系前缀评审
+
+## 标准轴 findings
+- 无
+
+## Spec 轴 findings
+- 无
+
+## 汇总
+无阻断
+EOF
+setfm docs/specs/0001-cycle.md status done
+t "done spec 清扫扫描经 ID 段匹配把前缀工单的评审计入残留" 1 "check.sh validate docs/specs/0001-cycle.md" "docs/reviews/0001-prefix-review.md"
+setfm docs/specs/0001-cycle.md status approved
 
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
