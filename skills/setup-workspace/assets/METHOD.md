@@ -106,7 +106,8 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 |---|---|---|
 | `phase` | 扫全部产物 frontmatter，输出全库状态总览（含轮次） | /sdlc、人 |
 | `frontier` | 列出阻塞已清、可开工的工单 | dev-implement 入口 |
-| `ticket NNNN` | 入口校验：工单 ready（或 in-progress 重入）、阻塞已清、spec approved | dev-implement 入口 |
+| `claim <type> <slug> [父类型 父ID]` | 原子取号：生成 YYYYMMDD-4hex 候选号、排他创建占位、撞号与历史号重掷，返回产物文件名（父为知识档自动带谱系前缀） | 各产物技能取号入口 |
+| `ticket NNNN 或 YYYYMMDD-4hex` | 入口校验：工单 ready（或 in-progress 重入）、阻塞已清、spec approved | dev-implement 入口 |
 | `all` | 全量 lint / typecheck / test（按 config.sh，经 RUN_PREFIX 包裹）；未定义任何检查命令时响亮警告并视为发现（不静默跳过） | dev-implement 出口、dev-ship、dev-accept |
 | `validate <file>` | 模板完整性：必填节、frontmatter、id 与文件名、FR 追溯（孤儿报错）、依赖无环、总览五节与 spec 引用校验、done spec 名下过程档残留扫描（未清扫即报错并逐个列出文件） | 各产物技能的出口门禁 |
 | `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单 in-progress/implemented，或带 `[trivial]`；Merge/Revert 信息头机械放行（合并/回退无工单可挂）（挂 git commit-msg hook） | git hook |
