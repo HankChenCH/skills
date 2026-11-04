@@ -723,6 +723,37 @@ t "RUN_PREFIX 包裹执行" 0 "check.sh all" "全量检查通过"
 echo "== publish =="
 t "local 适配器确认在盘" 0 "check.sh publish docs/adr/0001-local-tracker.md" "已在盘上"
 t "publish 缺文件拒绝" 1 "check.sh publish docs/adr/9999-nope.md" "找不到产物文件"
+echo "-- 适配器文件名校验：新旧双格式接受、畸形名拒绝（spec 0017 决策 7 / 票 0039）--"
+wfile docs/adr/20261104-b7c1-cache-note.md <<'EOF'
+---
+id: 20261104-b7c1
+status: accepted
+created: 2026-11-04
+---
+# 新格式产物投影样例
+EOF
+t "新格式文件名（时间戳 ID）publish 放行" 0 "check.sh publish docs/adr/20261104-b7c1-cache-note.md" "已在盘上"
+wfile docs/tickets/spec0001-20261104-d3f2-prefixed-slug.md <<'EOF'
+---
+id: 20261104-d3f2
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-04
+---
+# 谱系前缀产物投影样例
+EOF
+t "带谱系前缀的新格式文件名 publish 放行" 0 "check.sh publish docs/tickets/spec0001-20261104-d3f2-prefixed-slug.md" "已在盘上"
+wfile docs/adr/0001-Bad_Name.md <<'EOF'
+---
+id: 0001
+status: accepted
+created: 2026-11-04
+---
+# 畸形文件名样例（大写与下划线）
+EOF
+t "畸形文件名 publish 拒绝为调用错误（local）" 1 "check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER=.*/TRACKER=github/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 t "适配器未安装警告并放行" 0 "check.sh publish docs/adr/0001-local-tracker.md" "未安装"
 t "未安装警告附重装指引" 0 "check.sh publish docs/adr/0001-local-tracker.md" "setup-workspace"
@@ -768,6 +799,7 @@ t "github：gh 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PATH\
 t "github：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gh3.log\"" ""
 t "github：gh 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "gh 未安装"
 t "github：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+t "github：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== tracker 适配器 gitlab =="
@@ -805,6 +837,7 @@ t "gitlab：glab 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PAT
 t "gitlab：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gl3.log\"" ""
 t "gitlab：glab 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "glab 未安装"
 t "gitlab：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+t "gitlab：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== tracker 适配器 codeup =="
@@ -834,6 +867,7 @@ t "codeup 幂等：二次 publish 仅追加评论" 0 "$CU_ENV PATH=\"$TMP/fakebi
 t "codeup 幂等：评论端点被调用" 0 "grep -q 'workitems/comment' \"$TMP/cu2.log\"" ""
 t "codeup 幂等：无第二次创建调用" 0 "! grep -q 'workitem -H' \"$TMP/cu2.log\"" ""
 t "codeup 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/codeup.map\")\" -eq 1 ]" ""
+t "codeup：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== spec done 残留扫描（清扫门禁）=="
