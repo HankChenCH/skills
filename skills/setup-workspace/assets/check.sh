@@ -608,12 +608,12 @@ cmd_publish() {
 # 撞号重掷随机段重试 → 返回最终产物文件名（仓库相对路径，占位由调用会话写正文覆盖）。
 # 父为知识档（need/spec/design/adr/research）必带谱系前缀 <父类型><父ID>-；父为过程档不带。
 cmd_claim() {
-  [ $# -ge 2 ] || die "用法：check.sh claim <type> <slug> [父类型 父ID]"
+  [ $# -eq 2 ] || [ $# -eq 4 ] || die "用法：check.sh claim <type> <slug> [父类型 父ID]"
   local type="$1" slug="$2" prefix="" ptype pid pfile dir path id hexseg attempt dup g
   dir="$(dir_of_type "$type")" || die "未知产物类型：${type}（须为九类产物之一）"
   printf '%s\n' "$slug" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
     || die "slug 非法（限 ASCII 小写/数字/短横线）：$slug"
-  if [ $# -ge 4 ]; then
+  if [ $# -eq 4 ]; then
     ptype="$3"; pid="$4"
     dir_of_type "$ptype" >/dev/null || die "未知父产物类型：${ptype}（须为九类产物之一）"
     pfile="$(artifact_file "$ptype" "$pid")" || die "父产物 $ptype $pid 不存在（docs/）"
@@ -630,6 +630,10 @@ cmd_claim() {
     path="$DOCS/$dir/${prefix}${id}-${slug}.md"
     # 唯一键是 ID 段而非全路径：同目录已有同 ID 产物（任意 slug、任意前缀位置）即重掷
     if [ -n "$(id_hits "$DOCS/$dir" "$id")" ]; then continue; fi
+    # 历史号不复用（spec 0017 FR-1 场景 1）：tracker map 持久记录被清扫产物的路径
+    # （含其 ID 段），git 历史引用为第二来源；同类同 ID 任一来源命中即重掷
+    grep -Eq -- "^docs/$dir/.*$id" "$SDL"/trackers/*.map 2>/dev/null && continue
+    [ -n "$(git log --fixed-strings --format=%h --grep="$id" -1 2>/dev/null)" ] && continue
     if ( set -C; : > "$path" ) 2>/dev/null; then
       # 并发同掷核验：创建后同 ID 异文件在场即删自身重掷（互见者让位，恒至一者存活）
       dup=0
