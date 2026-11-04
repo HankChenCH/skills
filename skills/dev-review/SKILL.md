@@ -68,8 +68,11 @@ description: 对当前分支上已实现的工单做双轴代码评审——标�
 
 ## 4. 出口门禁（全部通过才算完）
 
-1. 写评审报告 `docs/reviews/NNNN-slug.md`（编号取 reviews 内最大号 +1，模板见下），
-   运行 `.sdlc/check.sh validate` 必须通过。
+1. 运行 `.sdlc/check.sh claim review <slug>` 取号（slug 用 ASCII 小写短横线）——
+   返回占位文件路径，号由入口原子分配、全历史唯一；评审覆盖的是工单集合（父为
+   过程档），文件名不带谱系前缀。写评审报告正文覆盖占位文件（模板见下，
+   frontmatter `id` 填文件名的 ID 段），运行 `.sdlc/check.sh validate <占位路径>`
+   必须通过。
 2. **各轴阻断均为零** → 报告 `status: approved`，然后按模式分岔：
    - **单票模式**：**立即用 Skill 工具调用 dev-ship** 准备 PR——评审通过不需要
      用户批准，合并才需要。dev-ship 未安装 → 停下说明，建议先完成 setup-workspace
@@ -89,13 +92,13 @@ description: 对当前分支上已实现的工单做双轴代码评审——标�
 
 ```markdown
 ---
-id: 0001
+id: <ID 段，YYYYMMDD-4hex>
 status: draft
 tickets: [0007, 0008]      # 声明覆盖面，pre-push 依据它校验
 branch: feat/checkout
 created: <date>
 ---
-# 0001: <一句话概括评审对象>
+# <ID 段>: <一句话概括评审对象>
 
 ## 标准轴 findings
 - [<文件:行>] <怎么改> —— <为什么>（阻断|建议）

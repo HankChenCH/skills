@@ -37,14 +37,17 @@ description: 把 need 或对话中的需求整理成 docs/specs/ 的规格文档
 ## 3. 起草纪律
 
 - **探索先行**：动笔前探索代码库，摸清现状与方案的落点；写进 spec 的是结论，不是漫游记录。
-- **固定模板**：一律用下面的模板落盘 `docs/specs/NNNN-slug.md`
-  （id = 目录内最大号 +1，slug 用 ASCII 小写短横线）：
+- **固定模板**：一律用下面的模板落盘。先运行 `.sdlc/check.sh claim spec <slug>
+  [need <need-ID>]` 取号（slug 用 ASCII 小写短横线）——返回占位文件路径，号由入口
+  原子分配、全历史唯一；有对应 need 时带父参数，文件名自动带 `need<父ID>-` 谱系前缀，
+  对话综合无 need 时不带。用模板写正文覆盖占位文件（frontmatter `id` 填文件名的
+  ID 段）：
 
 ```markdown
 ---
-id: 0001
+id: <ID 段，YYYYMMDD-4hex>
 status: draft
-need: 0003          # 可选
+need: 0003          # 可选；填了则取号带 need 父参数
 round: 1
 created: <date>
 ---
@@ -72,11 +75,11 @@ created: <date>
 
 ## 4. 出口门禁（全部通过才算完）
 
-1. 运行 `.sdlc/check.sh validate docs/specs/NNNN-slug.md`，必须通过；不过 → 修复后重跑。
+1. 运行 `.sdlc/check.sh validate <取号返回的路径>`，必须通过；不过 → 修复后重跑。
 2. 向用户完整念一遍：问题陈述、方案、本轮范围、验收场景清单，请求批准。
    **批准是决策点，必须用户显式确认**，不接受沉默或"都行"。要改 → 回 §3，改完重走本节。
 3. 批准 → frontmatter `status` 改 `approved`、追加 `approved: <今日>`，
-   运行 `.sdlc/check.sh publish docs/specs/NNNN-slug.md`。
+   运行 `.sdlc/check.sh publish <取号返回的路径>`。
 4. **含界面交付的建议（只建议不强制）**：spec 的用户故事或验收场景提及
    界面、页面、原型 → 建议用户"先述标再拆票"：走 /design-brief 链（design-brief →
    design-baseline → design-ui → design-deliver）产出述标说明与可评审的界面原型，

@@ -32,18 +32,20 @@ design 全文（若有）→ 名下全部工单（做什么 / 改动面 / 验收
 
 ## 3. 合成纪律
 
-- **落盘** `docs/overviews/NNNN-slug.md`：id = overviews 目录内最大号 + 1（目录内独立递增），
-  slug 用 ASCII 小写短横线；frontmatter 固定 `id` `spec` `status: draft` `created`。
-  五节模板内嵌如下，节序固定：
+- **落盘**：运行 `.sdlc/check.sh claim overview <slug> spec <spec-ID>` 取号——返回
+  `docs/overviews/` 下的占位文件路径，号由入口原子分配、全历史唯一，父为 spec
+  （知识档）自动带 `spec<父ID>-` 谱系前缀；slug 用 ASCII 小写短横线。用五节模板
+  写正文覆盖占位文件（frontmatter 固定 `id`（填文件名的 ID 段）`spec` `status: draft`
+  `created`）。五节模板内嵌如下，节序固定：
 
 ```markdown
 ---
-id: 0007
+id: <ID 段，YYYYMMDD-4hex>
 spec: 0003
 status: draft
 created: <date>
 ---
-# 0007: <标题>
+# <ID 段>: <标题>
 
 ## 全景一行
 一句话说清功能形态与交付切分。（来源：spec NNNN 方案；need NNNN FR 覆盖面）
