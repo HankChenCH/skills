@@ -37,6 +37,11 @@ ADR → GLOSSARY.md → CODING_STANDARDS.md。
 再用 Skill 工具装载三个参考：ref-implementation、ref-testing、ref-git-commit；
 写测试前重读 ref-testing，写哪类测试再按其场景路由表读取对应细则，一次只载一个。
 
+工单含界面实现（验收标准或正文提及界面、页面、原型）→ 追加两步装载：读
+docs/standards/ 设计基线分册（design-<platform>.md，按工单对象平台取册），
+再用 Skill 工具装载 design-ui 原则。无基线分册或 design-ui 未安装 → 照常实现，
+在 Progress 注明缺了哪样，不阻断。
+
 然后用三五句话向用户复述：这张工单交付什么、验收标准是哪几条、打算动哪些模块。
 有偏差，用户此刻纠正的成本最低。
 
