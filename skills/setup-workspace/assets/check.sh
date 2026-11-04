@@ -477,7 +477,8 @@ commit_refs() { # [MSGFILE]，缺省读 stdin -> 工单号（旧补零四位 / �
       line=substr(line, RSTART+RLENGTH)
     }
   }' "$src" | sort -u | while IFS= read -r r; do
-    key="$(ref_key "$r")" || continue
+    # 规整失败的引用原样出列：交由下游「工单不存在」分支显式点名，不静默蒸发
+    key="$(ref_key "$r")" || { printf '%s\n' "$r"; continue; }
     printf '%s\n' "$key"
   done
 }

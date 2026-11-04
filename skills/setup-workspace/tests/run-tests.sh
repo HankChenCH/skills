@@ -674,6 +674,9 @@ t "[#0002]（implemented）通过" 0 "printf '[#0002] c\n\nbody\n' > /tmp/msg.tx
 t "[trivial] 豁免通过" 0 "printf '[trivial] typo\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "豁免"
 t "无标记拒绝" 1 "printf 'no tag here\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "[#NNNN]"
 t "引用不存在的工单拒绝" 1 "printf '[#9999] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "不存在"
+t "混合消息中形态非法引用显式点名，不被好引用掩盖" 1 "printf '[#99999] [#0002] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "99999 不存在"
+t "单发形态非法引用报工单不存在，不失实报无标记" 1 "printf '[#99999] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "99999 不存在"
+t "混合消息中 5 位 hex 引用显式点名" 1 "printf '[#20261104-b7c11] [#0002] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "20261104-b7c11 不存在"
 t "引用 ready 工单拒绝" 1 "printf '[#1] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "ready"
 t "多位引用混合法" 0 "sed -i.bak 's/^status: ready/status: in-progress/' docs/tickets/0001-cart-checkout.md && rm -f docs/tickets/0001-cart-checkout.md.bak && printf '[#0001][#0002] both\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "门禁通过"
 setfm docs/tickets/0001-cart-checkout.md status ready
@@ -2728,7 +2731,7 @@ t "新格式引用精确定位（点名 hex 段，不误取同日期异段工单
 t "新格式引用带 slug 尾同样定位" 0 "check.sh ticket 20261104-b7c1-beta" "重入"
 t "旧格式四位引用定位仍命中（在途旧票不断链）" 0 "check.sh ticket 0023" "重入"
 t "5 位 hex 的非法引用被拒，不截段命中错误工单" 1 "check.sh ticket 20261104-b7c11" "工单号必须是"
-t "commit-msg 5 位 hex 引用被拒，不借截段拿错误工单过门" 1 "printf '[#20261104-b7c11] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "既无"
+t "commit-msg 5 位 hex 引用被拒，不借截段拿错误工单过门" 1 "printf '[#20261104-b7c11] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "20261104-b7c11 不存在"
 t "不存在的 hex 段引用拒绝" 1 "check.sh ticket 20261104-c0de" "不存在"
 t "裸日期串（缺 hex 段）不走旧路径误配" 1 "check.sh ticket 20261104" "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex"
 t "新格式无前缀文件名过 validate" 0 "check.sh validate docs/tickets/20261104-b7c1-beta.md" "通过（ticket）"
