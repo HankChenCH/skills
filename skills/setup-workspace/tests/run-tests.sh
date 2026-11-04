@@ -2989,6 +2989,21 @@ EOF
 t "父产物 frontmatter id 缺失时取号报错" 1 "check.sh claim ticket no-parent-probe spec 0012" "缺失或非法"
 t "父产物 frontmatter id 非法时取号报错" 1 "check.sh claim ticket bad-parent-probe spec 0013" "缺失或非法"
 
+echo "== claim 支持 retro 类型（轻产物纳入取号机制，spec 0017，票 0041）=="
+t "claim retro 返回 docs/retros/ 新格式文件名且占位落盘" 0 "out=\$(check.sh claim retro session-42); echo \"\$out\" | grep -qE '^docs/retros/[0-9]{8}-[0-9a-f]{4}-session-42\\.md\$' && [ -f \"\$out\" ]" ""
+mkdir -p "$TMP/docs/retros"
+: > "$TMP/docs/retros/$(date +%Y%m%d)-b7c1-retro-collide.md"
+printf 'b7c1\na1f2\n' > "$TMP/odseq-r1"
+t "retro 候选号占位已存在时重掷随机段返回新号（FR-2 撞号重掷与既有 claim 一致）" 0 "CLAIM_OD_SEQ=\"$TMP/odseq-r1\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim retro retro-collide | grep -qE '^docs/retros/[0-9]{8}-a1f2-retro-collide\\.md\$'" ""
+t "retro 并发六路取号各得两两互异的号（FR-2 零协调与既有 claim 一致）" 0 "for i in 1 2 3 4 5 6; do check.sh claim retro retro-fan >\"rfan\$i.out\" & done; wait; [ \"\$(cat rfan1.out rfan2.out rfan3.out rfan4.out rfan5.out rfan6.out | sort -u | wc -l | tr -d ' ')\" = 6 ] && [ \"\$(cat rfan1.out rfan2.out rfan3.out rfan4.out rfan5.out rfan6.out | wc -l | tr -d ' ')\" = 6 ]" ""
+wfile docs/retros/0001-naked-retro.md <<'EOF'
+# 复盘草稿
+
+没有 frontmatter，也没有任何门禁模板节。
+EOF
+t "validate 对 docs/retros/ 报无法识别产物类型（不受理即不进状态机）" 1 "check.sh validate docs/retros/0001-naked-retro.md" "无法识别产物类型"
+tn "retros 文件不触发产物模板校验（无 frontmatter 与必填节报错）" 1 "check.sh validate docs/retros/0001-naked-retro.md" "缺 frontmatter"
+
 echo "== 新格式依赖环检测（票 0038 评审核销）=="
 new_repo
 wfile docs/specs/0001-cycle.md <<'EOF'
