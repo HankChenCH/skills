@@ -1,9 +1,10 @@
 ---
 id: 0016
-status: approved
+status: done
 round: 1
 created: 2026-11-04
 approved: 2026-11-04
+done: 2026-11-04
 ---
 # dev-review 评审轴清单制：每轴恰一个独立子代理
 
