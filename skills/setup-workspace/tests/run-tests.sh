@@ -2729,6 +2729,73 @@ t "新格式引用带 slug 尾同样定位" 0 "check.sh ticket 20261104-b7c1-bet
 t "旧格式四位引用定位仍命中（在途旧票不断链）" 0 "check.sh ticket 0023" "重入"
 t "不存在的 hex 段引用拒绝" 1 "check.sh ticket 20261104-c0de" "不存在"
 t "裸日期串（缺 hex 段）不走旧路径误配" 1 "check.sh ticket 20261104" "不存在"
+t "新格式无前缀文件名过 validate" 0 "check.sh validate docs/tickets/20261104-b7c1-beta.md" "通过（ticket）"
+wfile docs/tickets/spec0002-20261104-a1b2-derived.md <<'EOF'
+---
+id: 20261104-a1b2
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# spec0002-20261104-a1b2-derived: 谱系前缀夹具工单
+
+**做什么：** 父 spec 0002 派生（谱系前缀文件名夹具）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+t "谱系前缀文件名过 validate（id 与文件名 ID 段一致）" 0 "check.sh validate docs/tickets/spec0002-20261104-a1b2-derived.md" "通过（ticket）"
+wfile docs/tickets/20261104-c3d4-wrong-id.md <<'EOF'
+---
+id: 20261104-ffff
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-c3d4-wrong-id: id 错位夹具
+
+**做什么：** frontmatter id 与文件名 ID 段不一致
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+x
+EOF
+t "id 与文件名 ID 段不一致拒绝" 1 "check.sh validate docs/tickets/20261104-c3d4-wrong-id.md" "前缀不一致"
+wfile docs/tickets/20261104-e5f6-Bad_Slug.md <<'EOF'
+---
+id: 20261104-e5f6
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-e5f6-Bad_Slug: 坏 slug 夹具
+
+**做什么：** 新格式文件名 slug 非法
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+x
+EOF
+t "新格式文件名 slug 非法拒绝" 1 "check.sh validate docs/tickets/20261104-e5f6-Bad_Slug.md" "slug 限"
 
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."

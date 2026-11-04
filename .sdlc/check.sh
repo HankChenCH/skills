@@ -178,6 +178,26 @@ artifact_file() {
   return 1
 }
 
+# artifact_name_id BASE：解析产物文件名 → 输出「ID段」或「谱系前缀 ID段」（前缀形如
+# <父类型><父ID>，spec 0017 决策 1/4）；识别顺序：带前缀新格式、无前缀新格式、旧四位格式。
+# 不识别返回 1（输出空）。frontmatter id 必须与输出的 ID 段一致。
+artifact_name_id() {
+  local b="${1%.md}"
+  if printf '%s\n' "$b" | grep -qE '^(need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$'; then
+    printf '%s\n' "$b" | sed -E 's/^(need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-([0-9]{8}-[0-9a-f]{4})-.*/\1\2 \3/'
+    return 0
+  fi
+  if printf '%s\n' "$b" | grep -qE '^([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$'; then
+    printf '%s\n' "${b:0:13}"
+    return 0
+  fi
+  if printf '%s\n' "$b" | grep -qE '^[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*$'; then
+    printf '%s\n' "${b%%-*}"
+    return 0
+  fi
+  return 1
+}
+
 title_of() { head -n 30 "$1" | grep -m1 '^# ' | sed 's/^#[[:space:]]*//'; }
 
 # 依赖环检测：读全部工单的 blocked-by 建图，输出 "CYCLE a -> b -> a" 或无输出
@@ -595,18 +615,29 @@ cmd_validate() {
   type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 九个产物目录内）：$file"
   local ERRORS=0
   err() { echo "  ✗ $*"; ERRORS=$((ERRORS+1)); }
-  local base id status pad spec_id need_id need_file frs covered missing round dep t any residue r
+  local base id status spec_id need_id need_file frs covered missing round dep t any residue r
   base="$(basename "$file")"
 
-  # --- 通用：frontmatter、id、文件名、状态 ---
+  # --- 通用：frontmatter、id、文件名、状态（id 与文件名双格式，spec 0017 决策 1）---
   fm_open "$file"    || err "缺 frontmatter（首行须为 ---）"
   fm_closed "$file"  || err "frontmatter 未闭合（缺第二个 ---）"
   id="$(fm_get "$file" id)"
-  case "$id" in ''|*[!0-9]*) err "frontmatter id 必须是四位数字：${id:-（空）}" ;; esac
-  pad="$(pad4 "$id" 2>/dev/null || echo 0000)"
-  case "$base" in "$pad"-*) ;; *) err "id 与文件名前缀不一致（应为 ${pad}-slug.md）：$base" ;; esac
-  echo "$base" | grep -qE '^[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*\.md$' \
-    || err "文件名不符合 NNNN-slug.md（slug 限 ASCII 小写/数字/短横线）：$base"
+  case "$id" in
+    [0-9][0-9][0-9][0-9]) ;;
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+    *) err "frontmatter id 必须是四位数字或 YYYYMMDD-4hex：${id:-（空）}" ;;
+  esac
+  local name_parse="" name_id="" name_prefix=""
+  name_parse="$(artifact_name_id "$base" 2>/dev/null)" || name_parse=""
+  if [ -z "$name_parse" ]; then
+    err "文件名不符合产物命名（NNNN-slug.md 或 [父类型父ID-]YYYYMMDD-4hex-slug.md，slug 限 ASCII 小写/数字/短横线）：$base"
+  else
+    # shellcheck disable=SC2086
+    set -- $name_parse
+    if [ $# -eq 2 ]; then name_prefix="$1"; name_id="$2"; else name_id="$1"; fi
+    [ "$name_id" = "$id" ] \
+      || err "id 与文件名前缀不一致（文件名 ID 段 ${name_id}，frontmatter id ${id}）：$base"
+  fi
   status="$(fm_get "$file" status)"
   if [ "$type" != research ]; then
     if [ -z "$status" ]; then
