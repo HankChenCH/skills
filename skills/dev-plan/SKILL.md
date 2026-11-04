@@ -57,19 +57,22 @@ docs/adr/ 中相关 ADR → GLOSSARY.md → 粗读改动将落到的代码区域
   改动面互斥，并行实现后合回不再常态冲突。相交对与所选处置并入既有"拆分粒度确认"
   （§4.1）一并向用户确认，不新增人工门；互斥不进门禁——validate 不受理票正文行，
   check.sh 零改动。
-- **固定模板**：确认后用下面的模板落盘 `docs/tickets/NNNN-slug.md`
-  （id = 目录内最大号 +1，type 一律 feature——fix 票出自 dev-fix，slug 用 ASCII 小写短横线）：
+- **固定模板**：确认后逐张运行 `.sdlc/check.sh claim ticket <slug> spec <spec-ID>`
+  取号落盘（type 一律 feature——fix 票出自 dev-fix；slug 用 ASCII 小写短横线）——
+  返回占位文件路径，号由入口原子分配、全历史唯一，父为 spec（知识档）自动带
+  `spec<父ID>-` 谱系前缀；用下面的模板写正文覆盖占位文件（frontmatter `id` 填
+  文件名的 ID 段）：
 
 ```markdown
 ---
-id: 0007
+id: <ID 段，YYYYMMDD-4hex>
 type: feature
 spec: 0001
 status: ready
 blocked-by: []
 created: <date>
 ---
-# 0007: <标题>
+# <ID 段>: <标题>
 
 **做什么：** 端到端行为（用户视角），非分层实现清单
 
@@ -90,9 +93,9 @@ created: <date>
    标题、覆盖哪些 FR、改动面、blocked-by 谁；同层改动面相交的票注明三选一处置），
    末尾单列集成级场景清单与默认建议，请求确认。
    要改 → 回 §3 改完重展；确认前一张票都不落盘。
-2. 确认后逐张落盘并运行 `.sdlc/check.sh validate docs/tickets/NNNN-slug.md`，
-   每张都必须通过；不过 → 修复后重跑。
-3. 逐张运行 `.sdlc/check.sh publish docs/tickets/NNNN-slug.md`。
+2. 确认后逐张取号落盘（§3 固定模板的 claim 步骤），每张运行
+   `.sdlc/check.sh validate <该票占位路径>`，都必须通过；不过 → 修复后重跑。
+3. 逐张运行 `.sdlc/check.sh publish <该票占位路径>`。
 4. 运行 `.sdlc/check.sh frontier` 并展示，抛出决策问题："从哪张开工？默认建议
    <最小编号>。"工单由用户点名，本技能不代挑、不自动开工。名下票 ≥2 的 spec，
    建议先 /dev-overview 走查再开工。

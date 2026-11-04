@@ -31,6 +31,11 @@ warn_skip() { echo "codeup: $*，投影跳过（产物已在盘上，docs/ 是�
 
 [ "$cmd" = "publish" ] || { echo "codeup: 未知子命令 ${cmd:-（空）}（支持 publish <file>）" >&2; exit 1; }
 [ -f "$file" ] || { echo "codeup: 找不到产物文件 ${file:-（空）}" >&2; exit 1; }
+# 文件名校验（spec 0017 决策 7）：投影只收产物名——旧四位或新时间戳 ID（可带谱系前缀），
+# 畸形名是调用错误 exit 1，不进投影与映射
+base="$(basename "$file")"
+printf '%s\n' "$base" | grep -qE '^((need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-[0-9]{8}-[0-9a-f]{4}|[0-9]{8}-[0-9a-f]{4}|[0-9]{4})-[a-z0-9]+(-[a-z0-9]+)*\.md$' \
+  || { echo "codeup: 文件名不符合产物命名（NNNN-slug.md 或 [父类型父ID-]YYYYMMDD-4hex-slug.md）：$base" >&2; exit 1; }
 [ -n "$TRACKER_REPO" ] || warn_skip "TRACKER_REPO 未配置（config.sh，格式 organizationId/spaceIdentifier）"
 case "$TRACKER_REPO" in
   */*/*) warn_skip "TRACKER_REPO 应为 organizationId/spaceIdentifier（至多一个 /）：$TRACKER_REPO" ;;

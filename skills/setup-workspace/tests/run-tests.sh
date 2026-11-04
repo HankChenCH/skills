@@ -674,6 +674,9 @@ t "[#0002]（implemented）通过" 0 "printf '[#0002] c\n\nbody\n' > /tmp/msg.tx
 t "[trivial] 豁免通过" 0 "printf '[trivial] typo\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "豁免"
 t "无标记拒绝" 1 "printf 'no tag here\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "[#NNNN]"
 t "引用不存在的工单拒绝" 1 "printf '[#9999] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "不存在"
+t "混合消息中形态非法引用显式点名，不被好引用掩盖" 1 "printf '[#99999] [#0002] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "99999 不存在"
+t "单发形态非法引用报工单不存在，不失实报无标记" 1 "printf '[#99999] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "99999 不存在"
+t "混合消息中 5 位 hex 引用显式点名" 1 "printf '[#20261104-b7c11] [#0002] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "20261104-b7c11 不存在"
 t "引用 ready 工单拒绝" 1 "printf '[#1] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "ready"
 t "多位引用混合法" 0 "sed -i.bak 's/^status: ready/status: in-progress/' docs/tickets/0001-cart-checkout.md && rm -f docs/tickets/0001-cart-checkout.md.bak && printf '[#0001][#0002] both\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "门禁通过"
 setfm docs/tickets/0001-cart-checkout.md status ready
@@ -720,6 +723,37 @@ t "RUN_PREFIX 包裹执行" 0 "check.sh all" "全量检查通过"
 echo "== publish =="
 t "local 适配器确认在盘" 0 "check.sh publish docs/adr/0001-local-tracker.md" "已在盘上"
 t "publish 缺文件拒绝" 1 "check.sh publish docs/adr/9999-nope.md" "找不到产物文件"
+echo "-- 适配器文件名校验：新旧双格式接受、畸形名拒绝（spec 0017 决策 7 / 票 0039）--"
+wfile docs/adr/20261104-b7c1-cache-note.md <<'EOF'
+---
+id: 20261104-b7c1
+status: accepted
+created: 2026-11-04
+---
+# 新格式产物投影样例
+EOF
+t "新格式文件名（时间戳 ID）publish 放行" 0 "check.sh publish docs/adr/20261104-b7c1-cache-note.md" "已在盘上"
+wfile docs/tickets/spec0001-20261104-d3f2-prefixed-slug.md <<'EOF'
+---
+id: 20261104-d3f2
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-04
+---
+# 谱系前缀产物投影样例
+EOF
+t "带谱系前缀的新格式文件名 publish 放行" 0 "check.sh publish docs/tickets/spec0001-20261104-d3f2-prefixed-slug.md" "已在盘上"
+wfile docs/adr/0001-Bad_Name.md <<'EOF'
+---
+id: 0001
+status: accepted
+created: 2026-11-04
+---
+# 畸形文件名样例（大写与下划线）
+EOF
+t "畸形文件名 publish 拒绝为调用错误（local）" 1 "check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER=.*/TRACKER=github/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 t "适配器未安装警告并放行" 0 "check.sh publish docs/adr/0001-local-tracker.md" "未安装"
 t "未安装警告附重装指引" 0 "check.sh publish docs/adr/0001-local-tracker.md" "setup-workspace"
@@ -765,6 +799,7 @@ t "github：gh 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PATH\
 t "github：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gh3.log\"" ""
 t "github：gh 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "gh 未安装"
 t "github：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+t "github：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== tracker 适配器 gitlab =="
@@ -802,6 +837,7 @@ t "gitlab：glab 未认证警告跳过且零创建" 0 "PATH=\"$TMP/fakebin:\$PAT
 t "gitlab：未认证路径无 create 调用" 0 "! grep -q 'issue create' \"$TMP/gl3.log\"" ""
 t "gitlab：glab 缺失警告跳过" 0 "PATH=\"$TMP/.sdlc:/usr/bin:/bin\" check.sh publish docs/adr/0001-local-tracker.md" "glab 未安装"
 t "gitlab：TRACKER_REPO 缺失警告跳过" 0 "sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO=\"\"/' \"$TMP/.sdlc/config.sh\" && rm -f \"$TMP/.sdlc/config.sh.bak\" && PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-local-tracker.md" "TRACKER_REPO"
+t "gitlab：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== tracker 适配器 codeup =="
@@ -831,6 +867,7 @@ t "codeup 幂等：二次 publish 仅追加评论" 0 "$CU_ENV PATH=\"$TMP/fakebi
 t "codeup 幂等：评论端点被调用" 0 "grep -q 'workitems/comment' \"$TMP/cu2.log\"" ""
 t "codeup 幂等：无第二次创建调用" 0 "! grep -q 'workitem -H' \"$TMP/cu2.log\"" ""
 t "codeup 幂等：映射仍一行" 0 "[ \"\$(wc -l < \"$TMP/.sdlc/trackers/codeup.map\")\" -eq 1 ]" ""
+t "codeup：畸形文件名拒绝为调用错误，不投影" 1 "PATH=\"$TMP/fakebin:\$PATH\" check.sh publish docs/adr/0001-Bad_Name.md" "文件名不符合产物命名"
 sed -i.bak 's/^TRACKER_REPO=.*/TRACKER_REPO="acme\/widget"/; s/^TRACKER=.*/TRACKER=local/' "$TMP/.sdlc/config.sh" && rm -f "$TMP/.sdlc/config.sh.bak"
 
 echo "== spec done 残留扫描（清扫门禁）=="
@@ -2599,11 +2636,653 @@ created: 2026-10-29
 EOF
 t "多行 repos 拒绝（单行字段形态，先例 blocked-by）" 1 "check.sh validate docs/tickets/0002-multiline-repos.md" "repos 须单行"
 
+echo "== 双格式产物定位与开工门禁（spec 0017，票 0038）=="
+new_repo
+wfile docs/specs/0002-dual.md <<'EOF'
+---
+id: 0002
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 双格式定位夹具规格
+
+## 问题陈述
+x
+
+## 方案
+x
+
+## 用户故事
+- 作为买家
+
+## 实现决策
+x
+
+## 测试决策
+x
+
+## 验收场景
+- [FR-1 | 工单级] Given x When x Then x
+
+## 非目标
+x
+
+## 备注
+x
+EOF
+wfile docs/overviews/0001-dual-overview.md <<'EOF'
+---
+id: 0001
+spec: 0002
+status: reviewed
+created: 2026-11-04
+---
+# 0001: 双格式定位总览
+
+## 全景一行
+x（来源：spec 0002 方案）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | x | ticket 0023 |
+
+## 黄金场景走查
+x（剧本：spec 0002 验收场景 FR-1）
+
+## 样张
+CLI 输出样例：x
+
+## 差距清单
+- 无
+EOF
+wfile docs/tickets/0023-legacy-inflight.md <<'EOF'
+---
+id: 0023
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 0023: 旧格式在途工单
+
+**做什么：** 在途旧格式票（过渡期不断链夹具）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+wfile docs/tickets/20261104-9f2e-alpha.md <<'EOF'
+---
+id: 20261104-9f2e
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-9f2e-alpha: 同日期异段工单一
+
+**做什么：** 新格式定位判别夹具（hex 段 9f2e）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+wfile docs/tickets/20261104-b7c1-beta.md <<'EOF'
+---
+id: 20261104-b7c1
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-b7c1-beta: 同日期异段工单二
+
+**做什么：** 新格式定位判别夹具（hex 段 b7c1）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+t "新格式引用精确定位（点名 hex 段，不误取同日期异段工单）" 0 "check.sh ticket 20261104-b7c1" "20261104-b7c1"
+t "新格式引用带 slug 尾同样定位" 0 "check.sh ticket 20261104-b7c1-beta" "重入"
+t "旧格式四位引用定位仍命中（在途旧票不断链）" 0 "check.sh ticket 0023" "重入"
+t "5 位 hex 的非法引用被拒，不截段命中错误工单" 1 "check.sh ticket 20261104-b7c11" "工单号必须是"
+t "commit-msg 5 位 hex 引用被拒，不借截段拿错误工单过门" 1 "printf '[#20261104-b7c11] x\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "20261104-b7c11 不存在"
+t "不存在的 hex 段引用拒绝" 1 "check.sh ticket 20261104-c0de" "不存在"
+t "裸日期串（缺 hex 段）不走旧路径误配" 1 "check.sh ticket 20261104" "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex"
+t "新格式无前缀文件名过 validate" 0 "check.sh validate docs/tickets/20261104-b7c1-beta.md" "通过（ticket）"
+wfile docs/tickets/spec0002-20261104-a1b2-derived.md <<'EOF'
+---
+id: 20261104-a1b2
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# spec0002-20261104-a1b2-derived: 谱系前缀夹具工单
+
+**做什么：** 父 spec 0002 派生（谱系前缀文件名夹具）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+t "谱系前缀文件名过 validate（id 与文件名 ID 段一致）" 0 "check.sh validate docs/tickets/spec0002-20261104-a1b2-derived.md" "通过（ticket）"
+wfile docs/tickets/20261104-c3d4-wrong-id.md <<'EOF'
+---
+id: 20261104-ffff
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-c3d4-wrong-id: id 错位夹具
+
+**做什么：** frontmatter id 与文件名 ID 段不一致
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+x
+EOF
+t "id 与文件名 ID 段不一致拒绝" 1 "check.sh validate docs/tickets/20261104-c3d4-wrong-id.md" "前缀不一致"
+wfile docs/tickets/20261104-e5f6-Bad_Slug.md <<'EOF'
+---
+id: 20261104-e5f6
+type: feature
+spec: 0002
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-e5f6-Bad_Slug: 坏 slug 夹具
+
+**做什么：** 新格式文件名 slug 非法
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+x
+EOF
+t "新格式文件名 slug 非法拒绝" 1 "check.sh validate docs/tickets/20261104-e5f6-Bad_Slug.md" "slug 限"
+t "commit-msg 新格式引用放行在途工单" 0 "printf '[#20261104-b7c1] dual gate\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "门禁通过"
+t "commit-msg 旧格式引用放行在途旧票（在途不断链）" 0 "printf '[#0023] legacy inflight\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "门禁通过"
+t "commit-msg 新格式 ready 票拒绝（状态校验逻辑不变）" 1 "sed -i.bak 's/^status: in-progress/status: ready/' docs/tickets/20261104-b7c1-beta.md && rm -f docs/tickets/20261104-b7c1-beta.md.bak && printf '[#20261104-b7c1] wip\n' > /tmp/msg.txt && check.sh commit-msg /tmp/msg.txt" "还是 ready"
+setfm docs/tickets/20261104-b7c1-beta.md status in-progress
+setfm docs/tickets/20261104-b7c1-beta.md status implemented
+setfm docs/tickets/0023-legacy-inflight.md status implemented
+t "pre-push 新旧双格式引用的 implemented 工单须 approved 评审覆盖" 1 "git checkout -q -b feat/dual && git add -A && git commit -qm '[#20261104-b7c1][#0023] dual pair' && check.sh pre-push" "评审覆盖"
+wfile docs/reviews/0001-dual-review.md <<'EOF'
+---
+id: 0001
+status: approved
+tickets: [0023, 20261104-b7c1]
+branch: feat/dual
+created: 2026-11-04
+---
+# 0001: 双格式评审
+
+## 标准轴 findings
+- 无
+
+## Spec 轴 findings
+- 无
+
+## 汇总
+无阻断
+EOF
+t "approved 评审声明双格式覆盖面后 pre-push 通过" 0 "git add -A && git commit -qm '[trivial] 评审夹具' && check.sh pre-push" "pre-push 门禁通过"
+
+echo "== 取号入口 claim（原子占号，spec 0017，票 0038）=="
+new_repo
+wfile docs/specs/0001-anchor.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 锚点规格
+
+## 问题陈述
+x
+
+## 方案
+x
+
+## 用户故事
+- 作为买家
+
+## 实现决策
+x
+
+## 测试决策
+x
+
+## 验收场景
+- [FR-1 | 工单级] Given x When x Then x
+
+## 非目标
+x
+
+## 备注
+x
+EOF
+wfile docs/tickets/0009-anchor-ticket.md <<'EOF'
+---
+id: 0009
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 0009: 锚点工单
+
+**做什么：** 过程档父产物夹具
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+printf 'docs/specs/0001-anchor.md\t41\thttps://github.com/acme/widget/issues/41\ndocs/tickets/0009-anchor-ticket.md\t87\thttps://github.com/acme/widget/issues/87\n' > "$TMP/.sdlc/trackers/github.map"
+t "父为 spec 的取号返回带谱系前缀文件名且占位落盘" 0 "out=\$(check.sh claim ticket dark-mode spec 0001); echo \"\$out\" | grep -qE '^docs/tickets/spec0001-[0-9]{8}-[0-9a-f]{4}-dark-mode\\.md\$' && [ -f \"\$out\" ]" ""
+t "父为工票的取号返回不带前缀文件名" 0 "out=\$(check.sh claim review notes ticket 0009); echo \"\$out\" | grep -qE '^docs/reviews/[0-9]{8}-[0-9a-f]{4}-notes\\.md\$'" ""
+t "无父参数取号返回无前缀文件名" 0 "out=\$(check.sh claim adr cache-note); echo \"\$out\" | grep -qE '^docs/adr/[0-9]{8}-[0-9a-f]{4}-cache-note\\.md\$'" ""
+t "号形如 YYYYMMDD-4hex（FR-1 格式契约）" 0 "out=\$(check.sh claim research gateway-probe); basename \"\$out\" .md | grep -qE '^[0-9]{8}-[0-9a-f]{4}-gateway-probe\$'" ""
+t "父产物不存在时取号报错" 1 "check.sh claim ticket dark-mode spec 9999" "不存在"
+t "父类型未知时取号报错" 1 "check.sh claim ticket dark-mode bogus 0001" "未知"
+t "slug 非法时取号报错" 1 "check.sh claim ticket Bad_Slug" "slug"
+t "产物类型未知时取号报错" 1 "check.sh claim bogus x" "未知"
+fake_cmd od <<'EOF'
+#!/bin/sh
+# 测试替身 od：从 CLAIM_OD_SEQ 逐行弹出随机段；耗尽后恒输出 dead
+seqfile="${CLAIM_OD_SEQ:-}"
+if [ -n "$seqfile" ] && [ -f "$seqfile" ]; then
+  n="$(sed -n '1p' "$seqfile")"
+  if [ -n "$n" ]; then
+    sed -i.bak 1d "$seqfile" && rm -f "$seqfile.bak"
+    printf '%s\n' "$n"
+    exit 0
+  fi
+fi
+printf 'dead\n'
+EOF
+mkdir -p "$TMP/docs/tickets"
+: > "$TMP/docs/tickets/$(date +%Y%m%d)-b7c1-parked-slug.md"
+printf 'b7c1\na1f2\n' > "$TMP/odseq"
+t "候选号占位已存在时重掷随机段返回新号（FR-2 撞号重试）" 0 "CLAIM_OD_SEQ=\"$TMP/odseq\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket parked-slug | grep -qE '^docs/tickets/[0-9]{8}-a1f2-parked-slug\\.md\$'" ""
+t "并发六路取号各得两两互异的号（FR-2 零协调）" 0 "for i in 1 2 3 4 5 6; do check.sh claim ticket fan-out >\"fan\$i.out\" & done; wait; [ \"\$(cat fan1.out fan2.out fan3.out fan4.out fan5.out fan6.out | sort -u | wc -l | tr -d ' ')\" = 6 ] && [ \"\$(cat fan1.out fan2.out fan3.out fan4.out fan5.out fan6.out | wc -l | tr -d ' ')\" = 6 ]" ""
+t "目录与 map 不变时两次取号互异且不入历史号（FR-1 非推导）" 0 "pre=\$(cksum docs/specs/0001-anchor.md docs/tickets/0009-anchor-ticket.md .sdlc/trackers/github.map | cksum); printf 'b7c1\na1f2\nc9d8\ne7f6\n' > \"$TMP/odseq2\"; c1=\$(CLAIM_OD_SEQ=\"$TMP/odseq2\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket probe-a); c2=\$(CLAIM_OD_SEQ=\"$TMP/odseq2\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket probe-b); post=\$(cksum docs/specs/0001-anchor.md docs/tickets/0009-anchor-ticket.md .sdlc/trackers/github.map | cksum); [ \"\$pre\" = \"\$post\" ] && [ \"\$c1\" != \"\$c2\" ] && ! grep -qF \"\$(basename \"\$c1\" .md | grep -oE '[0-9]{8}-[0-9a-f]{4}')\" .sdlc/trackers/github.map && ! grep -qF \"\$(basename \"\$c2\" .md | grep -oE '[0-9]{8}-[0-9a-f]{4}')\" .sdlc/trackers/github.map" ""
+printf 'a1b2\na1b2\nc3d4\n' > "$TMP/odseq3"
+t "同 ID 异 slug 取号重掷，两票 ID 段互异（FR-2 不限定同 slug）" 0 "a=\$(CLAIM_OD_SEQ=\"$TMP/odseq3\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket alpha); case \"\$a\" in *a1b2-alpha.md) ;; *) exit 9 ;; esac; b=\$(CLAIM_OD_SEQ=\"$TMP/odseq3\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket beta); case \"\$b\" in *c3d4-beta.md) ;; *) exit 8 ;; esac" ""
+printf 'd5e6\nd5e6\nf7a8\n' > "$TMP/odseq4"
+t "带前缀取号先占后，无前缀同掷重掷（ID 键跨前缀唯一）" 0 "p=\$(CLAIM_OD_SEQ=\"$TMP/odseq4\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket pre-anchored spec 0001); case \"\$p\" in docs/tickets/spec0001-*d5e6-pre-anchored.md) ;; *) exit 9 ;; esac; q=\$(CLAIM_OD_SEQ=\"$TMP/odseq4\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket solo-slug); case \"\$q\" in *f7a8-solo-slug.md) ;; *) exit 8 ;; esac" ""
+printf 'b9c8\nb9c8\nd7e6\n' > "$TMP/odseq5"
+t "无前缀取号先占后，带前缀同掷重掷（ID 键跨前缀唯一反向）" 0 "u=\$(CLAIM_OD_SEQ=\"$TMP/odseq5\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket solo-two); case \"\$u\" in docs/tickets/*b9c8-solo-two.md) ;; *) exit 9 ;; esac; v=\$(CLAIM_OD_SEQ=\"$TMP/odseq5\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket pre-two spec 0001); case \"\$v\" in docs/tickets/spec0001-*d7e6-pre-two.md) ;; *) exit 8 ;; esac" ""
+t "claim 三参数（漏父 ID）拒绝，不静默丢参按无父取号" 1 "check.sh claim ticket dark-mode spec" "用法"
+t "claim 五参数拒绝，不静默忽略多余参数" 1 "check.sh claim ticket dark-mode spec 0001 extra" "用法"
+printf "docs/tickets/$(date +%Y%m%d)-9a8b-swept-old.md\t141\thttps://github.com/acme/widget/issues/141\n" >> "$TMP/.sdlc/trackers/github.map"
+printf '9a8b\nc5d6\n' > "$TMP/odseq6"
+t "同日被清扫产物的历史 ID 不复用（map 持久行，FR-1 场景 1）" 0 "s=\$(CLAIM_OD_SEQ=\"$TMP/odseq6\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket swept-slug); case \"\$s\" in *c5d6-swept-slug.md) ;; *) exit 8 ;; esac" ""
+git -C "$TMP" add -A && git -C "$TMP" commit -qm "[#$(date +%Y%m%d)-7e2f] 历史引用夹具（产物已清扫，仅存于 git 历史）"
+printf '7e2f\na3c5\n' > "$TMP/odseq7"
+t "仅存于 git 历史引用的 ID 不复用（FR-1 git 历史来源）" 0 "w=\$(CLAIM_OD_SEQ=\"$TMP/odseq7\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim ticket git-hist); case \"\$w\" in *a3c5-git-hist.md) ;; *) exit 8 ;; esac" ""
+wfile docs/specs/0012-noid.md <<'EOF'
+---
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 无 id 夹具规格
+
+frontmatter 缺 id 字段
+EOF
+wfile docs/specs/0013-badid.md <<'EOF'
+---
+id: 0013-swept
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 坏 id 夹具规格
+
+frontmatter id 带尾段（非规整键不动点）
+EOF
+t "父产物 frontmatter id 缺失时取号报错" 1 "check.sh claim ticket no-parent-probe spec 0012" "缺失或非法"
+t "父产物 frontmatter id 非法时取号报错" 1 "check.sh claim ticket bad-parent-probe spec 0013" "缺失或非法"
+
+echo "== claim 支持 retro 类型（轻产物纳入取号机制，spec 0017，票 0041）=="
+t "claim retro 返回 docs/retros/ 新格式文件名且占位落盘" 0 "out=\$(check.sh claim retro session-42); echo \"\$out\" | grep -qE '^docs/retros/[0-9]{8}-[0-9a-f]{4}-session-42\\.md\$' && [ -f \"\$out\" ]" ""
+mkdir -p "$TMP/docs/retros"
+: > "$TMP/docs/retros/$(date +%Y%m%d)-b7c1-retro-collide.md"
+printf 'b7c1\na1f2\n' > "$TMP/odseq-r1"
+t "retro 候选号占位已存在时重掷随机段返回新号（FR-2 撞号重掷与既有 claim 一致）" 0 "CLAIM_OD_SEQ=\"$TMP/odseq-r1\" PATH=\"$TMP/fakebin:\$PATH\" check.sh claim retro retro-collide | grep -qE '^docs/retros/[0-9]{8}-a1f2-retro-collide\\.md\$'" ""
+t "retro 并发六路取号各得两两互异的号（FR-2 零协调与既有 claim 一致）" 0 "for i in 1 2 3 4 5 6; do check.sh claim retro retro-fan >\"rfan\$i.out\" & done; wait; [ \"\$(cat rfan1.out rfan2.out rfan3.out rfan4.out rfan5.out rfan6.out | sort -u | wc -l | tr -d ' ')\" = 6 ] && [ \"\$(cat rfan1.out rfan2.out rfan3.out rfan4.out rfan5.out rfan6.out | wc -l | tr -d ' ')\" = 6 ]" ""
+wfile docs/retros/0001-naked-retro.md <<'EOF'
+# 复盘草稿
+
+没有 frontmatter，也没有任何门禁模板节。
+EOF
+t "validate 对 docs/retros/ 报无法识别产物类型（不受理即不进状态机）" 1 "check.sh validate docs/retros/0001-naked-retro.md" "无法识别产物类型"
+tn "retros 文件不触发产物模板校验（无 frontmatter 与必填节报错）" 1 "check.sh validate docs/retros/0001-naked-retro.md" "缺 frontmatter"
+
+echo "== 新格式依赖环检测（票 0038 评审核销）=="
+new_repo
+wfile docs/specs/0001-cycle.md <<'EOF'
+---
+id: 0001
+status: approved
+need: 0001
+round: 1
+created: 2026-11-04
+---
+# 环检测夹具规格
+
+## 问题陈述
+x
+
+## 方案
+x
+
+## 用户故事
+- 作为买家
+
+## 实现决策
+x
+
+## 测试决策
+x
+
+## 验收场景
+- [FR-1 | 工单级] Given x When x Then x
+
+## 非目标
+x
+
+## 备注
+x
+EOF
+wfile docs/overviews/0001-cycle-overview.md <<'EOF'
+---
+id: 0001
+spec: 0001
+status: reviewed
+created: 2026-11-04
+---
+# 0001: 环检测总览
+
+## 全景一行
+x（来源：spec 0001 方案）
+
+## 全景矩阵
+| actor | FR | 场景 | 票号 |
+|---|---|---|---|
+| 买家 | FR-1 | x | ticket 20261104-cccc |
+
+## 黄金场景走查
+x（剧本：spec 0001 验收场景 FR-1）
+
+## 样张
+CLI 输出样例：x
+
+## 差距清单
+- 无
+EOF
+wfile docs/tickets/20261104-cccc-chain-c.md <<'EOF'
+---
+id: 20261104-cccc
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-dddd-chain-d]
+created: 2026-11-04
+---
+# 20261104-cccc-chain-c: 链式依赖上游
+
+**做什么：** 新格式链式依赖（无环正控夹具）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-dddd-chain-d
+
+## Progress
+实现中
+EOF
+wfile docs/tickets/20261104-dddd-chain-d.md <<'EOF'
+---
+id: 20261104-dddd
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-dddd-chain-d: 链式依赖下游
+
+**做什么：** 新格式链式依赖终点
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+实现中
+EOF
+t "新格式链式依赖无环时 validate 放行" 0 "check.sh validate docs/tickets/20261104-cccc-chain-c.md" "通过（ticket）"
+setfm docs/tickets/20261104-dddd-chain-d.md status implemented
+t "新格式链式依赖无环时 ticket 入口放行" 0 "check.sh ticket 20261104-cccc-chain-c" "重入"
+setfm docs/tickets/20261104-dddd-chain-d.md status in-progress
+wfile docs/tickets/spec0001-20261104-3f4a-loop-a.md <<'EOF'
+---
+id: 20261104-3f4a
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-5b6c]
+created: 2026-11-04
+---
+# spec0001-20261104-3f4a-loop-a: 谱系前缀环上工单 A
+
+**做什么：** 带前缀文件名互指环（A→B，此时全图唯一环，判别不被无前缀环掩盖）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-5b6c
+
+## Progress
+x
+EOF
+wfile docs/tickets/spec0001-20261104-5b6c-loop-b.md <<'EOF'
+---
+id: 20261104-5b6c
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-3f4a]
+created: 2026-11-04
+---
+# spec0001-20261104-5b6c-loop-b: 谱系前缀环上工单 B
+
+**做什么：** 带前缀文件名互指环（B→A）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-3f4a
+
+## Progress
+x
+EOF
+t "谱系前缀工单互指 blocked-by 时 validate 报环" 1 "check.sh validate docs/tickets/spec0001-20261104-3f4a-loop-a.md" "环"
+t "谱系前缀工单经裸 ID 定位后 ticket 同样报环" 1 "check.sh ticket 20261104-3f4a" "环"
+wfile docs/tickets/20261104-eeee-loop-a.md <<'EOF'
+---
+id: 20261104-eeee
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-ffff-loop-b]
+created: 2026-11-04
+---
+# 20261104-eeee-loop-a: 环上工单 A
+
+**做什么：** 同日新格式互指环（A→B）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-ffff-loop-b
+
+## Progress
+x
+EOF
+wfile docs/tickets/20261104-ffff-loop-b.md <<'EOF'
+---
+id: 20261104-ffff
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104-eeee-loop-a]
+created: 2026-11-04
+---
+# 20261104-ffff-loop-b: 环上工单 B
+
+**做什么：** 同日新格式互指环（B→A）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104-eeee-loop-a
+
+## Progress
+x
+EOF
+t "同日新格式工单互指 blocked-by 时 validate 报环" 1 "check.sh validate docs/tickets/20261104-eeee-loop-a.md" "环"
+t "同日新格式工单互指 blocked-by 时 ticket 拒绝开工" 1 "check.sh ticket 20261104-eeee-loop-a" "环"
+wfile docs/tickets/20261104-bare-date.md <<'EOF'
+---
+id: 20261104-aaaa
+type: feature
+spec: 0001
+status: in-progress
+blocked-by: [20261104]
+created: 2026-11-04
+---
+# 20261104-bare-date: 裸日期串引用
+
+**做什么：** blocked-by 写裸日期串（缺 hex 段的非法引用）
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 20261104
+
+## Progress
+x
+EOF
+t "blocked-by 裸日期串被 validate 点名不存在（不做环键透传）" 1 "check.sh validate docs/tickets/20261104-bare-date.md" "不存在"
+wfile docs/needs/0001-cycle-need.md <<'EOF'
+---
+id: 0001
+status: confirmed
+created: 2026-11-04
+---
+# 环检测夹具需求
+
+## 背景与业务目标
+x
+
+## 干系人与用户
+买家
+
+## 系统能力需求
+- FR-1 支持 x
+
+## 场景
+- Given x When x Then x
+
+## 假设与风险
+- x
+
+## 范围与非目标
+x
+
+## 开放问题
+无
+EOF
+wfile docs/reviews/0001-prefix-review.md <<'EOF'
+---
+id: 0001
+status: approved
+tickets: [20261104-3f4a]
+branch: feat/prefix-loop
+created: 2026-11-04
+---
+# 0001: 谱系前缀评审
+
+## 标准轴 findings
+- 无
+
+## Spec 轴 findings
+- 无
+
+## 汇总
+无阻断
+EOF
+setfm docs/specs/0001-cycle.md status done
+t "done spec 清扫扫描经 ID 段匹配把前缀工单的评审计入残留" 1 "check.sh validate docs/specs/0001-cycle.md" "docs/reviews/0001-prefix-review.md"
+setfm docs/specs/0001-cycle.md status approved
+
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
 t "两份 GLOSSARY.md 逐字一致" 0 "diff \"$ROOT/GLOSSARY.md\" \"$HERE/../assets/GLOSSARY.md\""
 t "两份 check.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$CHECK\""
+t "两份 tracker local.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/local.sh\" \"$HERE/../assets/trackers/local.sh\""
+t "两份 tracker github.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/github.sh\" \"$HERE/../assets/trackers/github.sh\""
+t "两份 tracker gitlab.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/gitlab.sh\" \"$HERE/../assets/trackers/gitlab.sh\""
+t "两份 tracker codeup.sh 逐字一致" 0 "diff \"$ROOT/.sdlc/trackers/codeup.sh\" \"$HERE/../assets/trackers/codeup.sh\""
 t "METHOD 产物表含 overview 行（draft→reviewed，dev-overview 推进）" 0 "grep -qF 'draft →reviewed（dev-overview，须用户显式确认）' \"$ROOT/docs/METHOD.md\"" ""
 t "METHOD 过程档枚举含 overview（总览随过程档归置）" 0 "grep -qF '（ticket、review、acceptance、overview）' \"$ROOT/docs/METHOD.md\"" ""
 t "METHOD 目录树含 overviews/ 且目录计数为九" 0 "grep -qF 'tickets/ overviews/ reviews/' \"$ROOT/docs/METHOD.md\" && grep -qF '九个产物目录' \"$ROOT/docs/METHOD.md\"" ""
@@ -2666,6 +3345,8 @@ oseq "归置次序：先更新产物、再更新总览" "$SCRATCH/ov-walk.md" "�
 oseq "状态推进：须用户显式确认（沉默不算），确认后置 reviewed 并追加 reviewed: 日期" "$SCRATCH/ov-walk.md" "显式确认" "沉默不算" "reviewed" "reviewed: <日期>"
 t "总览不替用户拍板" 0 "grep -q '不替用户拍板' \"$SCRATCH/ov-walk.md\"" ""
 t "出口过 validate" 0 "grep -q 'validate' \"$SKILL\"" ""
+t "出口 validate 走取号返回的占位路径（claim 占位流闭合）" 0 "grep -qF '.sdlc/check.sh validate <取号返回的路径>' \"$SKILL\"" ""
+t "出口不残留 docs/overviews/NNNN-slug.md 旧格式硬编码路径" 0 "! grep -qF 'validate docs/overviews/NNNN-slug.md' \"$SKILL\"" ""
 
 echo "-- FR-1 真实 spec 演练：五节齐备、validate 通过、每节含可溯源引用（grep 可核）--"
 wfile .gitignore <<'EOF'

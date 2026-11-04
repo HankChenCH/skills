@@ -48,9 +48,11 @@ description: 对工单已全部交付（done）的 spec 做集成验收——在
 ## 4. 出口门禁（全部通过才算完）
 
 1. **落盘前用 Skill 工具装载 ref-writing**，报告写法以它为准。
-2. 用下面的固定模板落盘 `docs/acceptance/NNNN-slug.md`（id = 目录内最大号 +1，
-   `round` = spec 的 round，slug 用 ASCII 小写短横线），跑 `.sdlc/check.sh validate`
-   必须通过，再跑 `publish`。
+2. 运行 `.sdlc/check.sh claim acceptance <slug> spec <spec-ID>` 取号落盘
+   （`round` = spec 的 round，slug 用 ASCII 小写短横线）——返回占位文件路径，号由
+   入口原子分配、全历史唯一，父为 spec（知识档）自动带 `spec<父ID>-` 谱系前缀；
+   用下面的固定模板写正文覆盖占位文件（frontmatter `id` 填文件名的 ID 段），跑
+   `.sdlc/check.sh validate <占位路径>` 必须通过，再跑 `publish <占位路径>`。
 3. **判定是机械的，不问人**：集成级场景全过且 `check.sh all` 全绿 → `status: passed`；任一场景没过或检查有红灯 → `status: rejected`，缺陷与范围问题如实写进报告。报告状态变更的提交用 `[trivial]`——流程状态落盘，不是绕门禁（dev-retro 可审计）。
 4. **passed 出口（固定序列，顺序不可换）**：
    1. **蒸馏四路**（各落点过 validate）——① need「假设与风险」节逐条标注验证结果（验证通过 / 证伪 / 本轮未触发，以报告「假设验证」为准），并把残余风险与「下一轮建议」及其依据补写进该节：下一轮建议与残余风险先折回 need，是清扫的前置（E3 边界），未折回不得清扫；② spec「验收场景」按实现中发现的实际边界行为修订（仅 passed 允许）；③ 有架构分量的决策新立 ADR（status: accepted）；④ 模式学习追加进 CODING_STANDARDS.md 索引的 standards/。
@@ -65,13 +67,13 @@ description: 对工单已全部交付（done）的 spec 做集成验收——在
 
 ```markdown
 ---
-id: 0001
+id: <ID 段，YYYYMMDD-4hex>
 status: draft
 spec: 0001
 round: 1
 created: <date>
 ---
-# 0001: <一句话概括验收对象>
+# <ID 段>: <一句话概括验收对象>
 ## 场景结果
 （逐条：场景 / FR / 证据（命令与输出）/ 结论：过 | 挂）
 ## 假设验证

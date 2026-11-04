@@ -66,9 +66,10 @@ GLOSSARY.md 项目术语 → 粗探相关代码现状。落盘前用 Skill 工�
    过滤闸后转「假设与风险」（按代价×不确定度排序）；明确不做 → 「范围与非目标」。
    节内只允许留拍板记录，一行一条：`D2 → 结论（一句理由；去向 FR-N/假设 An）`。
    "转调研"不许悬置：要调研的变 FR（调研报告是交付物）或转假设。
-2. 用 need 模板落盘 `docs/needs/NNNN-slug.md`（id = 目录内最大号 +1，slug 用
-   ASCII 小写短横线），运行 `.sdlc/check.sh validate docs/needs/NNNN-slug.md`
-   必须通过；不过 → 修复后重跑。
+2. 运行 `.sdlc/check.sh claim need <slug>` 取号（slug 用 ASCII 小写短横线）——返回
+   占位文件路径，号由入口原子分配、全历史唯一；用 need 模板写正文覆盖该占位文件
+   （frontmatter `id` 填文件名的 ID 段，形如 `YYYYMMDD-4hex`），运行
+   `.sdlc/check.sh validate <返回的路径>` 必须通过；不过 → 修复后重跑。
 3. **定稿（决策点，必须问）**：完整念一遍七节内容，请求确认。沉默不算确认，
    要改 → 回 §3 改完重念。通过 → `status: confirmed`、追加 `confirmed: <今日>`，
    重跑 validate 与 `.sdlc/check.sh publish`，提交留痕 `[trivial]`。
@@ -85,7 +86,7 @@ GLOSSARY.md 项目术语 → 粗探相关代码现状。落盘前用 Skill 工�
 
 ```markdown
 ---
-id: 0003
+id: <ID 段，YYYYMMDD-4hex>
 status: draft
 created: <date>
 ---

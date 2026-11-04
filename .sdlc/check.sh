@@ -91,6 +91,7 @@ dir_of_type() {
     overview) echo overviews ;;
     review) echo reviews ;;    acceptance) echo acceptance ;;
     adr) echo adr ;;           research) echo research ;;
+    retro) echo retros ;;      # 轻产物（票 0041）：仅 claim 取号落盘入口，type_of/validate 不受理
     *) return 1 ;;
   esac
 }
@@ -132,31 +133,91 @@ pad4() {
   printf '%04d' "$((10#$1))"
 }
 
-# artifact_file TYPE REF：按 NNNN 或 NNNN-slug 定位产物文件；找不到返回 1
+# ref_key REF：双格式引用规整键（spec 0017），ID 形态判定与截段的唯一落点——
+# 新时间戳 ID：恰 YYYYMMDD-4hex 原样返回；可带 -slug 尾（短横线起头才截前 13 位），
+# 5 位 hex 等非法形态与旧路径同样拒绝不透传。旧纯数字（可带 -slug 尾）截号段补零
+# 四位，超四位数字不透传。供关联字段等值比较、依赖图键、定位分派与文件名 ID 段
+# 提取用；无法规整返回 1。
+ref_key() {
+  local r="$1"
+  case "$r" in
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+      printf '%s\n' "$r"; return 0 ;;
+    [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*)
+      printf '%s\n' "${r:0:13}"; return 0 ;;
+  esac
+  r="${r%%-*}"
+  case "$r" in ''|*[!0-9]*) return 1 ;; esac
+  [ "${#r}" -le 4 ] || return 1
+  pad4 "$r"
+}
+
+# id_hits DIR ID：列出同目录下 ID 段相同的产物文件——ID 在文件名中的位置只有两种：
+# 无前缀时居首（ID-*），有前缀时居父前缀之后（*-ID-*）；每行一个。
+# 供占号查重与新格式定位共用（票 0038 评审核销：两种位置的知识只落这一处）。
+id_hits() {
+  local f
+  for f in "$1/${2}"-*.md "$1/"*-"${2}"-*.md; do
+    [ -f "$f" ] && printf '%s\n' "$f"
+  done
+}
+
+# artifact_file TYPE REF：按 NNNN（旧，可带 -slug 尾）或 YYYYMMDD-4hex（新，可带 -slug 尾）
+# 定位产物文件；找不到返回 1。引用先经 ref_key 规整，按键长分派：>4 位为新格式
+# （含谱系前缀文件名两种位置），≤4 位走旧四位 glob（spec 0017 决策 5）。
 artifact_file() {
-  local dir ref pad f
+  local dir key f
   dir="$(dir_of_type "$1")" || return 1
-  ref="${2%%-*}"
-  case "$ref" in ''|*[!0-9]*) return 1 ;; esac
-  pad="$(pad4 "$ref")" || return 1
-  for f in "$DOCS/$dir/${pad}"-*.md; do
+  key="$(ref_key "$2")" || return 1
+  for f in "$DOCS/$dir/${key}"-*.md; do
     [ -f "$f" ] || continue
     echo "$f"; return 0
   done
+  if [ "${#key}" -gt 4 ]; then
+    f="$(id_hits "$DOCS/$dir" "$key" | head -n 1)"
+    [ -n "$f" ] && { printf '%s\n' "$f"; return 0; }
+  fi
   return 1
+}
+
+# artifact_name_id BASE：解析产物文件名 → 输出「ID段」或「谱系前缀 ID段」（前缀形如
+# <父类型><父ID>，spec 0017 决策 1/4）；识别顺序：带前缀新格式、无前缀新格式、旧四位格式。
+# 各分支以单次 sed -En 同时判定并提取（每条正则只写一遍）；不识别返回 1（输出空）。
+# frontmatter id 必须与输出的 ID 段一致。
+artifact_name_id() {
+  local b="${1%.md}" out
+  out="$(printf '%s\n' "$b" | sed -En 's/^(need|spec|design|adr|research)([0-9]{4}|[0-9]{8}-[0-9a-f]{4})-([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$/\1\2 \3/p')"
+  [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
+  out="$(printf '%s\n' "$b" | sed -En 's/^([0-9]{8}-[0-9a-f]{4})-[a-z0-9]+(-[a-z0-9]+)*$/\1/p')"
+  [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
+  out="$(printf '%s\n' "$b" | sed -En 's/^([0-9]{4})-[a-z0-9]+(-[a-z0-9]+)*$/\1/p')"
+  [ -n "$out" ] && { printf '%s\n' "$out"; return 0; }
+  return 1
+}
+
+# artifact_id_of_name BASE：产物文件名 → ID 段（artifact_name_id 双字段输出取末字段，
+# 兼容谱系前缀文件名）。供依赖图节点键与清扫覆盖匹配从文件名归约 ID；不识别返回 1。
+artifact_id_of_name() {
+  local parse
+  parse="$(artifact_name_id "$1")" || return 1
+  # shellcheck disable=SC2086
+  set -- $parse
+  if [ $# -ge 2 ]; then printf '%s\n' "$2"; else printf '%s\n' "$1"; fi
 }
 
 title_of() { head -n 30 "$1" | grep -m1 '^# ' | sed 's/^#[[:space:]]*//'; }
 
-# 依赖环检测：读全部工单的 blocked-by 建图，输出 "CYCLE a -> b -> a" 或无输出
+# 依赖环检测：读全部工单的 blocked-by 建图，输出 "CYCLE a -> b -> a" 或无输出。
+# 节点键经 artifact_id_of_name 从文件名归约 ID 段（兼容谱系前缀文件名），边键走 ref_key
+# 规整引用，两键同处 ID 段空间：新旧格式、带前缀与否的工单互指环均可检出（票 0038 评审核销）。
 ticket_cycles() {
   local f id deps edges="" pad
   for f in "$DOCS/tickets"/*.md; do
     [ -f "$f" ] || return 0
-    id="$(basename "$f" .md)"; id="${id%%-*}"
+    id="$(artifact_id_of_name "$(basename "$f" .md)")" || continue
     deps=""
     for d in $(fm_list "$f" blocked-by); do
-      pad="$(pad4 "$d")" && deps="$deps $pad"
+      pad="$(ref_key "$d")" && deps="$deps $pad"
     done
     edges="$edges$id$deps
 "
@@ -196,31 +257,31 @@ ticket_cycles() {
 
 # spec_residue SPECID：输出该 spec 名下仍在盘上的过程档路径（相对仓库根，每行一个）。
 # 名下关系：ticket / acceptance / overview 的 spec 字段指向该 spec；review 的 tickets 与名下工单有交集。
+# SPECID 经 ref_key 规整，新旧双格式等值比较（spec 0017）。
 # 供 validate 清扫门禁使用：done 的 spec 名下过程档必须为零。
 spec_residue() {
-  local sid="$1" f tspec t tids tid
+  local sid f tspec t tids tid
+  sid="$(ref_key "$1" 2>/dev/null)" || return 0
   tids=" "
   for f in "$DOCS"/tickets/*.md; do
     [ -f "$f" ] || continue
-    tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
-    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+    tspec="$(ref_key "$(fm_get "$f" spec)" 2>/dev/null)" || continue
     [ "$tspec" = "$sid" ] || continue
     echo "${f#"$ROOT"/}"
-    tid="$(basename "$f" .md)"; tid="${tid%%-*}"
+    tid="$(artifact_id_of_name "$(basename "$f" .md)")" || continue
     tids="$tids$tid "
   done
   for dir in acceptance overviews; do
     for f in "$DOCS"/"$dir"/*.md; do
       [ -f "$f" ] || continue
-      tspec="$(fm_get "$f" spec)"; tspec="${tspec%%-*}"
-      tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+      tspec="$(ref_key "$(fm_get "$f" spec)" 2>/dev/null)" || continue
       [ "$tspec" = "$sid" ] && echo "${f#"$ROOT"/}"
     done
   done
   for f in "$DOCS"/reviews/*.md; do
     [ -f "$f" ] || continue
     for t in $(fm_list "$f" tickets); do
-      tid="$(pad4 "${t%%-*}" 2>/dev/null)" || continue
+      tid="$(ref_key "$t" 2>/dev/null)" || continue
       case "$tids" in
         *" $tid "*) echo "${f#"$ROOT"/}"; break ;;
       esac
@@ -233,12 +294,11 @@ spec_residue() {
 # 单票豁免放行；缺失或 draft 总览 → 非零退出并指路 /dev-overview。仅在 spec approved/done 后调用。
 overview_gate() {
   local sid own tf tspec of ospec found draft
-  sid="$(pad4 "${1%%-*}")" || return 0
+  sid="$(ref_key "$1" 2>/dev/null)" || return 0
   own=0
   for tf in "$DOCS"/tickets/*.md; do
     [ -f "$tf" ] || continue
-    tspec="$(fm_get "$tf" spec)"; tspec="${tspec%%-*}"
-    tspec="$(pad4 "$tspec" 2>/dev/null)" || continue
+    tspec="$(ref_key "$(fm_get "$tf" spec)" 2>/dev/null)" || continue
     [ "$tspec" = "$sid" ] || continue
     own=$((own+1))
   done
@@ -249,8 +309,7 @@ overview_gate() {
   found=""; draft=""
   for of in "$DOCS"/overviews/*.md; do
     [ -f "$of" ] || continue
-    ospec="$(fm_get "$of" spec)"; ospec="${ospec%%-*}"
-    ospec="$(pad4 "$ospec" 2>/dev/null)" || continue
+    ospec="$(ref_key "$(fm_get "$of" spec)" 2>/dev/null)" || continue
     [ "$ospec" = "$sid" ] || continue
     if [ "$(fm_get "$of" status)" = "reviewed" ]; then found="$of"; break; fi
     [ -n "$draft" ] || draft="$of"
@@ -328,20 +387,18 @@ cmd_frontier() {
 }
 
 cmd_ticket() {
-  [ -n "${1:-}" ] || die "用法：check.sh ticket NNNN"
-  local ref="${1%%-*}"
-  case "$ref" in ''|*[!0-9]*) die "工单号必须是数字或 NNNN-slug：$1" ;; esac
-  local pad f
-  pad="$(pad4 "$ref")" || die "非法工单号：$1"
-  f="$(artifact_file ticket "$ref")" || die "工单 $pad 不存在（docs/tickets/${pad}-*.md）"
+  [ -n "${1:-}" ] || die "用法：check.sh ticket NNNN 或 YYYYMMDD-4hex"
+  local disp f
+  disp="$(ref_key "$1")" || die "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex：$1"
+  f="$(artifact_file ticket "$1")" || die "工单 ${disp} 不存在（docs/tickets/）"
   local rc=0 st dep dep_f dst spec_id spec_f sst
   st="$(fm_get "$f" status)"
   case "$st" in
-    ready)       info "✓ 工单 $pad 就绪（status: ready，新开工）" ;;
-    in-progress) info "✓ 工单 $pad 重入（status: in-progress，从 ## Progress 续接）" ;;
-    implemented) die "工单 $pad 已 implemented——评审走 /dev-review，不要重复开工" ;;
-    done)        die "工单 $pad 已 done——缺陷请走 /dev-fix 开新工单" ;;
-    *)           die "工单 $pad 状态非法：${st}（先运行 check.sh validate 检查该文件）" ;;
+    ready)       info "✓ 工单 $disp 就绪（status: ready，新开工）" ;;
+    in-progress) info "✓ 工单 $disp 重入（status: in-progress，从 ## Progress 续接）" ;;
+    implemented) die "工单 $disp 已 implemented——评审走 /dev-review，不要重复开工" ;;
+    done)        die "工单 $disp 已 done——缺陷请走 /dev-fix 开新工单" ;;
+    *)           die "工单 $disp 状态非法：${st}（先运行 check.sh validate 检查该文件）" ;;
   esac
   for dep in $(fm_list "$f" blocked-by); do
     dep_f="$(artifact_file ticket "$dep")" \
@@ -376,7 +433,7 @@ cmd_ticket() {
     echo "✗ 工单依赖存在环：$(ticket_cycles | sed 's/^CYCLE //')"
     rc=1
   }
-  if [ "$rc" = 0 ]; then info "ticket ${pad}：入口校验通过"; else info "ticket ${pad}：入口校验未通过（见上）"; fi
+  if [ "$rc" = 0 ]; then info "ticket ${disp}：入口校验通过"; else info "ticket ${disp}：入口校验未通过（见上）"; fi
   return "$rc"
 }
 
@@ -412,17 +469,18 @@ cmd_all() {
   return "$rc"
 }
 
-commit_refs() { # [MSGFILE]，缺省读 stdin -> 四位零填充、去重的工单号（每行一个）
-  local src="${1:--}"
+commit_refs() { # [MSGFILE]，缺省读 stdin -> 工单号（旧补零四位 / 新 YYYYMMDD-4hex 原样），去重每行一个
+  local src="${1:--}" key
   awk '{
     line=$0
-    while (match(line, /\[#[0-9]+\]/)) {
+    while (match(line, /\[#[0-9]+(-[0-9a-f]+)?\]/)) {
       print substr(line, RSTART+2, RLENGTH-3)
       line=substr(line, RSTART+RLENGTH)
     }
   }' "$src" | sort -u | while IFS= read -r r; do
-    p="$(pad4 "$r")" || continue
-    printf '%s\n' "$p"
+    # 规整失败的引用原样出列：交由下游「工单不存在」分支显式点名，不静默蒸发
+    key="$(ref_key "$r")" || { printf '%s\n' "$r"; continue; }
+    printf '%s\n' "$key"
   done
 }
 
@@ -447,8 +505,8 @@ cmd_commit_msg() {
   refs="$(commit_refs "$msg")"
   if [ -z "$refs" ]; then
     cat >&2 <<'EOT'
-✗ commit message 既无 [#NNNN] 也无 [trivial]。
-  规则：功能/修复提交带 [#NNNN]（对应工单须 in-progress/implemented）；
+✗ commit message 既无 [#NNNN] 也无 [#YYYYMMDD-4hex]，也无 [trivial]。
+  规则：功能/修复提交带 [#NNNN] 或 [#YYYYMMDD-4hex]（对应工单须 in-progress/implemented）；
   小修（typo、纯文档）带 [trivial]（每次豁免留痕，dev-retro 审计）。
 EOT
     return 1
@@ -507,7 +565,7 @@ cmd_pre_push() {
           [ -f "$rv" ] || continue
           [ "$(fm_get "$rv" status)" = "approved" ] || continue
           for t in $(fm_list "$rv" tickets); do
-            [ "$(pad4 "$t")" = "$d" ] && { cov=1; break; }
+            [ "$(ref_key "$t" 2>/dev/null)" = "$d" ] && { cov=1; break; }
           done
           [ "$cov" = 1 ] && break
         done
@@ -550,6 +608,58 @@ cmd_publish() {
   esac
 }
 
+# cmd_claim TYPE SLUG [PARENT_TYPE PARENT_REF]：原子取号入口（spec 0017）。
+# 一次调用完成：生成 YYYYMMDD-4hex 候选号 → 以排他创建（noclobber）落占位文件占号 →
+# 撞号重掷随机段重试 → 返回最终产物文件名（仓库相对路径，占位由调用会话写正文覆盖）。
+# 父为知识档（need/spec/design/adr/research）必带谱系前缀 <父类型><父ID>-；父为过程档不带。
+# 类型含九类门禁产物与轻产物 retro（retro → docs/retros/，仅取号落盘，validate 不受理，票 0041）。
+cmd_claim() {
+  [ $# -eq 2 ] || [ $# -eq 4 ] || die "用法：check.sh claim <type> <slug> [父类型 父ID]"
+  local type="$1" slug="$2" prefix="" ptype pid pfile dir path id hexseg attempt dup g
+  dir="$(dir_of_type "$type")" || die "未知产物类型：${type}（须为九类产物之一，或轻产物 retro）"
+  printf '%s\n' "$slug" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' \
+    || die "slug 非法（限 ASCII 小写/数字/短横线）：$slug"
+  if [ $# -eq 4 ]; then
+    ptype="$3"; pid="$4"
+    dir_of_type "$ptype" >/dev/null || die "未知父产物类型：${ptype}（须为九类产物之一，或轻产物 retro）"
+    pfile="$(artifact_file "$ptype" "$pid")" || die "父产物 $ptype $pid 不存在（docs/）"
+    pid="$(fm_get "$pfile" id)"   # 前缀取父产物 frontmatter id（唯一事实源）
+    # 守卫：id 非空且为规整键不动点，否则拼出的谱系前缀产出过不了自家命名门的文件名
+    if [ -z "$pid" ] || [ "$(ref_key "$pid")" != "$pid" ]; then
+      die "父产物 frontmatter id 缺失或非法：$pfile"
+    fi
+    case "$ptype" in
+      need|spec|design|adr|research) prefix="$ptype$pid-" ;;
+    esac
+  fi
+  mkdir -p "$DOCS/$dir"
+  for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+    hexseg="$(od -An -N2 -tx1 /dev/urandom | tr -d ' \n')"
+    [ "${#hexseg}" -eq 4 ] || die "随机段异常（${#hexseg} 字符）：$hexseg（检查 od 与系统熵源）"
+    id="$(date +%Y%m%d)-$hexseg"
+    path="$DOCS/$dir/${prefix}${id}-${slug}.md"
+    # 唯一键是 ID 段而非全路径：同目录已有同 ID 产物（任意 slug、任意前缀位置）即重掷
+    if [ -n "$(id_hits "$DOCS/$dir" "$id")" ]; then continue; fi
+    # 历史号不复用（spec 0017 FR-1 场景 1）：tracker map 持久记录被清扫产物的路径
+    # （含其 ID 段），git 历史引用为第二来源；同类同 ID 任一来源命中即重掷
+    grep -Eq -- "^docs/$dir/.*$id" "$SDL"/trackers/*.map 2>/dev/null && continue
+    [ -n "$(git log --fixed-strings --format=%h --grep="$id" -1 2>/dev/null)" ] && continue
+    if ( set -C; : > "$path" ) 2>/dev/null; then
+      # 并发同掷核验：创建后同 ID 异文件在场即删自身重掷（互见者让位，恒至一者存活）
+      dup=0
+      while IFS= read -r g; do
+        [ "$g" = "$path" ] && continue
+        dup=1; break
+      done < <(id_hits "$DOCS/$dir" "$id")
+      if [ "$dup" = 1 ]; then rm "$path"; continue; fi
+      printf '%s\n' "${path#"$ROOT"/}"
+      return 0
+    fi
+    [ -e "$path" ] || die "占位文件创建失败：$path（目录不可写？）"
+  done
+  die "取号连续 16 次撞号，放弃（${prefix}$(date +%Y%m%d)-* 段拥挤或随机源异常）"
+}
+
 cmd_validate() {
   [ -n "${1:-}" ] || die "用法：check.sh validate <file>"
   local file
@@ -559,18 +669,28 @@ cmd_validate() {
   type="$(type_of "$file")" || die "无法识别产物类型（文件须位于 docs/ 九个产物目录内）：$file"
   local ERRORS=0
   err() { echo "  ✗ $*"; ERRORS=$((ERRORS+1)); }
-  local base id status pad spec_id need_id need_file frs covered missing round dep t any residue r
+  local base id id_key status spec_id need_id need_file frs covered missing round dep t any residue r
   base="$(basename "$file")"
 
-  # --- 通用：frontmatter、id、文件名、状态 ---
+  # --- 通用：frontmatter、id、文件名、状态（id 与文件名双格式，spec 0017 决策 1）---
   fm_open "$file"    || err "缺 frontmatter（首行须为 ---）"
   fm_closed "$file"  || err "frontmatter 未闭合（缺第二个 ---）"
   id="$(fm_get "$file" id)"
-  case "$id" in ''|*[!0-9]*) err "frontmatter id 必须是四位数字：${id:-（空）}" ;; esac
-  pad="$(pad4 "$id" 2>/dev/null || echo 0000)"
-  case "$base" in "$pad"-*) ;; *) err "id 与文件名前缀不一致（应为 ${pad}-slug.md）：$base" ;; esac
-  echo "$base" | grep -qE '^[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*\.md$' \
-    || err "文件名不符合 NNNN-slug.md（slug 限 ASCII 小写/数字/短横线）：$base"
+  # frontmatter id 须为规整键的不动点（四位数字或完整 YYYYMMDD-4hex，不带尾段）
+  if ! id_key="$(ref_key "$id")" || [ "$id_key" != "$id" ]; then
+    err "frontmatter id 必须是四位数字或 YYYYMMDD-4hex：${id:-（空）}"
+  fi
+  local name_parse="" name_id="" name_prefix=""
+  name_parse="$(artifact_name_id "$base" 2>/dev/null)" || name_parse=""
+  if [ -z "$name_parse" ]; then
+    err "文件名不符合产物命名（NNNN-slug.md 或 [父类型父ID-]YYYYMMDD-4hex-slug.md，slug 限 ASCII 小写/数字/短横线）：$base"
+  else
+    # shellcheck disable=SC2086
+    set -- $name_parse
+    if [ $# -eq 2 ]; then name_prefix="$1"; name_id="$2"; else name_id="$1"; fi
+    [ "$name_id" = "$id" ] \
+      || err "id 与文件名前缀不一致（文件名 ID 段 ${name_id}，frontmatter id ${id}）：$base"
+  fi
   status="$(fm_get "$file" status)"
   if [ "$type" != research ]; then
     if [ -z "$status" ]; then
@@ -614,7 +734,7 @@ cmd_validate() {
       fi
       # 清扫门禁：done 的 spec 名下必无过程档残留（蒸馏清扫完成后才允许置 done）
       if [ "$status" = "done" ]; then
-        for residue in $(spec_residue "$pad"); do
+        for residue in $(spec_residue "$id"); do
           err "spec 已置 done 但名下过程档未清扫：$residue"
         done
       fi
@@ -688,10 +808,13 @@ usage() {
 用法：check.sh <子命令> [参数]
   phase                 全库状态总览（九类产物 + frontier）
   frontier              列出阻塞已清、可开工的工单
+  claim <type> <slug> [父类型 父ID]
+                        原子取号：生成 YYYYMMDD-4hex 候选号、排他创建占位、撞号重掷，
+                        返回产物文件名（类型为九类产物或轻产物 retro；父为知识档自动带谱系前缀）
   ticket NNNN           dev-implement 入口校验（ready/重入、阻塞已清、spec approved、多票 spec 须 reviewed 总览）
   all                   全量 lint/typecheck/test（按 .sdlc/config.sh，经 RUN_PREFIX 包裹）
   validate <file>       产物模板完整性与追溯校验（必填节/frontmatter/FR 追溯/依赖环/done 残留扫描）
-  commit-msg <msgfile>  轻门禁：[#NNNN] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行
+  commit-msg <msgfile>  轻门禁：[#NNNN] / [#YYYYMMDD-4hex] 且工单 in-progress/implemented，或 [trivial]；Merge/Revert 信息头机械放行
   pre-push              重门禁：分支上 implemented 工单须被 approved 评审覆盖
   publish <file>        按 TRACKER 发布产物（local=确认在盘）
   help                  本说明
@@ -704,6 +827,7 @@ main() {
   case "$cmd" in
     phase)      cmd_phase ;;
     frontier)   cmd_frontier ;;
+    claim)      cmd_claim "$@" ;;
     ticket)     cmd_ticket "$@" ;;
     all)        cmd_all ;;
   validate)   cmd_validate "$@" ;;
