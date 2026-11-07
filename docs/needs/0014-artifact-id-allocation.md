@@ -1,8 +1,9 @@
 ---
 id: 0014
-status: confirmed
+status: fulfilled
 created: 2026-11-04
 confirmed: 2026-11-04
+fulfilled: 2026-11-05
 ---
 # 产物编号分配机制统一治理（号复用与多会话竞态）
 
