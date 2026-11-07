@@ -1,8 +1,9 @@
 ---
 id: 20261107-450d
-status: confirmed
+status: fulfilled
 created: 2026-11-07
 confirmed: 2026-11-07
+fulfilled: 2026-11-07
 ---
 # ref-refactoring-ui：Refactoring UI 方法论参考技能
 
