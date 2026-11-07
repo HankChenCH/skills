@@ -35,7 +35,7 @@
 | ticket.implemented | 实现完成、全量检查绿，待评审 | dev-implement |
 | ticket.done | 已合并（终态） | dev-ship |
 | overview.draft / reviewed | 总览合成中 / 走查完成（用户显式确认后推进，沉默不算） | dev-overview |
-| review.draft / approved | 评审中 / 两轴阻断清零 | dev-review |
+| review.draft / approved / blocked | 评审中 / 两轴阻断清零 / 设计级阻断待处置（修复后复审） | dev-review |
 | acceptance.draft / passed / rejected | 验收中 / 通过 / 不通过 | dev-accept |
 | adr.accepted / superseded | 生效中 / 被新 ADR 取代 | dev-design |
 | retro.draft / done | 复盘中 / 复盘定稿（终态） | dev-retro |

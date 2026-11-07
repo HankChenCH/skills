@@ -92,7 +92,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | design | `id` `spec` `status` | draft →approved（dev-design / design-deliver） |
 | ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `repos?` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
 | overview | `id` `spec` `status` | draft →reviewed（dev-overview，须用户显式确认） |
-| review | `id` `tickets: []` `branch` `status` | draft →approved（dev-review，两轴阻断项清零） |
+| review | `id` `tickets: []` `branch` `status` | draft →approved | blocked（dev-review；approved = 两轴阻断项清零，blocked = 设计级阻断出口，修复后复审） |
 | acceptance | `id` `spec` `round` `status` | draft →passed \| rejected（dev-accept） |
 | adr | `id` `status` | accepted →superseded（被新 ADR 取代时） |
 | research | `id` | 无状态，纯参考资料 |
