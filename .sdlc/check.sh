@@ -291,7 +291,8 @@ spec_residue() {
 
 # overview_gate SPEC_ID：FR-7 开工门禁——名下票 ≥2 的 spec 须有 reviewed 总览才准开工。
 # 名下关系与 spec_residue 同一定义（票 frontmatter spec 字段指向该 spec）。
-# 单票豁免放行；缺失或 draft 总览 → 非零退出并指路 /dev-overview。仅在 spec approved/done 后调用。
+# 单票豁免放行；缺失或 draft 总览 → 非零退出并指路 /dev-overview。
+# 仅 approved spec 调用（done 豁免——总览义务验收时已履行，清扫后不在盘，见调用点）。
 overview_gate() {
   local sid own tf tspec of ospec found draft
   sid="$(ref_key "$1" 2>/dev/null)" || return 0
@@ -421,8 +422,11 @@ cmd_ticket() {
         draft)    echo "✗ spec $spec_id 还是 draft，先 /dev-spec 完成批准"; rc=1 ;;
         *)        echo "✗ spec $spec_id 状态非法：$sst"; rc=1 ;;
       esac
-      # FR-7 开工门禁：spec 批准之后校验 reviewed 总览（名下 ≥2 票才触发，单票豁免）
-      if [ "$sst" = "approved" ] || [ "$sst" = "done" ]; then
+      # FR-7 开工门禁：仅 approved spec 校验 reviewed 总览（名下 ≥2 票才触发，单票豁免）。
+      # done 豁免：总览是开工前过程档，验收清扫保证其不在盘——对 done 再要求 reviewed
+      # 总览在设计上不可满足（20261107-23b0 验收后 fix 票入口实证，自指死锁），
+      # 总览义务已在验收履行。[trivial] 豁免修复 2026-11-07，dev-retro 审计。
+      if [ "$sst" = "approved" ]; then
         overview_gate "$spec_id" || rc=1
       fi
     else
