@@ -1,10 +1,11 @@
 ---
 id: 20261107-672e
-status: approved
+status: done
 need: 20261107-aac2
 round: 1
 created: 2026-11-07
 approved: 2026-11-07
+done: 2026-11-07
 ---
 # ref-b-side-design 参考技能（B端体验设计课六讲蒸馏 + 设计链挂载）
 
