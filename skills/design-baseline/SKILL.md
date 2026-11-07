@@ -1,6 +1,6 @@
 ---
 name: design-baseline
-description: 建立、读取与跟随项目设计语言基线——先查 docs/standards/ 既有设计分册（按平台命名 design-<platform>.md：web / mobile / desktop / cli / docs），无基线经用户确认后引导产出分册（最低内容集：配色 / 字体 / 密度 / 间距与字号阶梯 / 组件观感 / 反例）并登记 CODING_STANDARDS.md 索引，有基线读入并给出跟随纪律（先读基线再设计、偏离逐条声明理由），让风格跟随有据可依、不再像默认 Bootstrap。design-* 套件「场景约束 → 基线 → 设计 → 述标」链的基线环节。当用户说"给项目建立设计基线""界面风格统一一下"，或 design-brief 出口指路时使用。任务实际是要出布局与原型（指路 /design-ui）、要定稿述标（指路 /design-deliver）、或想把基线写成实现代码与样式表时会亮牌拒绝；基线分册未经用户确认不落定稿，同名分册不覆盖。
+description: 建立、读取与跟随项目设计语言基线——先查 docs/standards/ 既有设计分册（按平台命名 design-<platform>.md：web / mobile / desktop / cli / docs），无基线经用户确认后引导产出分册（最低内容集：配色 / 字体 / 密度 / 间距与字号阶梯 / 组件观感 / 反例）并登记 CODING_STANDARDS.md 索引，有基线读入并给出跟随纪律（先读基线再设计、偏离逐条声明理由），让风格跟随有据可依、不再像默认 Bootstrap。design-* 套件「场景约束 → 基线 → 设计 → 述标」链的基线环节。当用户说"给项目建立设计基线""界面风格统一一下"，或 design-brief 出口指路时使用。任务实际是要出布局与原型（指路 /design-ui）、要定稿述标（指路 /design-deliver）、或想把基线写成实现代码与样式表时会亮牌拒绝；基线分册未经用户确认不落定稿，同名分册不覆盖。建立与跟随基线时加载 ref-refactoring-ui。
 ---
 
 # design-baseline：建立、读取与跟随设计基线
