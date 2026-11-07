@@ -281,9 +281,9 @@
 - **定位**：技能体系分层：L3 流程技能驱动生命周期、持门禁、自动串联；L2 参考技能定义"什么是好"，由流程技能在指定时机加载；L1 基础设施是 check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块。对应的三层分工：**技能=行为，参考=标准，脚本=判断逻辑**。
 - **落点**：蓝图 §2 原则 6、§7。
 
-### ref-* 参考技能（writing / implementation / testing / review / git-commit / refactoring-ui）〔方法自创〕
-- **定位**：六个内部参考——ref-writing（平实具体、例子优先、禁空洞抽象词、给数字/命令/文件名）；ref-implementation（深模块、显式错误处理、无投机泛化、diff 最小化）；ref-testing（只测外部行为、期望值独立、反模式清单）；ref-review（可执行 finding、阻断/建议分级、坏味道基线）；ref-git-commit（一次提交一件事、首行 [#NNNN] 带行为摘要、正文写 diff 看不出的为什么）；ref-refactoring-ui（界面视觉设计章法：从功能起步、一切决定出自受限体系、层级优先于装饰，蒸馏自《Refactoring UI》中文翻译仓库，零原文零图片）。"什么是好"只存一份、按需进上下文，不污染每个会话。用户直呼 ref-* 时引导到对应流程技能。
-- **落点**：蓝图 §7.1、§7.3、§11.3。
+### ref-* 参考技能（writing / implementation / testing / review / git-commit / refactoring-ui / b-side-design）〔方法自创〕
+- **定位**：七个内部参考——ref-writing（平实具体、例子优先、禁空洞抽象词、给数字/命令/文件名）；ref-implementation（深模块、显式错误处理、无投机泛化、diff 最小化）；ref-testing（只测外部行为、期望值独立、反模式清单）；ref-review（可执行 finding、阻断/建议分级、坏味道基线）；ref-git-commit（一次提交一件事、首行 [#NNNN] 带行为摘要、正文写 diff 看不出的为什么）；ref-refactoring-ui（界面视觉设计章法：从功能起步、一切决定出自受限体系、层级优先于装饰，蒸馏自《Refactoring UI》中文翻译仓库，零原文零图片）；ref-b-side-design（B 端体验设计章法：复杂守恒、功能归类用客户的语言、信息架构与效率优先级、大屏/组件/权限典型场景，蒸馏自《B端体验设计入门课》体验设计六讲，零原文零图片零音频）。"什么是好"只存一份、按需进上下文，不污染每个会话。用户直呼 ref-* 时引导到对应流程技能。
+- **落点**：蓝图 §7.1、§7.2、§7.3、§11.3。
 
 ### 引用矩阵（越靠近实现层 reference 越密）〔方法自创〕
 - **定位**：规定每个流程技能在什么时机加载哪个参考：文档类技能落盘前加载 ref-writing；dev-implement 开工装 ref-implementation + ref-testing（写测试前重读）；dev-review 评审前装 ref-review + ref-implementation；dev-fix 在失败测试之前装 ref-testing。

@@ -334,23 +334,27 @@ created: <date>
 
 ```
 L3 流程技能 dev-*（15 个）：驱动生命周期、持门禁、自动串联；用户与模型均可调用
-L2 参考技能 ref-*（5 个）：定义"什么是好"；由流程技能在指定时机用 Skill 工具加载
+L2 参考技能 ref-*（7 个）：定义"什么是好"；由流程技能在指定时机用 Skill 工具加载
 L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 ```
 
-### 7.1 五个参考技能的内容要点
+### 7.1 七个参考技能的内容要点
 
 - **ref-writing（编写人类可理解文档）**：平实具体、例子优先、一段一个观点；术语一律来自 GLOSSARY 且首次出现给定义；禁用空洞抽象词（"提升效率""优化体验"），写成可验证的陈述；给数字、给命令、给文件名。
 - **ref-implementation（什么是好的实现）**：代码读起来像叙事；命名表意；模块深（接口窄、做的事多）；错误处理显式；边界情况被处理而不是被注释；无投机泛化；diff 最小化——只改工单要求的。
 - **ref-testing（什么是好的测试）**：通则——只测外部行为不测实现；期望值来自独立来源（已知字面量、算例、spec），禁止用与实现相同的逻辑算出；只在预定 seam 上测；一个测试一个行为；测试名即规格；失败信息能直接定位；可重复确定（不依赖执行顺序、真实时间与外部服务，随机须固定种子）。含反模式清单：实现耦合、同义反复、横向切片。细则按六类测试拆 references/（red-green 红绿循环、table-driven 表格驱动、integration 集成、e2e、stress-capacity 压力与容量、chaos 混沌），进入具体场景按 SKILL.md 路由表按需读取、一次只载一个（§11.3）。
 - **ref-review（什么是好的评审行为）**：只评 diff 范围内的事；每条 finding 可执行（文件:行 + 怎么改 + 为什么）；分级"阻断 / 建议"；区分"违反标准"与"个人品味"，后者不阻断；双轴独立不互相稀释；内置 Fowler 代码坏味道基线清单（每条：是什么 → 怎么修），repo 已文档化的标准优先于基线，工具已强制的跳过。
 - **ref-git-commit（规范的提交与合并信息）**：一次提交只做一件事（一个验收标准或一次红绿循环）；首行 `[#NNNN]`（豁免 `[trivial]`）+ 祈使句行为摘要，不报文件清单；正文写 diff 看不出来的"为什么"与证据；合并信息随合并方式收敛（merge commit 讲合入什么，squash 按首行规范重写，ff 历史即提交本身）；PR/MR 描述里的工单引用语法随平台，平台编号 ≠ 盘上工单编号（`Closes #N` 吃平台编号），三平台语法见 docs/research/0001。
+- **ref-refactoring-ui（什么是好的界面视觉设计）**：界面靠层级与体系成立，不靠装饰——从功能而非外壳起步、一切决定出自提前定好的受限体系、层级优先于语义、弱化与强调成对使用、少用边框。九分册按其任务路由表按需读取、一次只载一个；蒸馏自《Refactoring UI》中文翻译仓库，零原文段落与图片。
+- **ref-b-side-design（什么是好的 B 端体验设计）**：复杂守恒——产品复杂性不可移除，设计以客户视角重构其归属，落到体感是"找得到 + 看得懂"；管 B 端结构层与业务章法（复杂性归属、功能归类、信息架构、关键界面与大屏/组件/权限典型场景），视觉细节章法路由至 ref-refactoring-ui。四分册按其任务路由表按需读取、一次只载一个；蒸馏自《B端体验设计入门课》体验设计六讲，零原文零图片零音频。
 
 ### 7.2 引用矩阵（越靠近实现层，reference 越密）
 
 | 流程技能 | 加载哪个参考 | 时机 |
 |---|---|---|
 | design-baseline / design-ui | ref-refactoring-ui | design-baseline 建立与跟随基线时装载；design-ui 出布局与视觉决策时装载——按其任务路由表读对应分册，一次只载一个 |
+| design-brief | ref-b-side-design | B 端项目做功能归类与信息架构相关的约束采集时装载——按其任务路由表读对应分册，一次只载一个 |
+| design-ui | ref-b-side-design | 出数字大屏、组件化、权限模块等 B 端结构层决策时装载——按其任务路由表读对应分册，一次只载一个 |
 | dev-clarify / dev-spec / dev-design / dev-research / dev-docs | ref-writing | 落盘前 |
 | dev-implement | ref-implementation + ref-testing + ref-git-commit | 开工装载；写测试前重读 ref-testing |
 | dev-execute | ref-implementation + ref-testing + ref-git-commit | 开工装载；收口 PR 正文与合并信息按 ref-git-commit |

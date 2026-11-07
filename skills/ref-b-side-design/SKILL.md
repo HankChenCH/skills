@@ -14,8 +14,8 @@ description: 内部参考，定义什么是好的 B 端体验设计：复杂守�
 |---|---|
 | 判断复杂性归谁处理、对齐客户语言体系、调研原有业务与流程、匹配组织结构与角色 | references/understand-customer.md |
 | 功能归类（MECE）、落地信息架构与导航结构、给新增功能归位、画泳道图排效率优先级 | references/architect-structure.md |
-| 设计关键界面：错误防线、响应反馈节奏、聚焦核心竞争力打造体验亮点 | references/craft-key-interface.md（由工票 20261107-3155 交付） |
-| 数字大屏、组件化、权限模块等典型场景 | references/special-scenes.md（由工票 20261107-3155 交付） |
+| 设计关键界面：错误防线、响应反馈节奏、聚焦核心竞争力打造体验亮点 | references/craft-key-interface.md |
+| 数字大屏、组件化、权限模块等典型场景 | references/special-scenes.md |
 
 两可时按**更靠上游的结构决策**选：还没摸清客户业务先载 understand-customer；摸清了在做归类与排优先级就载 architect-structure。
 

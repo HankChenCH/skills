@@ -98,3 +98,5 @@
 - **复杂守恒定律** —— 产品的内在复杂性不可移除也不可隐藏，设计能决定的只是它归谁处理：以客户视角重构复杂性的归属，把复杂扛在设计侧、把简单留给客户，落到体感是"找得到 + 看得懂"（首次出现：ref-b-side-design 技能 references/understand-customer.md）。
 - **MECE** —— 功能归类的硬判据：互相独立、完全穷尽；ref-b-side-design 主要取"互相独立"一翼——一个功能只归一个大类，归类维度从客户业务逻辑取而非技术实现取，出现"归 A 还是归 B"的犹豫即耦合信号（首次出现：ref-b-side-design 技能 references/architect-structure.md）。
 - **泳道图** —— 按角色分列的流程图绘制形式：第一列客户逐动作记录（多角色全排左侧）、第二列产品界面内容、第三列后台数据读取储存判断；用于还原原有流程、识别最高频最耗精力的界面与等待出错点位，是 B 端流程优化的前提工具（首次出现：ref-b-side-design 技能 references/architect-structure.md）。
+- **5E 原则** —— 可用性工程给出的体验五要素自查清单：易学性、效率、容错性、有效性、吸引力；B 端核心界面按此顺序自查——对执行者易学性第一、效率第二，吸引力在面向决策者的报表与大屏场景升到第一（首次出现：ref-b-side-design 技能 references/craft-key-interface.md）。
+- **多尔蒂门槛** —— 系统须在 400ms 内对使用者操作给出响应的体验判据（源自 IBM 研究员多尔蒂的响应时间研究）：超出即被感知为卡顿；B 端数据量大、加载慢不是豁免理由，设计侧以即时出现的 loading 动画与久候引导文案缓解（首次出现：ref-b-side-design 技能 references/craft-key-interface.md）。
