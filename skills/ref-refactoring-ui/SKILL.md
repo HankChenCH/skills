@@ -36,7 +36,7 @@ description: 内部参考，定义什么是好的界面视觉设计：从功能�
 
 - 内容蒸馏自《Refactoring UI》（Adam Wathan & Steve Schoger）中文翻译仓库：
   https://github.com/read-x/refactoring-ui-zh
-- 内容快照 commit：`ec3aa73`（2026-11-07），九分册与原书 01–09 章一一对应。
+- 内容快照：2026-11-07 取 commit `ec3aa73`，九分册与原书 01–09 章一一对应。
 - 版权声明：原书译文与图片版权归原书作者及翻译仓库所有，翻译仓库不授许可；
   本技能为蒸馏产物，不含原文段落与图片，不得向本技能追加原文或图片。
 
