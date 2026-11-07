@@ -350,6 +350,7 @@ L1 基础设施：check.sh + trackers/ + config.sh + METHOD.md + AGENTS.md 块
 
 | 流程技能 | 加载哪个参考 | 时机 |
 |---|---|---|
+| design-baseline / design-ui | ref-refactoring-ui | design-baseline 建立与跟随基线时装载；design-ui 出布局与视觉决策时装载——按其任务路由表读对应分册，一次只载一个 |
 | dev-clarify / dev-spec / dev-design / dev-research / dev-docs | ref-writing | 落盘前 |
 | dev-implement | ref-implementation + ref-testing + ref-git-commit | 开工装载；写测试前重读 ref-testing |
 | dev-execute | ref-implementation + ref-testing + ref-git-commit | 开工装载；收口 PR 正文与合并信息按 ref-git-commit |
