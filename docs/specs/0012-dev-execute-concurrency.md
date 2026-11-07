@@ -1,6 +1,7 @@
 ---
 id: 0012
-status: approved
+status: done
+done: 2026-11-07
 need: 0010
 round: 1
 created: 2026-10-31
