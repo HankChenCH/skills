@@ -134,9 +134,12 @@ git worktree add "<repo>-runs/<spec-id>-run" -b "run/<spec-id>"
 ```
 
 建立后**立即物化**：把主工作区当前过程档目录（docs/tickets、docs/reviews、
-docs/acceptance）以盘上文件复制进运行 worktree——untracked、照旧不进任何提交
-（ADR 0003 裁决 1；物化纪律对任何运行/票 worktree 一律成立，票 worktree 同款见
-§4）。
+docs/acceptance、docs/overviews）以盘上文件复制进运行 worktree——untracked、
+照旧不进任何提交（ADR 0003 裁决 1；物化纪律对任何运行/票 worktree 一律成立，
+票 worktree 同款见 §4）。**物化清单 = 门禁输入目录全集**：新增门禁输入目录时
+与本清单同批成文；目录不存在则跳过（如单票 spec 无 docs/overviews）。漏物化
+docs/overviews/ 的失败模式：≥2 票 spec 的票门禁（FR-7 总览前置）在 worktree 内
+fail-loud 误拦（票 20261107-2a2b 演练实证）。
 
 核对清单（任一不满足即停，不派发）：
 
@@ -159,9 +162,12 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
   或 done；blocked-by 未满足的票不建 worktree、不派发（演练：无票 worktree 条目）。
   流水线下派发时机跟着依赖满足走，不等"当前层凑齐"。
 - **物化（建 worktree 后立即执行，ADR 0003 裁决 1）**：把主工作区当前过程档目录
-  （docs/tickets、docs/reviews、docs/acceptance）以盘上文件复制进票 worktree——
-  untracked、照旧不进任何提交。不物化 → 该 worktree 内门禁读不到过程档，
-  dev-implement 出口提交会被 commit-msg hook 拦（fail-loud，非静默）。
+  （docs/tickets、docs/reviews、docs/acceptance、docs/overviews——清单全集口径
+  与"目录不存在则跳过"同 §3）以盘上文件复制进票 worktree——untracked、照旧不进
+  任何提交。不物化 → 该 worktree 内门禁读不到过程档，dev-implement 出口提交会被
+  commit-msg hook 拦（fail-loud，非静默）；漏物化 docs/overviews/ → ≥2 票 spec
+  的票门禁（FR-7 总览前置）在 worktree 内报缺总览（fail-loud，票 20261107-2a2b
+  演练实证）。
 - **运行声明段（v1.25，派发时随物化后落笔）**：开工确认双点选结果（值守模式 +
   并行档 + 默认建议理由）写入该票 `## Progress` 首行（票 worktree 物化副本上，
   每张派发票同款）——续接会话据此恢复值守语义（§5 第 8 条；档 1 另由 journal
