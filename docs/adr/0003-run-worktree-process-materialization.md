@@ -5,7 +5,7 @@ created: 2026-10-30
 ---
 # 0003: 过程档 gitignore 化后的运行 worktree 物化机制
 
-ADR 0002 裁决落地后，过程档（docs/tickets|reviews|acceptance）不再进 git：`git worktree add` 的新建 worktree 不携带任何过程档文件，而 `.sdlc/check.sh` 的门禁（validate、commit-msg、pre-push）全部读**当前工作目录**的盘上过程档——实测 commit-msg hook 在未物化的 worktree 内拦截一切 `[#NNNN]` 提交（报"提交引用的工单不存在"）。本 ADR 记录 dev-execute 编排运行在 gitignore 时代的机械适配（run/0011 运行全程实证，spec 0011 验收报告 0001 折回）。
+ADR 0002 裁决落地后，过程档（docs/tickets|reviews|acceptance〔+docs/overviews，2026-11-07 扩项〕）不再进 git：`git worktree add` 的新建 worktree 不携带任何过程档文件，而 `.sdlc/check.sh` 的门禁（validate、commit-msg、pre-push）全部读**当前工作目录**的盘上过程档——实测 commit-msg hook 在未物化的 worktree 内拦截一切 `[#NNNN]` 提交（报"提交引用的工单不存在"）。本 ADR 记录 dev-execute 编排运行在 gitignore 时代的机械适配（run/0011 运行全程实证，spec 0011 验收报告 0001 折回）。
 
 ## 裁决
 
