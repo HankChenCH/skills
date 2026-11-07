@@ -114,7 +114,7 @@ allowed_list() {
     design) echo "draft approved" ;;
     ticket) echo "ready in-progress implemented done" ;;
     overview) echo "draft reviewed" ;;
-    review) echo "draft approved" ;;
+    review) echo "draft approved blocked" ;;
     acceptance) echo "draft passed rejected" ;;
     adr) echo "accepted superseded" ;;
     *) echo "" ;;

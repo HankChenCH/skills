@@ -339,6 +339,27 @@ t "validate need" 0 "check.sh validate docs/needs/0001-checkout.md" "通过"
 t "validate spec（FR-1/2/10 追溯）" 0 "check.sh validate docs/specs/0001-checkout.md" "通过"
 t "validate ticket" 0 "check.sh validate docs/tickets/0002-coupon.md" "通过"
 t "validate review" 0 "check.sh validate docs/reviews/0001-coupon-review.md" "通过"
+# 票 20261107-18a9: review blocked（设计级阻断出口）是合法状态，validate 受理
+wfile docs/reviews/0002-cart-review-blocked.md <<'EOF'
+---
+id: 0002
+status: blocked
+tickets: [0002]
+branch: feat/coupon
+created: 2026-10-26
+---
+# 0002: 购物车评审（设计级阻断）
+
+## 标准轴 findings
+- [docs/x/y.ts:1] 怎么改 —— 为什么（阻断）
+
+## Spec 轴 findings
+- [ticket 0002 / spec 0001] 走样：说明 + 怎么改（阻断）
+
+## 汇总
+标准轴阻断 1 / 建议 0；Spec 轴阻断 1 / 建议 0。结论：待修复项列表
+EOF
+t "validate review blocked 合法（设计级阻断出口）" 0 "check.sh validate docs/reviews/0002-cart-review-blocked.md" "通过"
 t "validate acceptance" 0 "check.sh validate docs/acceptance/0001-checkout-round1.md" "通过"
 t "validate adr" 0 "check.sh validate docs/adr/0001-local-tracker.md" "通过"
 t "validate research" 0 "check.sh validate docs/research/0001-gateway.md" "通过"
