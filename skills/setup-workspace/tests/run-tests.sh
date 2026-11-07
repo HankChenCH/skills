@@ -3295,6 +3295,70 @@ setfm docs/specs/0001-cycle.md status done
 t "done spec 清扫扫描经 ID 段匹配把前缀工单的评审计入残留" 1 "check.sh validate docs/specs/0001-cycle.md" "docs/reviews/0001-prefix-review.md"
 setfm docs/specs/0001-cycle.md status approved
 
+echo "== 枚举交叉断言（retro 20261107-873f 采纳②）：词条枚举与过程档目录集一致 =="
+ROOT="$HERE/../../.."
+t "GLOSSARY 过程档词条枚举含全部四过程档目录" 0 "grep -qF 'ticket、review、acceptance、overview' \"$ROOT/GLOSSARY.md\"" ""
+t "GLOSSARY 清扫词条枚举含全部四过程档目录" 0 "grep -qF 'tickets / overviews / reviews / acceptance' \"$ROOT/GLOSSARY.md\"" ""
+
+echo "== 物化清单演练（retro 采纳④，票 20261107-2a2b）：四目录物化 → worktree 内票门禁放行 =="
+DRILL="$(mktemp -d)"
+git init -q "$DRILL/repo"
+git -C "$DRILL/repo" config user.email d@d
+git -C "$DRILL/repo" config user.name d
+mkdir -p "$DRILL/repo/.sdlc"
+cp -R "$ROOT/.sdlc/." "$DRILL/repo/.sdlc/"
+cp "$CHECK" "$DRILL/repo/.sdlc/check.sh"
+chmod +x "$DRILL/repo/.sdlc/check.sh"
+mkdir -p "$DRILL/repo/docs/specs" "$DRILL/repo/docs/tickets" "$DRILL/repo/docs/overviews"
+printf '.sdlc/trackers/github.map\ndocs/tickets/\ndocs/reviews/\ndocs/acceptance/\ndocs/overviews/\n' > "$DRILL/repo/.gitignore"
+cat > "$DRILL/repo/docs/specs/0001-x.md" <<'EOF'
+---
+id: 0001
+status: approved
+created: 2026-11-07
+---
+# 演练 spec
+EOF
+for n in 1 2; do
+cat > "$DRILL/repo/docs/tickets/000$n-t.md" <<EOF
+---
+id: 000$n
+type: feature
+spec: 0001
+status: ready
+blocked-by: []
+created: 2026-11-07
+---
+# 000$n: 演练票
+EOF
+done
+cat > "$DRILL/repo/docs/overviews/0001-x.md" <<'EOF'
+---
+id: 0001
+spec: 0001
+status: reviewed
+created: 2026-11-07
+reviewed: 2026-11-07
+---
+# 演练总览
+EOF
+git -C "$DRILL/repo" add .gitignore .sdlc docs/specs
+git -C "$DRILL/repo" commit -qm "[trivial] init"
+git -C "$DRILL/repo" worktree add -q "$DRILL/wt" -b wtbranch
+for d in tickets reviews acceptance overviews; do
+  if [ -d "$DRILL/repo/docs/$d" ]; then cp -R "$DRILL/repo/docs/$d" "$DRILL/wt/docs/$d"; fi
+done
+out="$(cd "$DRILL/wt" && "$CHECK" ticket 0001 2>&1)"
+rc=$?
+if [ "$rc" -eq 0 ] && case "$out" in *"已 reviewed"*) true ;; *) false ;; esac; then
+  echo "ok: 物化清单四目录 → worktree 内票门禁放行（≥2 票 + reviewed 总览）"; PASS=$((PASS+1))
+else
+  echo "FAIL: 物化清单演练 —— 退出码 $rc"
+  printf '%s\n' "$out" | sed 's/^/    | /'
+  FAIL=$((FAIL+1))
+fi
+rm -rf "$DRILL"
+
 echo "== 双份文档资产逐字一致（活本 vs 生成资产）=="
 ROOT="$HERE/../../.."
 t "两份 METHOD.md 逐字一致" 0 "diff \"$ROOT/docs/METHOD.md\" \"$HERE/../assets/METHOD.md\""
