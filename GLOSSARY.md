@@ -95,6 +95,6 @@
 - **间距阶梯** —— 预先定好的受限间距与尺寸取值序列：以 16px 为基准、相邻取值差距不低于约 25%，所有间距与尺寸决定只从阶梯里选，不做逐像素临场微调（首次出现：ref-refactoring-ui 技能 references/layout-spacing.md）。
 - **色阶** —— 一种颜色按深浅预先排定的一组变体：灰色系备 8–10 阶、主色与强调色各备 5–10 阶（编号如 100–900），用时取阶、禁止临时计算新色；定名沿用译文仓库 @ ec3aa73 术语表 shade 译名（首次出现：ref-refactoring-ui 技能 references/color.md）。
 - **强调色** —— 主色之外用于传达信息或突出语义状态的颜色（警示黄、破坏性红、成功绿等）：克制使用并按色阶体系管理；定名沿用译文仓库 @ ec3aa73 术语表 accent color 译名（首次出现：ref-refactoring-ui 技能 references/color.md）。
-- **复杂守恒定律** —— 产品的内在复杂性不可移除也不可隐藏，设计能决定的只是它归谁处理：以客户视角重构复杂性的归属，把复杂扛在设计侧、把简单留给客户，落到体感是"找得到 + 看得懂"（首次出现：skills/ref-b-side-design/references/understand-customer.md）。
-- **MECE** —— 功能归类的硬判据：互相独立、完全穷尽；本技能主要取"互相独立"一翼——一个功能只归一个大类，归类维度从客户业务逻辑取而非技术实现取，出现"归 A 还是归 B"的犹豫即耦合信号（首次出现：skills/ref-b-side-design/references/architect-structure.md）。
-- **泳道图** —— 按角色分列的流程图绘制形式：第一列客户逐动作记录（多角色全排左侧）、第二列产品界面内容、第三列后台数据读取储存判断；用于还原原有流程、识别最高频最耗精力的界面与等待出错点位，是 B 端流程优化的前提工具（首次出现：skills/ref-b-side-design/references/architect-structure.md）。
+- **复杂守恒定律** —— 产品的内在复杂性不可移除也不可隐藏，设计能决定的只是它归谁处理：以客户视角重构复杂性的归属，把复杂扛在设计侧、把简单留给客户，落到体感是"找得到 + 看得懂"（首次出现：ref-b-side-design 技能 references/understand-customer.md）。
+- **MECE** —— 功能归类的硬判据：互相独立、完全穷尽；ref-b-side-design 主要取"互相独立"一翼——一个功能只归一个大类，归类维度从客户业务逻辑取而非技术实现取，出现"归 A 还是归 B"的犹豫即耦合信号（首次出现：ref-b-side-design 技能 references/architect-structure.md）。
+- **泳道图** —— 按角色分列的流程图绘制形式：第一列客户逐动作记录（多角色全排左侧）、第二列产品界面内容、第三列后台数据读取储存判断；用于还原原有流程、识别最高频最耗精力的界面与等待出错点位，是 B 端流程优化的前提工具（首次出现：ref-b-side-design 技能 references/architect-structure.md）。
