@@ -46,7 +46,7 @@
 - **工单级 / 集成级**：验收场景的验证层级。工单级映射进单张工单的验收标准；集成级拆不进单票，是 acceptance 的运行清单。
 - **round**：spec 的迭代轮次。round 1 覆盖风险最大的最小范围（MVP），后续轮次由验收后的"下一轮建议"驱动。
 - **frontier**：阻塞已清、可开工的工单清单，`check.sh frontier` 输出。
-- **[trivial]**：提交豁免标记，限 typo 与纯文档改动；每次豁免留痕于 commit message，dev-retro 审计。
+- **[trivial]**：提交豁免标记，限 typo 与纯文档改动；唯一例外 = 门禁自指场景（修复门禁的改动被该门禁拦截且流程内无解），须经用户显式拍板、commit message 记完整因果，dev-retro 复核其语义；每次豁免留痕于 commit message，dev-retro 审计。
 - **哨兵块**：AGENTS.md 中 `<!-- sdlc:begin/end -->` 之间的内容，由 setup-workspace 管理，勿手改。
 - **盘上主本 / tracker 投影**：docs/ 是唯一真相源，tracker（GitHub/GitLab/Codeup）只单向接收发布，不回读。
 - **门禁分级**：commit-msg 查轻量项（[#NNNN] 状态合法或 [trivial]；Merge/Revert 信息头机械豁免）；pre-push 查重项（implemented 工单须有 approved 评审覆盖）。
