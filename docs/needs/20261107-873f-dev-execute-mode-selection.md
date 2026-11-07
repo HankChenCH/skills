@@ -1,8 +1,9 @@
 ---
 id: 20261107-873f
-status: confirmed
+status: fulfilled
 created: 2026-11-07
 confirmed: 2026-11-07
+fulfilled: 2026-11-07
 ---
 # dev-execute 运行形态选择：并行模式与值守模式
 
