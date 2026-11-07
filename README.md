@@ -113,7 +113,7 @@ AI 协作开发的三种常见失控：
 
 **参考层（内部参考，被流程技能装载，不独立调用）**
 
-[ref-writing](./skills/ref-writing/SKILL.md)、[ref-implementation](./skills/ref-implementation/SKILL.md)、[ref-review](./skills/ref-review/SKILL.md)、[ref-testing](./skills/ref-testing/SKILL.md)、[ref-git-commit](./skills/ref-git-commit/SKILL.md)、[ref-refactoring-ui](./skills/ref-refactoring-ui/SKILL.md)——分别定义「什么是好」的文档、实现、评审、测试、提交信息与界面视觉设计。
+[ref-writing](./skills/ref-writing/SKILL.md)、[ref-implementation](./skills/ref-implementation/SKILL.md)、[ref-review](./skills/ref-review/SKILL.md)、[ref-testing](./skills/ref-testing/SKILL.md)、[ref-git-commit](./skills/ref-git-commit/SKILL.md)、[ref-refactoring-ui](./skills/ref-refactoring-ui/SKILL.md)、[ref-b-side-design](./skills/ref-b-side-design/SKILL.md)——分别定义「什么是好」的文档、实现、评审、测试、提交信息、界面视觉设计与 B 端体验设计。
 
 ## 接入后的工作区
 
