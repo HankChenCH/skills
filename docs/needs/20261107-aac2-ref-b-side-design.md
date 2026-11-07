@@ -1,8 +1,9 @@
 ---
 id: 20261107-aac2
-status: confirmed
+status: fulfilled
 created: 2026-11-07
 confirmed: 2026-11-07
+fulfilled: 2026-11-07
 ---
 # ref-b-side-design：B 端体验设计方法论参考技能
 
