@@ -96,9 +96,13 @@ created: <date>
 2. 确认后逐张取号落盘（§3 固定模板的 claim 步骤），每张运行
    `.sdlc/check.sh validate <该票占位路径>`，都必须通过；不过 → 修复后重跑。
 3. 逐张运行 `.sdlc/check.sh publish <该票占位路径>`。
-4. 运行 `.sdlc/check.sh frontier` 并展示，抛出决策问题："从哪张开工？默认建议
-   <最小编号>。"工单由用户点名，本技能不代挑、不自动开工。名下票 ≥2 的 spec，
-   建议先 /dev-overview 走查再开工。
+4. **出口衔接**：名下票全部 publish 后统计本 spec 名下 ready 票数——≥2 → 立即链式调用
+   /dev-overview 并携带本轮 spec 编号（先例：dev-spec 出口调 dev-plan、dev-fix 出口调
+   dev-implement），总览合成、走查与归置全部结束后再进入 frontier 呈现与开工点名；
+   单票 → 不调用（门禁豁免，总览冗余），直接进入。两路随后都运行
+   `.sdlc/check.sh frontier` 并展示，抛出决策问题："从哪张开工？默认建议 <最小编号>。"
+   工单由用户点名，本技能不代挑、不自动开工。衔接被推迟走查或会话中断的（仅 ≥2 票
+   存在此路），出口指路 /dev-overview——draft 已在盘上，重入从走查续接，先走查再开工。
 
 ## 5. 中断与交接
 
