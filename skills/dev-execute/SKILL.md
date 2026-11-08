@@ -22,12 +22,19 @@ description: 整 spec 编排运行——点名一张 approved spec，把名下�
 2. **校验 spec**：存在且 `status: approved`。仍是 draft → 拒绝并指路
    "/dev-spec 完成批准"；已 done → 拒绝并指路 /dev-accept。名下没有任何工票 →
    拒绝并指路 /dev-plan。名下工票已全部 done → 拒绝："无可运行工票，走
-   /dev-accept"——唯一例外：**验收段未走完**（docs/acceptance/ 无本 spec 终态
-   报告或报告 draft，或 spec 已 done 而 need 未置 fulfilled）时不拒绝，视为运行
-   在途，按 §1.3 重入判定与 §7 续接（run-mechanics §5 第 6 条自动验收段分支）。
+   /dev-accept"。**门级例外（唯一）——验收段未走完的运行在途态**：以下任一命中
+   时不拒绝、越过本条各拒绝句（含已 done 与无工票句——done spec 的工票已被
+   dev-accept 清扫删除，"名下没有任何工票"字面为真不构成拦截），视为运行在途，
+   按 §1.3 重入判定与 §7 续接（run-mechanics §5 第 6 条自动验收段分支）：
+   ① docs/acceptance/ 无本 spec 报告且 spec 仍 approved（验收未起或报告未落盘）；
+   ② 报告 `status: draft`（验收中段，spec 仍 approved）；
+   ③ 报告 `status: passed` 而 spec 仍 approved（判定已落、收口序列中断）；
+   ④ spec 已 `done` 而 need 未置 fulfilled（序列走完，停在 fulfilled 门等人）。
+   rejected 终态报告在盘，或 passed 且 need 已 fulfilled（完成态）→ 例外不命中，
+   照旧拒绝改道 /dev-accept。
 3. **重入判定**：`git worktree list` 已发现该 spec 的运行分支 worktree，或 §1.2
-   例外命中（票全 done 而验收段未走完）→ 运行已在进行中，跳过建图与开工确认，
-   直接按 §7 续接（断点推导方法见 run-mechanics §5）。
+   门级例外命中 → 运行已在进行中，跳过建图与开工确认，直接按 §7 续接（断点推导
+   方法见 run-mechanics §5）。
 
 ## 2. 装载上下文
 

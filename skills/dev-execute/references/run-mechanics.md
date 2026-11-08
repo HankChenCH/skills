@@ -308,12 +308,15 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
    - 票已 done、worktree 未清（`git worktree list` 仍有 run/ 前缀条目）→ 从
      §8.5 清理续起。
    - 断点落在自动验收段（票全 done、worktree 已清，SKILL.md §6.7 验收未走完；
-     v1.29 新分支）→ 按 docs/acceptance/ 盘上报告状态续接：无本 spec 报告 → 从
-     §8.7 重新自动启动 dev-accept；报告 `status: draft` → 按 dev-accept §1.1
-     重入续接，已出结论的场景不重跑；passed 收口序列已走完（spec 已 done）而
-     need 未置 fulfilled → 停在 fulfilled 门等人显式确认（沉默不算接受残余风险）；
-     rejected → 运行以验收报告终态收场，fix 票开不开归人（rejected
-     出口不自动开轮）。
+     v1.29 新分支）→ 按 docs/acceptance/ 盘上报告状态与 spec 状态续接，判读次序
+     固定：报告 `status: draft` → 按 dev-accept §1.1 重入续接，已出结论的场景
+     不重跑；报告 `status: passed` 且 spec 仍 approved（判定已落、收口序列中断）
+     → 从 dev-accept §4.4 序列断点续起（蒸馏残余 → 清扫 → 置 done → 原子提交
+     → fulfilled 门）；报告 `status: passed` 且 spec 已 done 而 need 未置
+     fulfilled → 停在 fulfilled 门等人显式确认（沉默不算接受残余风险）——passed
+     报告已随清扫删除时以 spec done + need 未 fulfilled 为判据；无本 spec 报告
+     且 spec 仍 approved → 从 §8.7 重新自动启动 dev-accept；rejected → 运行以
+     验收报告终态收场，fix 票开不开归人（rejected 出口不自动开轮）。
    已合回票的评审不重做：评审报告经合回前同步在运行 worktree 盘上（docs/
    reviews/），pre-push 按覆盖面机械核对，缺了才补（SKILL.md §8 收口 pre-push
    异常）。
@@ -503,5 +506,5 @@ git worktree prune
 - **rejected**：运行以验收报告终态收场（dev-accept rejected 出口语义不变：缺陷
   指路 dev-fix、不自动开轮），出口报告如实载明 rejected 与报告编号；fix 票开不
   开归人。
-- **中断续接**：断点落在验收段按 §5.6 末条续接（报告 draft 续跑、无报告重启
-  验收、序列走完停在 fulfilled 门）。
+- **中断续接**：断点落在验收段按 §5 第 6 条自动验收段分支续接（报告 draft 续跑、
+  passed 序列中断从序列断点续起、无报告重启验收、序列走完停在 fulfilled 门）。
