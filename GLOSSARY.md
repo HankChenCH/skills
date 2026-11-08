@@ -26,9 +26,11 @@
 | need.draft | 需求澄清中，开放问题未清零 | dev-clarify |
 | need.confirmed | 澄清完成，可作为 spec 输入 | dev-clarify |
 | need.fulfilled | 成功标准全部核销、无未接受风险（终态） | dev-accept |
+| need.reconstructed | 逆向扫描 / 迁移沉淀的 need 落盘即置：不进正向待办流（frontier 不受理），phase 照常显示 | setup-reconstruct / setup-migrate |
 | spec.draft | 规格起草中 | dev-spec |
 | spec.approved | 用户已显式批准，可拆工单 | dev-spec |
 | spec.done | 验收通过，且名下过程档已清扫（终态） | dev-accept |
+| spec.reconstructed | 逆向扫描 / 迁移沉淀的 spec 落盘即置：不进正向待办流（frontier 不受理），phase 照常显示 | setup-reconstruct / setup-migrate |
 | design.draft / approved | 技术方案起草 / 定稿 | dev-design / design-deliver |
 | ticket.ready | 阻塞已清、可开工 | dev-plan |
 | ticket.in-progress | 开工中，进展写进 ## Progress | dev-implement |

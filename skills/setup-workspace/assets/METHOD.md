@@ -87,8 +87,8 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 
 | 产物 | frontmatter 字段 | 状态机（箭头上是推进者） |
 |---|---|---|
-| need | `id` `status` | draft →confirmed（dev-clarify）→fulfilled（dev-accept，末轮通过且成功标准核销、无未接受风险） |
-| spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫） |
+| need | `id` `status` | draft →confirmed（dev-clarify）→fulfilled（dev-accept，末轮通过且成功标准核销、无未接受风险）；逆向产物落盘即 reconstructed（setup-reconstruct / setup-migrate，不进正向待办流） |
+| spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫）；逆向产物落盘即 reconstructed（setup-reconstruct / setup-migrate，不进正向待办流） |
 | design | `id` `spec` `status` | draft →approved（dev-design / design-deliver） |
 | ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `repos?` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
 | overview | `id` `spec` `status` | draft →reviewed（dev-overview，须用户显式确认） |

@@ -3389,6 +3389,15 @@ t "README 审计链句改分档表述（审计链主承载句在）" 0 "grep -qF
 tn "concepts 审计链词条不再写「全部进版本库、不 gitignore」（ADR 0002 已废除）" 0 "cat \"$CONCEPTS\"" "全部进版本库、不 gitignore"
 t "concepts 审计链词条改分档表述（审计链主承载句在）" 0 "grep -qF '审计链主承载' \"$CONCEPTS\"" ""
 
+echo "== reconstructed 状态成文枚举（票 20261108-5516，spec 0008）=="
+ROOT="$HERE/../../.."
+t "活本 METHOD 状态机表含 reconstructed 注记（逆向产物落盘即置、不进正向待办流）" 0 "grep -qF '逆向产物落盘即 reconstructed' \"$ROOT/docs/METHOD.md\""
+t "生成资产 METHOD 状态机表含 reconstructed 注记（整文件复制同步面）" 0 "grep -qF '逆向产物落盘即 reconstructed' \"$HERE/../assets/METHOD.md\""
+t "活本 GLOSSARY 状态表含 need.reconstructed 行" 0 "grep -qF '| need.reconstructed |' \"$ROOT/GLOSSARY.md\""
+t "活本 GLOSSARY 状态表含 spec.reconstructed 行" 0 "grep -qF '| spec.reconstructed |' \"$ROOT/GLOSSARY.md\""
+t "生成资产 GLOSSARY 状态表含两 reconstructed 行（同步面）" 0 "grep -qF '| need.reconstructed |' \"$HERE/../assets/GLOSSARY.md\" && grep -qF '| spec.reconstructed |' \"$HERE/../assets/GLOSSARY.md\""
+t "蓝图 §6.1 状态机总表含 reconstructed 注记（v1.26 review 行补 blocked 同款）" 0 "grep -qF '逆向产物落盘即 reconstructed' \"$ROOT/docs/sdlc-skills-blueprint.md\""
+
 echo "== 终态断言：spec 0011 零改动面（check.sh 机械层与 dev-accept 蒸馏清扫序列不动）=="
 t "零改动面：check.sh 与生成资产 diff 为空" 0 "diff \"$ROOT/.sdlc/check.sh\" \"$HERE/../assets/check.sh\""
 t "零改动面：dev-accept 清扫范围句原样（spec 0014 票 0030 授权纳入 overviews 后的形态）" 0 "grep -qF \"删除该 spec 名下全部 tickets、overviews、reviews 与本次验收报告文件\" \"$ROOT/skills/dev-accept/SKILL.md\""
