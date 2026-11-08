@@ -1,6 +1,6 @@
 ---
 name: dev-overview
-description: 在 dev-plan 出口之后、首票开工之前，把一张 approved spec 名下的 need、design（若有）与全部工单纯读合成为五节总览（全景一行/全景矩阵/黄金场景走查/样张/差距清单）落 docs/overviews/，陪用户走查并把暴露的缝隙三路归置到 spec 与工单上；经用户显式确认后置 reviewed，名下票 ≥2 的 spec 开工须有 reviewed 总览。当用户要求出总览、开工前走查、看功能会实现成什么样时使用——spec 未批准或名下无 ready 票会在入口被拦下。
+description: 在 dev-plan 出口之后、首票开工之前，把一张 approved spec 名下的 need、design（若有）与全部工单纯读合成为五节总览（全景一行/全景矩阵/黄金场景走查/样张/差距清单）落 docs/overviews/，陪用户走查并把暴露的缝隙三路归置到 spec 与工单上；经用户显式确认后置 reviewed，名下票 ≥2 的 spec 开工须有 reviewed 总览。当用户要求出总览、开工前走查、看功能会实现成什么样，或由 dev-plan 出口自动链式进入（携带 spec 编号，免点名）时使用——spec 未批准或名下无 ready 票会在入口被拦下。
 ---
 
 # dev-overview：开工前总览合成与走查
@@ -16,13 +16,14 @@ description: 在 dev-plan 出口之后、首票开工之前，把一张 approved
 
 ## 1. 入口门禁（全部通过才继续）
 
-1. **确定 spec**。用户给了编号或路径 → 用它；没给 → 运行 `.sdlc/check.sh phase`，
+1. **确定 spec**。由 dev-plan 出口链式进入 → 直接取调用方携带的 spec 编号，跳过点名；
+   用户给了编号或路径 → 用它；没给 → 运行 `.sdlc/check.sh phase`，
    列出 `approved` 的 spec 及各自名下 ready 票数，请用户点名。禁止自行挑一张没被点名的 spec。
 2. spec 的 `status` 不是 `approved` → **停止**："spec NNNN 还是 draft，先 /dev-spec 完成批准。"
 3. **名下一张 ready 票都没有**（docs/tickets/ 没有 `spec: NNNN` 且 `status: ready` 的工单）→
    **停止**："spec NNNN 的票还没拆完，先 /dev-plan——全景矩阵的票号列依赖票在盘上。"
 4. **重入**：docs/overviews/ 已有 `spec: NNNN` 指向它的 draft 总览 → 从 §4 走查续接，
-   不重新合成（盘上的 draft 就是进度）。
+   不重新合成（盘上的 draft 就是进度）；由 dev-plan 出口衔接进入的补票场景同走此分支。
 
 ## 2. 装载上下文（全程纯读）
 
@@ -91,7 +92,10 @@ created: <date>
 
 ## 4. 走查与三路归置
 
-1. 合成完成后逐节念给用户走查：五节按序，样张给出打开命令。
+1. 合成完成后逐节念给用户走查：五节按序，样张给出打开命令。从 §1 重入分支续接时
+   （含由 dev-plan 出口衔接进入的补票场景），走查前先核对全景矩阵与盘上票集：
+   合成后补的票能指回的格子更新票号列，仍指不回任何票的格子标缺口进差距清单，
+   归置走第 2 步三路、更新次序守第 3 步——不重新合成。
 2. 暴露的缝隙**三路归置**，落点永远在 spec 与工单上，总览不替用户拍板：
    - 缺 FR 或场景错 → 回 dev-spec 补 FR 改场景（回路，不是失败）；
    - 缺票或切分错 → 回 dev-plan 补票重切；
