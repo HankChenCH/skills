@@ -1,10 +1,11 @@
 ---
 id: 20261108-c196
-status: approved
+status: done
 need: 0012
 round: 2
 created: 2026-11-08
 approved: 2026-11-08
+done: 2026-11-08
 ---
 # dev-overview round 2：plan 出口自动衔接总览合成
 
