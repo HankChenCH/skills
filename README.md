@@ -2,7 +2,7 @@
 
 **门禁式 SDLC 技能集——把「团队 + AI 协作开发」的流程规矩变成机器门禁。**
 
-27 个技能（23 个已实现，design-\* 界面设计套件 4 个随 spec 0015 建设中）驱动一条脊柱流水线，八类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
+30 个技能（全部已实现）驱动一条脊柱流水线，九类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
 
 ```
 need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现）→ review（评审）→ ship（交付）→ accept（验收）
@@ -60,7 +60,7 @@ AI 协作开发的三种常见失控：
 /dev-clarify → /dev-spec → /dev-plan → /dev-implement → /dev-review → /dev-ship → /dev-accept
 ```
 
-## 技能清单（27 个）
+## 技能清单（30 个）
 
 **总控与初始化**
 
@@ -78,6 +78,7 @@ AI 协作开发的三种常见失控：
 | [dev-clarify](./skills/dev-clarify/SKILL.md) | 想法 → need：方法论亮牌路由 + 校准阶梯，开放问题三路归置清零 |
 | [dev-spec](./skills/dev-spec/SKILL.md) | need/对话 → spec：固定模板，验收场景带 FR 追溯（孤儿报错），round 1 圈风险最大的最小范围 |
 | [dev-plan](./skills/dev-plan/SKILL.md) | spec → 工票：tracer-bullet 垂直切片，`blocked-by` 阻塞边 |
+| [dev-overview](./skills/dev-overview/SKILL.md) | 开工前总览：need/spec/design 与名下工票合成五节总览、走查归置缝隙；名下票 ≥2 的 spec 须 reviewed 总览才准开工（单票豁免） |
 | [dev-implement](./skills/dev-implement/SKILL.md) | 按票实现：入口校验状态与依赖，出口跑全量检查 |
 | [dev-review](./skills/dev-review/SKILL.md) | 双轴评审：标准轴（写得对不对）+ Spec 轴（做的是不是要的），两轴阻断清零才放行 |
 | [dev-ship](./skills/dev-ship/SKILL.md) | 交付：PR 三节模板（Summary / Evidence / Merge Danger）、合并、工票 done |
@@ -100,16 +101,16 @@ AI 协作开发的三种常见失控：
 | [dev-release](./skills/dev-release/SKILL.md) | 语义化版本 + CHANGELOG + 发布检查单（tag 与推送是单向门，必须问人） |
 | [dev-docs](./skills/dev-docs/SKILL.md) | 面向人的文档维护：每条行为断言先核验后落笔 |
 
-**界面设计（design-\* 套件，spec 0015 建设中）**
+**界面设计（design-\* 套件）**
 
-「场景约束 → 基线 → 设计 → 述标」链；技能文件随后五张实现票落地，届时链接改指各自 SKILL.md，当前规格见[设计蓝图 §11.20–§11.23](./docs/sdlc-skills-blueprint.md)。
+「场景约束 → 基线 → 设计 → 述标」链，随 spec 0015 交付：
 
 | 技能 | 职责 |
 |---|---|
-| [design-brief](./docs/sdlc-skills-blueprint.md) | 使用者角色 → 书面设计约束（信息优先级 / 密度 / 关键操作路径），链起点 |
-| [design-baseline](./docs/sdlc-skills-blueprint.md) | 建立 / 读取项目设计语言基线（docs/standards/ 按平台分册 + 标准索引登记） |
-| [design-ui](./docs/sdlc-skills-blueprint.md) | 约束与基线下的多平台布局视觉决策：四态完备、Web 必含移动端适配决策、硬指标自查 |
-| [design-deliver](./docs/sdlc-skills-blueprint.md) | 述标交付：design 产物「界面设计」节四小节 + 可点 HTML 原型落 designs/assets/，approved 门即述标评审门 |
+| [design-brief](./skills/design-brief/SKILL.md) | 使用者角色 → 书面设计约束（信息优先级 / 密度 / 关键操作路径），链起点 |
+| [design-baseline](./skills/design-baseline/SKILL.md) | 建立 / 读取项目设计语言基线（docs/standards/ 按平台分册 + 标准索引登记） |
+| [design-ui](./skills/design-ui/SKILL.md) | 约束与基线下的多平台布局视觉决策：四态完备、Web 必含移动端适配决策、硬指标自查 |
+| [design-deliver](./skills/design-deliver/SKILL.md) | 述标交付：design 产物「界面设计」节四小节 + 可点 HTML 原型落 designs/assets/，approved 门即述标评审门 |
 
 **参考层（内部参考，被流程技能装载，不独立调用）**
 
@@ -134,7 +135,7 @@ AI 协作开发的三种常见失控：
 └── CHANGELOG.md            # 懒创建，仅需要发布流程的项目
 ```
 
-- **八类产物各有固定状态机**（如 spec：draft → approved → done），frontmatter 是 check.sh 的解析依据——产物目录加 git log 就是完整审计链。状态机详见 [docs/METHOD.md](./docs/METHOD.md) §5。
+- **九类产物各有固定状态机**（如 spec：draft → approved → done），frontmatter 是 check.sh 的解析依据——产物目录加 git log 就是完整审计链。状态机详见 [docs/METHOD.md](./docs/METHOD.md) §5。
 - **check.sh 常用子命令**：`phase` 全库状态总览；`frontier` 可开工的工票；`validate <file>` 产物模板与 FR 追溯校验；`publish <file>` 投影到 tracker；`all` 全量 lint/typecheck/test。提交走轻门禁（message 带 `[#NNNN]` 或 `[trivial]`），push 前走重门禁（implemented 工票必须有 approved 评审覆盖）。
 
 ## 文档
@@ -149,4 +150,4 @@ AI 协作开发的三种常见失控：
 
 ## 项目状态
 
-23 个技能已实现；design-\* 界面设计套件 4 个按 spec 0015 建设中，设计真相源见蓝图 §11.20–§11.23。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。
+30 个技能全部已实现（含 design-\* 界面设计套件 4 个，spec 0015 交付）。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。

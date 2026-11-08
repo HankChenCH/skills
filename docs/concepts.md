@@ -82,14 +82,14 @@
 
 ### 豁免通道（[trivial]）〔方法自创〕
 - **定位**：typo、纯文档改动走 `[trivial]` 标记豁免门禁，每次豁免留痕（commit message），由 `dev-retro` 审计是否滥用。防止门禁把小事卡死，也防止豁免成为后门。
-- **落点**：蓝图 §3、§5.4 pre-commit、§6.6。
+- **落点**：蓝图 §3、§5.4 commit-msg、§6.6。
 
 ### 门禁分级（轻门禁 / 重门禁）〔方法自创〕
 - **定位**：commit 时只查轻量项（message 带 `[#NNNN]` 且工单状态合法，或带 `[trivial]`）；merge/push 前才查重项（implemented 工单都有 approved 评审）。每次提交都全量检查会让人想卸载门禁。
-- **落点**：蓝图 §3、§5.4 `pre-commit` / `pre-push`。
+- **落点**：蓝图 §3、§5.4 `commit-msg` / `pre-push`。
 
 ### check.sh〔方法自创〕
-- **定位**：门禁脚本是全部机械判断的单一落点，8 个子命令：`phase`（全库状态总览）/ `frontier`（可开工工单）/ `ticket`（入口校验）/ `all`（全量 lint/typecheck/test）/ `validate`（模板与追溯校验）/ `pre-commit` / `pre-push` / `publish`（发布到 tracker）。git hook 和技能用同一套判断——校验逻辑下沉到脚本，技能只保留判断性行为。
+- **定位**：门禁脚本是全部机械判断的单一落点，8 个子命令：`phase`（全库状态总览）/ `frontier`（可开工工单）/ `ticket`（入口校验）/ `all`（全量 lint/typecheck/test）/ `validate`（模板与追溯校验）/ `commit-msg`（轻门禁）/ `pre-push`（重门禁）/ `publish`（发布到 tracker）。git hook 和技能用同一套判断——校验逻辑下沉到脚本，技能只保留判断性行为。
 - **落点**：蓝图 §2 原则 1、§5.4。
 
 ### 能机械检查的绝不只写成指令〔方法自创〕
@@ -125,8 +125,8 @@
 - **定位**：评审报告与工单等流程产物全部进版本库、不 gitignore——它们本身就是审计链，是门禁体系的一部分；豁免留痕供 retro 审计。
 - **落点**：蓝图 §5.1 原则 2、§5.7。
 
-### git hooks（pre-commit / pre-push）与一行转发〔外部〕
-- **定位**：L3 机械层的载体。hooks 本身不进版本库，所以只做一行转发（`.sdlc/check.sh pre-commit`），真逻辑全在版本化的 check.sh 里；换机器重跑 `/setup-workspace` 即恢复。
+### git hooks（commit-msg / pre-push）与一行转发〔外部〕
+- **定位**：L3 机械层的载体。hooks 本身不进版本库，所以只做一行转发（`.sdlc/check.sh commit-msg`、`.sdlc/check.sh pre-push`），真逻辑全在版本化的 check.sh 里；换机器重跑 `/setup-workspace` 即恢复。轻门禁挂 commit-msg 而非 pre-commit——git 在 commit-msg 时点才写入提交消息，pre-commit 时消息尚不存在，机械校验无从执行。
 - **来源**：git 官方钩子机制。
 - **落点**：蓝图 §5.2、§5.4。
 

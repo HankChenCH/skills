@@ -242,15 +242,16 @@ CHECK_TEST="npm run test"
 | 产物 | frontmatter 字段 | 状态机（箭头上是推进者） |
 |---|---|---|
 | need | `id` `status` | draft →confirmed（dev-clarify）→fulfilled（dev-accept，末轮通过且成功标准核销、无未接受风险） |
-| spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过） |
-| design | `id` `spec` `status` | draft →approved（dev-design） |
-| ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
+| spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫） |
+| design | `id` `spec` `status` | draft →approved（dev-design / design-deliver） |
+| ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `repos?` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
+| overview | `id` `spec` `status` | draft →reviewed（dev-overview，须用户显式确认） |
 | review | `id` `tickets: []` `branch` `status` | draft →approved | blocked（dev-review；approved = 各轴阻断项清零，blocked = 设计级阻断出口，修复后复审，v1.26） |
 | acceptance | `id` `spec` `round` `status` | draft →passed \| rejected（dev-accept） |
 | adr | `id` `status` | accepted →superseded（被新 ADR 取代时） |
 | research | `id` | 无状态，纯参考资料 |
 
-> 列表字段（`blocked-by`、`tickets`）必须单行书写：`[]` 或 `[0006, 0008]`；多行列表不予解析，`validate` 报错。
+> 列表字段（`blocked-by`、`repos`、`tickets`）必须单行书写：`[]` 或 `[0006, 0008]`；多行列表不予解析，`validate` 报错。
 
 ### 6.2 need 模板（固定；方法论不同，落盘同构）
 
@@ -305,6 +306,7 @@ type: feature
 spec: 0001
 status: ready
 blocked-by: []
+repos: []           # 可选；跨仓工单填成员仓库目录名，如 [frontend, backend]（.sdlc/members.list）
 created: <date>
 ---
 # 0007: <标题>
@@ -390,6 +392,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 | dev-spec | publish → 进 dev-plan | **spec 批准**；MVP 分轮范围 |
 | dev-design | publish design + ADR → 建议进 dev-plan | **方案批准**；ADR 级取舍 |
 | dev-plan | publish 工单 → 提示 frontier | 拆分粒度确认（含同层改动面互斥处置：并票 / blocked-by 串行 / expand–contract 重切三选一） |
+| dev-overview | 置 reviewed 后停，指路 /dev-implement（回路：缺 FR 场景回 /dev-spec、缺票回 /dev-plan；不自动串联） | 总览走查确认（缝隙归置清零后须用户显式确认才置 reviewed，沉默不算） |
 | dev-implement | **自动调 dev-review** | 无（spec 缺口时停下报告，属门禁回路） |
 | dev-execute | 全部票 done 后停，指路 /dev-accept（不自动串联） | **开工确认**（含同层改动面重叠预检报告 + 并行档点选 + 值守模式点选——不硬拦、不新增人工门；点选无人值守时声明宿主权限模式前提）；**合并确认**（单向门，全模式人工）；异常流处置**按值守模式分档**——有人值守：停下问人（预演失败 / 全序合回冲突 / 设计级阻断 / spec 缺口 / 收口 pre-push 不过五类），无人值守：大模型自主处置 + 逐条留痕、运行不停 |
 | dev-review | 通过 → 自动准备 PR（dev-ship 前半；dev-execute 编排模式下止于 approved，PR 由编排方运行末统一准备） | 阻断项修复策略：机械问题自动修再审，设计级问题问人 |
@@ -399,6 +402,10 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 | dev-fix | 自动调 dev-implement（fix 票进实现链，经其出口到达 dev-review） | 定级与修复时机 |
 | dev-retro | 产出改动清单 | 采纳哪些 |
 | dev-docs | 无自动串联（指路 dev-fix / dev-release / dev-retro） | 变更清单确认；文档与实现冲突时改哪边（默认建议：以实际行为为准改文档） |
+| design-brief | 约束清单落盘 → 指路 design-baseline（无基线）或 design-ui（已有基线）；不自动串联 | 角色清单确认（拿不准问用户，不猜）；约束逐角色三要素齐备 |
+| design-baseline | 报告基线状态（新建 / 既有读入）→ 指路 design-ui；不自动串联 | 新建基线须经用户确认；同名分册不覆盖 |
+| design-ui | 布局视觉决策 + 四态原型交 design-deliver 定稿；不自动串联 | 硬指标清单逐项有结果记录才出口 |
+| design-deliver | design approved → 指路 dev-plan；不自动串联 | **述标评审门 = design 的 approved 门**（用户显式批准，沉默不算批准） |
 
 `/sdlc` 增加一个 `next` 模式：**自动推进到下一个决策点为止**——"你只管决策，重复劳动归流水线"。
 
@@ -490,7 +497,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
   1. 前置校验：必须在 git 仓库内；assets/ 与 references/ 完整。**识别智能体**（环境变量 → 配置目录 → 技能安装路径），命中 `references/agent-adapters/<name>.md` 则全程应用其接入差异（如 Claude Code 需 CLAUDE.md 加 `@AGENTS.md` 转发行），未命中走通用流程——AGENTS.md 是跨智能体契约。
   2. 扫描（只读，先扫后问）：**仓库类型**（根级 workspace 标志 → monorepo 逐包扫描，否则整仓）；语言与框架（按包读 manifest）；检查命令（monorepo 优先聚合命令 turbo/nx/pnpm -r/go work）；环境已述项（Dockerfile/compose、版本管理文件、lockfile）；已有接入物（.sdlc/check.sh 存在 → 升级模式，全程按 §5.2 所有权表执行并逐项报告覆盖/保留/补缺）。
   3. 决策点（必须问、带默认建议，扫描已答的只复述不重问）：① 产物与 issue 出口 local（默认）/ GitHub / GitLab / 云效 Codeup——选 GitHub 验证 `gh auth status`，选 GitLab 验证 `glab auth status`，选 Codeup 引导添加 Codeup MCP；凭据/MCP 不通过回落 local 并明确告知，不静默降级；github/gitlab/codeup 的 publish 适配器随技能分发（assets/trackers/），setup 按所选出口安装对应文件并告知投影失败时的警告跳过语义（不阻断技能出口链）。② 执行环境缺口——每语言三问（跑在哪/版本管理/包管理器），仓库已描述的直接复述，结果写 config.sh 的 RUN_ENV/RUN_PREFIX/PKG_MGR/CODE_DIRS。③ 编码标准来源——内置 starter 只是兜底：问用户自有/团队标准及其来源（本地路径 / URL，可多个），导入 docs/standards/（增量、同名不覆盖），CODING_STANDARDS.md 写成"索引 + 兜底基线"；没有则引入匹配语言的 starter；可两者都要或跳过。
-  4. 生成/升级：按 §5.2 所有权表逐项执行。config.sh 预填探测结果，绝不覆盖；GLOSSARY.md 首建"流程术语与状态"章（项目术语不动）；AGENTS.md **最后收口**（不存在则连带创建；无标记文末追加；有标记只替换标记之间内容），智能体额外动作在此一并执行；git hooks 幂等重装，外来 hook 不覆盖只报告；docs/ 八个产物目录懒创建；源码与一切用户文件永不触碰。
+  4. 生成/升级：按 §5.2 所有权表逐项执行。config.sh 预填探测结果，绝不覆盖；GLOSSARY.md 首建"流程术语与状态"章（项目术语不动）；AGENTS.md **最后收口**（不存在则连带创建；无标记文末追加；有标记只替换标记之间内容），智能体额外动作在此一并执行；git hooks 幂等重装，外来 hook 不覆盖只报告；docs/ 九个产物目录懒创建；源码与一切用户文件永不触碰。
   5. 自检与收尾报告：跑 `check.sh phase` 与 `frontier` 确认可执行；报告四段——做了什么（含覆盖/保留决策、识别到的智能体与仓库类型）/ 探测画像（语言、包清单、版本管理、包管理器、聚合命令）/ config 待补项（TRACKER_REPO、留空的检查命令、未完成的 MCP/凭据）/ 建议跑 /sdlc（未安装则说明）。出口形态 = 报告 + 指路，无下游自动串联。
 - **注意**：实现时先检查 `~/.zcode/skills` 与 `~/.agents/skills` 的镜像关系，确认技能实际生效路径。
 
