@@ -26,7 +26,9 @@ description: 整 spec 编排运行——点名一张 approved spec，把名下�
    时不拒绝、越过本条各拒绝句（含已 done 与无工票句——done spec 的工票已被
    dev-accept 清扫删除，"名下没有任何工票"字面为真不构成拦截），视为运行在途，
    按 §1.3 重入判定与 §7 续接（run-mechanics §5 第 6 条自动验收段分支）：
-   ① docs/acceptance/ 无本 spec 报告且 spec 仍 approved（验收未起或报告未落盘）；
+   ① docs/acceptance/ 无本 spec 报告且 spec 仍 approved，且名下工票非空并已全部
+   done（票全 done 未清扫、报告未落盘——收口清理与验收启动之间的在途态；全新
+   运行工票 ready 不命中，照常走建图与开工确认）；
    ② 报告 `status: draft`（验收中段，spec 仍 approved）；
    ③ 报告 `status: passed` 而 spec 仍 approved（判定已落、收口序列中断）；
    ④ spec 已 `done` 而 need 未置 fulfilled（序列走完，停在 fulfilled 门等人）。
