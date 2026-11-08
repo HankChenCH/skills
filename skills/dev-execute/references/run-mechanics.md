@@ -311,8 +311,8 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
      v1.29 新分支）→ 按 docs/acceptance/ 盘上报告状态续接：无本 spec 报告 → 从
      §8.7 重新自动启动 dev-accept；报告 `status: draft` → 按 dev-accept §1.1
      重入续接，已出结论的场景不重跑；passed 收口序列已走完（spec 已 done）而
-     need 未置 fulfilled → 停在 fulfilled 门等人显式确认（沉默不算接受残余
-     风险）；rejected → 运行以验收报告终态收场，fix 票开不开归人（rejected
+     need 未置 fulfilled → 停在 fulfilled 门等人显式确认（沉默不算接受残余风险）；
+     rejected → 运行以验收报告终态收场，fix 票开不开归人（rejected
      出口不自动开轮）。
    已合回票的评审不重做：评审报告经合回前同步在运行 worktree 盘上（docs/
    reviews/），pre-push 按覆盖面机械核对，缺了才补（SKILL.md §8 收口 pre-push
@@ -498,8 +498,8 @@ git worktree prune
 - **无人值守**：运行中间的复述确认降为**声明留痕**（不问人，声明随验收报告与
   出口报告载明）；验收全自动跑到报告——passed/rejected 由 AI 按 dev-accept 分级
   判据（硬伤 / 瑕疵）机械作出，passed 的蒸馏 / 清扫 / spec 置 done 自动完成；
-  **need 置 fulfilled 一律停点等人显式确认**（全模式不豁免，沉默不算接受残余
-  风险）——此门是运行后停点，不计入运行内人工交互（恰两次定位不变）。
+  **need 置 fulfilled 一律停点等人显式确认**（全模式不豁免，沉默不算接受残余风险）
+  ——此门是运行后停点，不计入运行内人工交互（恰两次定位不变）。
 - **rejected**：运行以验收报告终态收场（dev-accept rejected 出口语义不变：缺陷
   指路 dev-fix、不自动开轮），出口报告如实载明 rejected 与报告编号；fix 票开不
   开归人。
