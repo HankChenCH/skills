@@ -91,7 +91,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫）；逆向产物落盘即 reconstructed（setup-reconstruct / setup-migrate，不进正向待办流） |
 | design | `id` `spec` `status` | draft →approved（dev-design / design-deliver） |
 | ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `repos?` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
-| overview | `id` `spec` `status` | draft →reviewed（dev-overview，须用户显式确认） |
+| overview | `id` `spec` `status` | draft →reviewed（dev-overview，须用户显式确认）；reviewed →draft（dev-overview，补票回置，不需显式确认） |
 | review | `id` `tickets: []` `branch` `status` | draft →approved | blocked（dev-review；approved = 两轴阻断项清零，blocked = 设计级阻断出口，修复后复审） |
 | acceptance | `id` `spec` `round` `status` | draft →passed \| rejected（dev-accept） |
 | adr | `id` `status` | accepted →superseded（被新 ADR 取代时） |
