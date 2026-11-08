@@ -1,10 +1,11 @@
 ---
 id: 20261108-d240
-status: approved
+status: done
 need: 0012
 round: 3
 created: 2026-11-08
 approved: 2026-11-08
+done: 2026-11-08
 ---
 # round 3：出口触发口径对齐门禁（D3）+ reviewed 总览遇补票回置走查
 
