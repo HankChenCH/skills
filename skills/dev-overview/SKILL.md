@@ -22,8 +22,16 @@ description: 在 dev-plan 出口之后、首票开工之前，把一张 approved
 2. spec 的 `status` 不是 `approved` → **停止**："spec NNNN 还是 draft，先 /dev-spec 完成批准。"
 3. **名下一张 ready 票都没有**（docs/tickets/ 没有 `spec: NNNN` 且 `status: ready` 的工单）→
    **停止**："spec NNNN 的票还没拆完，先 /dev-plan——全景矩阵的票号列依赖票在盘上。"
-4. **重入**：docs/overviews/ 已有 `spec: NNNN` 指向它的 draft 总览 → 从 §4 走查续接，
-   不重新合成（盘上的 draft 就是进度）；由 dev-plan 出口衔接进入的补票场景同走此分支。
+4. **重入**：docs/overviews/ 已有 `spec: NNNN` 指向它的总览，按状态分三支，三支都不重新合成：
+   ① 既有 draft → 从 §4 走查续接（盘上的 draft 就是进度）；由 dev-plan 出口衔接进入的补票
+   场景同走此支。② 既有 reviewed → 先做 §4 第 1 步的矩阵-票集核对：发现指不回的新票
+   （reviewed 之后补票）→ 不重新合成，把既有总览回置 draft（frontmatter 翻转并删去 `reviewed:`
+   行，正文注明
+   补票回置缘由）后从 §4 走查续接——续接中矩阵票号列更新守 §4 次序（先产物后格子），
+   差距清单清零后经用户显式确认重新置 reviewed；回置 draft 期间开工门禁照旧拦截（draft 态
+   非零退出并指路 /dev-overview），推迟走查的绕行通道就此关闭——补票后必须重走查才能开工
+   新票（回置是降级方向，不需显式确认）。③ 既有 reviewed 且核对全覆盖（无补票）→ 总览
+   不动（不回置、不重合成），直接告知已 reviewed 即可。
 
 ## 2. 装载上下文（全程纯读）
 

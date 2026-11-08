@@ -96,7 +96,8 @@ created: <date>
 2. 确认后逐张取号落盘（§3 固定模板的 claim 步骤），每张运行
    `.sdlc/check.sh validate <该票占位路径>`，都必须通过；不过 → 修复后重跑。
 3. 逐张运行 `.sdlc/check.sh publish <该票占位路径>`。
-4. **出口衔接**：名下票全部 publish 后统计本 spec 名下 ready 票数——≥2 → 立即用 Skill 工具调用
+4. **出口衔接**：名下票全部 publish 后统计本 spec 名下全部票数（docs/tickets/ 中 `spec: NNNN`
+   指向本 spec 的工单，不分状态，与开工门禁 overview_gate 同口径）——≥2 → 立即用 Skill 工具调用
    dev-overview 并携带本轮 spec 编号（先例：dev-spec 出口调 dev-plan、dev-fix 出口调
    dev-implement；dev-overview 未安装 → 停下说明"spec NNNN 名下 ≥2 票，开工前须走查总览"，
    指路 /dev-overview 手动进入，不代劳合成），总览合成、走查与归置全部结束后再进入
