@@ -25,7 +25,8 @@ description: 在 dev-plan 出口之后、首票开工之前，把一张 approved
 4. **重入**：docs/overviews/ 已有 `spec: NNNN` 指向它的总览，按状态分三支，三支都不重新合成：
    ① 既有 draft → 从 §4 走查续接（盘上的 draft 就是进度）；由 dev-plan 出口衔接进入的补票
    场景同走此支。② 既有 reviewed → 先做 §4 第 1 步的矩阵-票集核对：发现指不回的新票
-   （reviewed 之后补票）→ 不重新合成，把既有总览回置 draft（frontmatter 翻转，正文注明
+   （reviewed 之后补票）→ 不重新合成，把既有总览回置 draft（frontmatter 翻转并删去 `reviewed:`
+   行，正文注明
    补票回置缘由）后从 §4 走查续接——续接中矩阵票号列更新守 §4 次序（先产物后格子），
    差距清单清零后经用户显式确认重新置 reviewed；回置 draft 期间开工门禁照旧拦截（draft 态
    非零退出并指路 /dev-overview），推迟走查的绕行通道就此关闭——补票后必须重走查才能开工
