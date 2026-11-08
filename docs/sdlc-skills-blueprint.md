@@ -114,7 +114,7 @@
 ### 5.1 三条总原则
 
 1. **机器物与人文物分家**：`.sdlc/` 放流程基础设施，`docs/` 放流程产物，互不越界。
-2. **一切流程产物进版本库**：不往 `.gitignore` 加任何东西——审计链的完整性是门禁体系的一部分。
+2. **流程产物分档归置**：知识档（need、spec、design、adr、research、standards）进库永久留存；过程档（ticket、review、acceptance、overview）过程中盘上存在、被 `.gitignore` 排除、不进任何提交，验收通过后随蒸馏清扫删除——审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用。
 3. **可升级、不覆盖**：setup-workspace 幂等重跑；"整体覆盖"还是"只补缺失"按 §5.2 所有权表严格执行。
 
 ### 5.2 目录总览与所有权
@@ -132,9 +132,10 @@
 │   ├── research/               # 调研报告     NNNN-slug.md
 │   ├── specs/                  # 规格         NNNN-slug.md
 │   ├── designs/                # 技术方案     NNNN-slug.md
-│   ├── tickets/                # 工单（feature 与 fix 同池编号）
-│   ├── reviews/                # 评审报告     NNNN-slug.md
-│   ├── acceptance/             # 验收报告     NNNN-slug.md
+│   ├── tickets/                # 工单（feature 与 fix 同池编号）【过程档】
+│   ├── overviews/              # 开工前总览   NNNN-slug.md【过程档】
+│   ├── reviews/                # 评审报告     NNNN-slug.md【过程档】
+│   ├── acceptance/             # 验收报告     NNNN-slug.md【过程档】
 │   ├── retros/                 # 复盘报告     NNNN-slug.md（轻产物，不进 check.sh 门禁）
 │   ├── migrations/             # 迁移对账清单 NNNN-slug.md（轻产物，不进 check.sh 门禁）
 │   ├── standards/              # 用户自有/团队编码标准（setup 增量导入，可多份）
@@ -150,6 +151,8 @@
 **目录懒创建**：setup 只建 `.sdlc/` 和 `docs/`，其余产物目录由第一个产物落盘时创建，不留 `.gitkeep`。
 
 `docs/retros/` 与 `docs/migrations/` 是非门禁产物目录：复盘报告由 dev-retro 落盘（§11.10），迁移对账清单由 setup-migrate 落盘（§11.19），`validate` / `phase` / `publish` 均不受理，符合 §5.7"门禁只管有真实代价的事"；审计链价值靠版本库留痕，不靠门禁。
+
+**过程档目录**：`docs/tickets/`、`docs/reviews/`、`docs/acceptance/`、`docs/overviews/` 自创建起被 `.gitignore` 排除、不进任何提交，过程中盘上存在、门禁照常（状态在盘上不在 git 里），验收通过后随蒸馏清扫删除（ADR 0002）；审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用。
 
 | 路径 | 首次创建 | 日常写入者 | setup-workspace 重跑时 |
 |---|---|---|---|
@@ -231,7 +234,7 @@ CHECK_TEST="npm run test"
 ### 5.7 明确的"不做"
 
 - 不设 `.scratch/` 草稿区：草稿就是 `status: draft` 的正式产物，杜绝第二真相源。
-- 不 gitignore 任何流程产物：评审报告和工单是审计链本身。
+- 不把知识档目录写进 .gitignore：过程档（ticket / review / acceptance / overview）自创建起被 .gitignore 排除、验收后随蒸馏清扫删除（ADR 0002）——审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用。
 - METHOD.md 不放产物模板：模板内嵌在写产物的技能里（执行者持有模板），METHOD.md 只写规则、状态机、目录规范，避免两处模板漂移。
 - 门禁只管有真实代价的事：分支名等约定不进 check.sh。
 

@@ -122,7 +122,7 @@
 - **落点**：蓝图 §5.3（L1 防御的载体）。
 
 ### 审计链〔通用〕
-- **定位**：评审报告与工单等流程产物全部进版本库、不 gitignore——它们本身就是审计链，是门禁体系的一部分；豁免留痕供 retro 审计。
+- **定位**：流程产物分档归置（ADR 0002）——知识档（need、spec、design、adr、research、standards）进版本库永久留存，过程档（ticket、review、acceptance、overview）被 .gitignore 排除、验收后蒸馏清扫删除；审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用；豁免留痕供 retro 审计。
 - **落点**：蓝图 §5.1 原则 2、§5.7。
 
 ### git hooks（commit-msg / pre-push）与一行转发〔外部〕

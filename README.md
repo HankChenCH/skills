@@ -135,7 +135,7 @@ AI 协作开发的三种常见失控：
 └── CHANGELOG.md            # 懒创建，仅需要发布流程的项目
 ```
 
-- **九类产物各有固定状态机**（如 spec：draft → approved → done），frontmatter 是 check.sh 的解析依据——产物目录加 git log 就是完整审计链。状态机详见 [docs/METHOD.md](./docs/METHOD.md) §5。
+- **九类产物各有固定状态机**（如 spec：draft → approved → done），frontmatter 是 check.sh 的解析依据；知识档进版本库，过程档（工票 / 评审 / 验收 / 总览）被 .gitignore 排除、验收后蒸馏清扫——审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用。状态机详见 [docs/METHOD.md](./docs/METHOD.md) §5。
 - **check.sh 常用子命令**：`phase` 全库状态总览；`frontier` 可开工的工票；`validate <file>` 产物模板与 FR 追溯校验；`publish <file>` 投影到 tracker；`all` 全量 lint/typecheck/test。提交走轻门禁（message 带 `[#NNNN]` 或 `[trivial]`），push 前走重门禁（implemented 工票必须有 approved 评审覆盖）。
 
 ## 文档
