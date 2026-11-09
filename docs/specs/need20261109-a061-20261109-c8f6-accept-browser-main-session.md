@@ -1,10 +1,11 @@
 ---
 id: 20261109-c8f6
-status: approved
+status: done
 need: 20261109-a061
 round: 1
 created: 2026-11-09
 approved: 2026-11-09
+done: 2026-11-09
 ---
 # dev-accept 浏览器场景当前会话验收（混合验收形态）
 
