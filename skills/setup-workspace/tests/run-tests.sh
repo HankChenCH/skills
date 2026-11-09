@@ -2884,6 +2884,53 @@ created: 2026-11-04
 EOF
 t "approved 评审声明双格式覆盖面后 pre-push 通过" 0 "git add -A && git commit -qm '[trivial] 评审夹具' && check.sh pre-push" "pre-push 门禁通过"
 
+echo "== frontier 谱系前缀票名标题与 basename 回喂（spec 0017，票 20261108-7b58）=="
+wfile docs/tickets/spec0002-20261104-8c2a-frontier-fix.md <<'EOF'
+---
+id: 20261104-8c2a
+type: fix
+spec: 0002
+status: ready
+blocked-by: []
+created: 2026-11-04
+---
+# spec0002-20261104-8c2a-frontier-fix: 前缀票 frontier 标题夹具
+
+**做什么：** 谱系前缀 ready 票，钉 frontier 标题列空与 basename 回喂缺陷
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+EOF
+wfile docs/tickets/20261104-4d9b-gamma-title.md <<'EOF'
+---
+id: 20261104-4d9b
+type: feature
+spec: 0002
+status: ready
+blocked-by: []
+created: 2026-11-04
+---
+# 20261104-4d9b-gamma-title: 非前缀票 frontier 标题夹具
+
+**做什么：** 非前缀新格式 ready 票，回归护栏
+
+**验收标准：**
+- [ ] x
+
+**Blocked by：** 无
+
+## Progress
+EOF
+t "frontier 对谱系前缀 ready 票显示标题列" 0 "check.sh frontier" "8c2a-frontier-fix: 前缀票 frontier 标题夹具"
+tn "frontier 前缀票 stderr 无 head 噪声" 0 "check.sh frontier" "No such file or directory"
+t "frontier 非前缀新格式票标题行为不变（回归）" 0 "check.sh frontier" "4d9b-gamma-title: 非前缀票 frontier 标题夹具"
+t "frontier 输出的前缀 basename 回喂 ticket 被接受" 0 "check.sh ticket spec0002-20261104-8c2a-frontier-fix" "入口校验通过"
+t "frontier 输出的非前缀 basename 回喂 ticket 被接受（回归）" 0 "check.sh ticket 20261104-4d9b-gamma-title" "入口校验通过"
+
 echo "== 取号入口 claim（原子占号，spec 0017，票 0038）=="
 new_repo
 wfile docs/specs/0001-anchor.md <<'EOF'

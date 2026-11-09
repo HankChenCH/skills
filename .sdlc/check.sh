@@ -372,15 +372,17 @@ frontier_ids() {
 }
 
 cmd_frontier() {
-  local ids f title
+  local ids title
   ids="$(frontier_ids)"
   if [ -z "$ids" ]; then
     info "frontier：（空）当前没有阻塞已清、可开工的工单"
   else
     info "frontier：可开工工单"
     for i in $ids; do
-      f="$(artifact_file ticket "$i")"
-      title="$(title_of "$f")"
+      # $i 是 frontier_ids 刚从 docs/tickets/ 列出的 basename，补 .md 即原文件——
+      # 不经 ref 解析：ref_key 按设计不认谱系前缀文件名，直喂 artifact_file 空转
+      # （标题列空 + head 噪声，票 20261108-7b58）。
+      title="$(title_of "$DOCS/tickets/$i.md")"
       info "  $i  $title"
     done
   fi
@@ -389,9 +391,14 @@ cmd_frontier() {
 
 cmd_ticket() {
   [ -n "${1:-}" ] || die "用法：check.sh ticket NNNN 或 YYYYMMDD-4hex"
-  local disp f
-  disp="$(ref_key "$1")" || die "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex：$1"
-  f="$(artifact_file ticket "$1")" || die "工单 ${disp} 不存在（docs/tickets/）"
+  local disp f ref
+  ref="$1"
+  # frontier 输出的票 basename（含谱系前缀）可直接回喂：文件名先经 artifact_name_id
+  # 单点归约成 ID 段再按引用定位（票 20261108-7b58）；引用形态仍走 ref_key。
+  ref_key "$ref" >/dev/null 2>&1 || ref="$(artifact_id_of_name "${ref%.md}")" \
+    || die "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex：$1"
+  disp="$(ref_key "$ref")"
+  f="$(artifact_file ticket "$ref")" || die "工单 ${disp} 不存在（docs/tickets/）"
   local rc=0 st dep dep_f dst spec_id spec_f sst
   st="$(fm_get "$f" status)"
   case "$st" in
