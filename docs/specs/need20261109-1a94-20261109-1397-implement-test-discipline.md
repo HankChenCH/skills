@@ -1,6 +1,6 @@
 ---
 id: 20261109-1397
-status: approved
+status: done
 need: 20261109-1a94
 round: 1
 created: 2026-11-09
@@ -119,3 +119,4 @@ approved: 2026-11-09
 ```bash
 grep -rn "集成级 | 承载票\|集成级 | 人工：" skills/dev-spec/SKILL.md skills/dev-plan/SKILL.md skills/dev-accept/SKILL.md skills/ref-testing/SKILL.md skills/ref-testing/references/integration.md
 ```
+done: 2026-11-10
