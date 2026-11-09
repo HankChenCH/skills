@@ -20,3 +20,4 @@ ADR 0002 裁决落地后，过程档（docs/tickets|reviews|acceptance〔+docs/o
 - 代价：物化是编排者的人工纪律，check.sh 不校验"worktree 是否已物化"——漏物化的失败模式是 hook 拦截（fail-loud，非静默）；多 worktree 副本在同步点之间短暂分叉，以"合回前同步"为唯一一致性要求。
 - 修订面：dev-execute run-mechanics §4（建 worktree 后物化）、§7（合回前同步翻转）、§8.4（done 落盘不提交）已随 spec 0012 并发修订成文（票 0022，2026-10-31），本修订面核销（need 0009 验收折回记录）。
 - 修订记录（2026-11-07，票 20261107-2a2b）：物化清单补 docs/overviews/（spec 20261107-5cb8 验收期缺陷①——FR-7 总览前置纳入门禁输入时物化清单未随批扩项，≥2 票 spec 票门禁在 worktree 内 fail-loud 误拦，验收报告 20261107-23b0 实证）；随之成文"清单 = 门禁输入目录全集"同步纪律。
+- 修订记录（2026-11-09，票 20261108-6057）：裁决 1 物化源修订为「后建票 worktree 以运行 worktree 现状物化（前置票状态取运行 worktree 已同步副本）」——原条文只规定物化动作未定物化源，编排者取主工作区时前置票合回翻转的 implemented 未同步回主工作区，后建票开工入口按陈旧 ready 副本误拦（round 3 运行 d240/7edc 实录，验收报告 20261108-eb9e 下一轮建议 1）；run-mechanics §4 物化条同批修订。

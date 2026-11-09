@@ -165,10 +165,14 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
 - **派发判据**：票 frontmatter `blocked-by` 中 spec 内依赖全部已合回（§5.3 判据）
   或 done；blocked-by 未满足的票不建 worktree、不派发（演练：无票 worktree 条目）。
   流水线下派发时机跟着依赖满足走，不等"当前层凑齐"。
-- **物化（建 worktree 后立即执行，ADR 0003 裁决 1）**：把主工作区当前过程档目录
-  （docs/tickets、docs/reviews、docs/acceptance、docs/overviews——清单全集口径
+- **物化（建 worktree 后立即执行，ADR 0003 裁决 1）**：把**运行 worktree 现状**的
+  过程档目录（docs/tickets、docs/reviews、docs/acceptance、docs/overviews——清单全集口径
   与"目录不存在则跳过"同 §3）以盘上文件复制进票 worktree——untracked、照旧不进
-  任何提交。不物化 → 该 worktree 内门禁读不到过程档，dev-implement 出口提交会被
+  任何提交；**后建票 worktree 以运行 worktree 现状物化（前置票状态取运行 worktree
+  已同步副本，票 20261108-6057）**——物化源若取主工作区，前置票合回翻转的
+  implemented 未同步回主工作区时，新票开工入口按陈旧 ready 副本误拦（round 3
+  运行 d240/7edc 实录；首票时运行 worktree 与主工作区一致，同式物化不受影响）。
+  不物化 → 该 worktree 内门禁读不到过程档，dev-implement 出口提交会被
   commit-msg hook 拦（fail-loud，非静默）；漏物化 docs/overviews/ → ≥2 票 spec
   的票门禁（FR-7 总览前置）在 worktree 内报缺总览（fail-loud，票 20261107-2a2b
   演练实证）。
