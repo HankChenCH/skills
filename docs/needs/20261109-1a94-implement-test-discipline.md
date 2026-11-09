@@ -1,6 +1,6 @@
 ---
 id: 20261109-1a94
-status: confirmed
+status: fulfilled
 created: 2026-11-09
 confirmed: 2026-11-09
 ---
@@ -174,3 +174,4 @@ check.sh 是否新增校验规则由 spec/design 决策。
 - D3 测试落点 → 承载票制：dev-plan 指定承载票（FR-4），dev-accept 先自动化后人工
   （FR-5）；dev-accept 脚本制、合回门制否决。
 - 方法论 → 风险驱动分轮；分轮 → round 1 全做；存量 → 仅新生效（FR-6）。
+fulfilled: 2026-11-10
