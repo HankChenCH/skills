@@ -460,6 +460,8 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
    （单向不回删）+ 源码 `[#NNNN]` 引用 + 盘上状态。
 3. TRACKER 指向平台 → 逐张 `publish` 投影（投影失败警告跳过不阻断，
    GLOSSARY"投影"语义）。
+4. **同批：评审报告同步回主工作区 docs/reviews/（§8.5 清理前置步骤，先于任何
+   worktree 删除）**。
 
 ### 8.5 清理
 
@@ -478,8 +480,9 @@ git worktree prune
 ```
 
 - **合并未执行不清理**：单向门未过，盘上证据即运行状态。
-- 核对：`git worktree list` 无 run/ 前缀条目、`git branch --list "run/*"` 为空。
-  任一残留 → 报告，不静默。
+- 核对：`git worktree list` 无 run/ 前缀条目、`git branch --list "run/*"` 为空，
+  任一残留 → 报告，不静默；同步核对：`ls docs/reviews/` 含本 spec 逐票评审
+  报告，缺失 → 报告，不静默（先于删除暴露丢失模式）。
 
 ### 8.6 出口报告
 

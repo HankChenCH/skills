@@ -176,8 +176,9 @@ need 置 fulfilled 门（运行后停点等人，不计入运行内交互）；�
    `done: <今日>`，状态变更**落盘不提交**（ADR 0003 物化语义：过程档无可提交
    内容，validate 通过即终态；审计链 = tracker 投影 + 源码 `[#NNNN]` 引用 + 盘上
    状态，细则见 run-mechanics §8.4）。
-6. **清理**：先移除全部票 worktree，再移除运行 worktree，随后删票分支与运行
-   分支（顺序与命令见 run-mechanics §8.5——worktree 占用的分支删不动）。合并
+6. **清理**：先同步评审报告回主工作区 docs/reviews/（run-mechanics §8.5 前置
+   步骤），再移除全部票 worktree，随后移除运行 worktree、删票分支与运行分支
+   （顺序与命令见 run-mechanics §8.5——worktree 占用的分支删不动）。合并
    未执行不清理：单向门未过，盘上证据即运行状态。
 7. **自动启动验收（义务）**：清理完成后自动调 dev-accept（Skill 工具）——收口不再
    止于指路，验收是收口的尾巴（v1.29 反转 spec 0006"收口不自动调 dev-accept"拍板）。
