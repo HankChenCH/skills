@@ -324,7 +324,9 @@ git worktree add "<repo>-runs/<spec-id>-t<NNNN>" -b "run/<spec-id>-t<NNNN>" "run
    - 断点落在自动验收段（票全 done、worktree 已清，SKILL.md §6.7 验收未走完；
      v1.29 新分支）→ 按 docs/acceptance/ 盘上报告状态与 spec 状态续接，判读次序
      固定：报告 `status: draft` → 按 dev-accept §1.1 重入续接，已出结论的场景
-     不重跑；报告 `status: passed` 且 spec 仍 approved（判定已落、收口序列中断）
+     不重跑（**混合形态回填兼容（v1.33）**：浏览器场景结果行已由主会话回填且
+     报告 draft 在盘 → 按本分支续接；已回填的浏览器场景行在盘即已出结论，同此
+     不重跑主会话亲做取证）；报告 `status: passed` 且 spec 仍 approved（判定已落、收口序列中断）
      → 从 dev-accept §4.4 序列断点续起（蒸馏残余 → 清扫 → 置 done → 原子提交
      → fulfilled 门）；报告 `status: passed` 且 spec 已 done 而 need 未置
      fulfilled → 停在 fulfilled 门等人显式确认（沉默不算接受残余风险）——passed
