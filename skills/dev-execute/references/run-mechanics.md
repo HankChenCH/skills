@@ -463,7 +463,11 @@ git merge --no-ff "run/<spec-id>-t<NNNN>" -m "[#NNNN] 合回票 NNNN（评审 ap
 
 ### 8.5 清理
 
-顺序固定——分支被 worktree 占用时 `git branch -d` 拒绝执行：
+顺序固定——分支被 worktree 占用时 `git branch -d` 拒绝执行；**清理前置步骤：评审
+报告同步回主工作区 docs/reviews/（先于任何 worktree 删除，与 §8.4 done 落盘同批，
+票 20261108-a202）**——合回前同步只写到运行 worktree（ADR 0003 裁决 4），清理
+先于同步执行会随 worktree 删除丢失盘上评审报告（round 3 运行 spec 20261108-d240
+实录：两评审报告盘上丢失靠会话内正本恢复，验收报告 20261108-eb9e 折回）：
 
 ```sh
 git worktree remove "<repo>-runs/<spec-id>-t<NNNN>"   # 逐票 worktree
