@@ -24,7 +24,7 @@ description: 内部参考，定义什么是好的测试：只测外部行为、�
 |---|---|
 | 实现一个新行为：先写失败测试再写实现 | references/red-green.md |
 | 同一逻辑要验证多组输入输出（解析、校验、纯函数、边界值） | references/table-driven.md |
-| 跨模块 / 跨工单协作路径（spec 场景标 [FR-N \| 集成级 \| 承载票 NNNN] 或 [FR-N \| 集成级 \| 人工：<理由>]，承载声明格式；仅约束新立 spec） | references/integration.md |
+| 跨模块 / 跨工单协作路径（spec 场景标 [FR-N \| 集成级 \| 承载票 NNNN] 或 [FR-N \| 集成级 \| 人工：<理由>]；承载声明格式仅约束新立 spec，存量标签场景照常按本行路由） | references/integration.md |
 | 关键用户旅程全链路（UI → API → 落库） | references/e2e.md |
 | 容量 / 性能目标（并发、吞吐、延迟上限）或防性能回归 | references/stress-capacity.md |
 | 依赖故障下保持可用（降级、重试、熔断） | references/chaos.md |
