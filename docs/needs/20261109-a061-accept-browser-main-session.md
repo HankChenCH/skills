@@ -1,8 +1,9 @@
 ---
 id: 20261109-a061
-status: confirmed
+status: fulfilled
 created: 2026-11-09
 confirmed: 2026-11-09
+fulfilled: 2026-11-09
 ---
 # accept 浏览器场景当前会话验收
 
