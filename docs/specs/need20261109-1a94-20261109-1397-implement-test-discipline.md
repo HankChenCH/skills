@@ -96,7 +96,7 @@ approved: 2026-11-09
   自动化测试须全绿，再逐条人工段；有红停下指路 dev-fix"与核销证据要求（自动化
   测试名或人工理由）。
 - [FR-6 | 工单级] Given 各技能强制条款，When 交叉核对，Then 全部带"仅约束新立
-  spec"生效限定，存量已 fulfilled spec 无回改要求。
+  spec"生效限定，存量 spec 无回改要求（ Glossary 状态词表：fulfilled 为 need 终态，spec 终态为 done，存量 spec 无论终态一律不回改）。
 - [FR-3 | 集成级 | 人工：跨文件格式一致性属验收阶段 grep 走查，不进仓库测试体系]
   Given dev-spec / dev-plan / dev-accept / ref-testing 四文件规则全部落盘，When 按
   备注命令 grep 承载声明格式特征串，Then 四处引用字面一致。
@@ -104,7 +104,7 @@ approved: 2026-11-09
 ## 非目标
 
 - 不改 check.sh 校验规则（validate 机器化留 round 2 备选，need 假设 A2）。
-- 不回改存量已 fulfilled spec（need FR-6，拍板仅新生效）。
+- 不回改存量 spec（need FR-6，拍板仅新生效；措辞修订 20261110 无人值守运行留痕：原"已 fulfilled"系 need 终态词误挂 spec）。
 - 不为表格驱动写死 implement 强制路由（need 拍板 D4 否决原 D1-B）。
 - 不动 dev-execute 合回门（need 拍板承载票制，spec 0006 既有先例保留）。
 - 不重写 ref-testing 六类细则本体——只动 SKILL.md 路由表集成级行措辞与
