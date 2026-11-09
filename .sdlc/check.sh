@@ -394,8 +394,8 @@ cmd_ticket() {
   local disp f ref
   ref="$1"
   # frontier 输出的票 basename（含谱系前缀）可直接回喂：文件名先经 artifact_name_id
-  # 单点归约成 ID 段再按引用定位（票 20261108-7b58）；引用形态仍走 ref_key。
-  ref_key "$ref" >/dev/null 2>&1 || ref="$(artifact_id_of_name "${ref%.md}")" \
+  # 单点归约成 ID 段再按引用定位（.md 尾归约内部自剥，票 20261108-7b58）；引用形态仍走 ref_key。
+  ref_key "$ref" >/dev/null 2>&1 || ref="$(artifact_id_of_name "$ref")" \
     || die "工单号必须是 NNNN-slug 或 YYYYMMDD-4hex：$1"
   disp="$(ref_key "$ref")"
   f="$(artifact_file ticket "$ref")" || die "工单 ${disp} 不存在（docs/tickets/）"
