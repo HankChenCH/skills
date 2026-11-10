@@ -1,10 +1,11 @@
-# setup-workspace pytest 套件（迁移批 1 基建 + 批 2 全量迁移）
+# setup-workspace pytest 套件（迁移批 1 基建 + 批 2 全量迁移 + 批 3 收口）
 
 旧套件 `run-tests.sh`（bash，529 条断言）向 pytest + uv 迁移的落地。spec：
 `docs/specs/need20261110-a98b-20261110-d145-pytest-test-suite-migration.md`。
 迁移全程旧套件保持 canonical；批 1 交付工具链、骨架、等价索引、oseq 黄金样本
 与双跑对照管线（claim 试点已由批 2 数据面取代）；批 2 交付全量迁移、逐参数
-等价对号签收、注故障检测与集成测试。
+等价对号签收、注故障检测与集成测试；批 3 收口：门禁 `CHECK_TEST` 切
+pytest+uv（`--project` 锁定 tests/ 环境），等价签收后旧 `run-tests.sh` 删除。
 
 ## 工具链清单
 
@@ -67,6 +68,12 @@ uv run python tools/generate_legacy_stream.py
 uv run python tools/generate_oseq_golden.py
 ```
 
+**批 3 收口后的历史审计工具**：上列五条命令与 `test_stream_frozen.py` 的输入源
+run-tests.sh 已删，保留作迁移期审计记录，日常不跑；如需重跑须回迁移基点
+（74aae44）前的提交取源。套件常驻路径（`test_migration.py`/`test_oseq_golden.py`/
+`test_integration_gate.py`）不依赖 run-tests.sh，期望值全部来自冻结数据面与
+黄金样本。
+
 ## 迁移架构要点（为何是持久会话 + 数据面）
 
 - 旧套件 529 条断言中有 115 条的 cmd 引用前序 setup 行定义的 shell 变量
@@ -77,6 +84,10 @@ uv run python tools/generate_oseq_golden.py
   再 eval 二次展开——与旧套件的展开链逐字同构。
 - 断言本体（退出码/子串/不含/词序）全部在 pytest 侧，期望值一律来自冻结数据面
   （旧套件字面，独立来源，零重算）；中文输出/多字节文件名按字节敏感往返。
-- `assets/` 分发物逐字节不变；旧 `run-tests.sh` 不删改（等价签收前不删）。
+- `assets/` 分发物逐字节不变（FR-6 门禁终验在案）；旧 `run-tests.sh` 已于批 3
+  删除（等价签收 529/529 后收口）。
+- 数据面冻结断言 `test_stream_frozen.py`（活本↔生成资产双拷贝守卫）随活本退役：
+  双拷贝对不存在即无守卫对象；`legacy_stream.py` 冻结面仍由 `test_migration.py`
+  全量承载，期望值独立性不受影响。
 - 用例子壳 stdin 显式接 /dev/null：对齐管线运行语境（旧套件由 CI/双跑运行时
   用例 stdin 即 EOF 型；pre-push 的 `cat >/dev/null` 消费 git 传入行）。

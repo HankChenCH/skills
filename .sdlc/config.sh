@@ -9,4 +9,4 @@ CODE_DIRS=
 
 CHECK_LINT=""
 CHECK_TYPE=""
-CHECK_TEST="bash skills/setup-workspace/tests/run-tests.sh"
+CHECK_TEST="uv run --project skills/setup-workspace/tests pytest skills/setup-workspace/tests"
