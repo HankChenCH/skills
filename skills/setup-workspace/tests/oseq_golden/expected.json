@@ -1,0 +1,141 @@
+{
+  "_comment": "oseq 黄金样本期望：由 tools/generate_oseq_golden.py 从旧套件 run-tests.sh 提取的 oseq 助手真实运行产生，勿手工编辑。",
+  "suite": "run-tests.sh",
+  "results": [
+    {
+      "id": "ok-basic",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-multibyte",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-crossline",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-word-in-middle",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-five-words",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-repeat-word",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-overlap",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-regex-metachars",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-at-start",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-with-quotes",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-with-space",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-mixed-cjk-ascii",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-no-trailing-newline",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-crlf",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-tail-newline-strip",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-empty-word",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "ok-first-occurrence-pos",
+      "stdout": "ok: golden\n",
+      "rc": 0
+    },
+    {
+      "id": "fail-earlier-words-repeated-later-word-missing",
+      "stdout": "FAIL: golden —— 自偏移 22 起未找到「Y」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-empty-word-increment",
+      "stdout": "FAIL: golden —— 「」偏移 1 未严格递增（前词 1）\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-missing",
+      "stdout": "FAIL: golden —— 自偏移 3 起未找到「不存在的词」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-out-of-order",
+      "stdout": "FAIL: golden —— 自偏移 6 起未找到「规划」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-missing-after-progress",
+      "stdout": "FAIL: golden —— 自偏移 11 起未找到「absent」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-duplicate-equal-pos",
+      "stdout": "FAIL: golden —— 自偏移 15 起未找到「marker」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-empty-file",
+      "stdout": "FAIL: golden —— 自偏移 0 起未找到「anything」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-first-word-missing",
+      "stdout": "FAIL: golden —— 自偏移 0 起未找到「开头词」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-multibyte-offset",
+      "stdout": "FAIL: golden —— 自偏移 6 起未找到「第四段落」\n",
+      "rc": 1
+    },
+    {
+      "id": "fail-single-line-mid",
+      "stdout": "FAIL: golden —— 自偏移 9 起未找到「keep」\n",
+      "rc": 1
+    }
+  ]
+}
