@@ -6,11 +6,11 @@ created: 2026-11-10
 
 ## 1. 执行摘要（结论速览）
 
-**推荐：bats-core 原地升级路线**（git submodule 钉 v1.13.x 起步）。一句否决理由：
-它是四条路线中唯一「运行时不变、夹具不变、测试体仍是 bash」的框架化升级——528 条
-用例中 83.9%（t 443 + tn 32，均为「退出码+子串」同构断言）可脚本化批量改写，53 条
-oseq 词序断言原样保留零语义漂移，而诊断质量获得框架级提升（失败自带行号+失败命令
-原文+expected/actual）。
+**推荐：bats-core 原地升级路线**（git submodule 钉 v1.13.x 起步）。推荐依据：它是
+四条路线中唯一「运行时不变、夹具不变、测试体仍是 bash」的框架化升级——528 条用例中
+475 条（t 443 + tn 32，占 90.0%）为可 codemod 直译的 t/tn 同构形态（其中 238 条带
+非空子串断言、237 条纯退出码断言，分布见 §3），53 条 oseq 词序断言原样保留零语义
+漂移，其余三条路线的共性否决点见下方各候选结论。
 
 各候选一句话结论（对应调研问题）：
 
@@ -20,9 +20,9 @@ oseq 词序断言原样保留零语义漂移，而诊断质量获得框架级提
 - **vitest**：断言表达力够、诊断好（toContain 失败自动展示实际全文 diff），代价
   37MB 依赖树 + lockfile + 约一年一次大版本（5.0 已把 node 下限抬到 22.12）；
   其核心卖点（vite transform、组件测试）对纯进程型 bash 用例全部闲置。（来源 N1–N6，实测）
-- **node:test（node 路线内的零依赖变体）**：零安装零依赖最干净，但子串断言失败不
-  显示实际输出（须纪律性手写 message 补偿），诊断短板正中本套件「断言输出子串」
-  的主要用例形态。（来源 N3/N4，实测）
+- **node:test（node 路线内的零依赖变体）**：node 自带零安装、运行期零网络调用，
+  但子串断言失败不显示实际输出（须纪律性手写 message 补偿），诊断短板正中本套件
+  「断言输出子串」的主要用例形态。（来源 N3/N4，实测）
 - **bash 现状基线**：能用（24.4s 全绿），但痛点是慢性的——每条新用例继承
   eval/引号坑（`run-tests.sh:82-83`、`:3694` 两处已留下 bash 3.2 规避注释），失败
   诊断停留在 print 式子串比对。收益/成本对照见 §3.5。
@@ -36,25 +36,54 @@ python3 3.9.6 / node v22.23.4）实跑验证；「判断」= 依据一手来源�
 
 | 维度 | pytest | node 系（vitest / node:test） | bats-core | bash 现状基线 |
 |---|---|---|---|---|
-| **①安装形态与离线性** | pip + venv（官方推荐）；离线可行已实测：`pip download` 8 个纯 Python wheel 进 wheelhouse，`--no-index --find-links` 装成功（P2，实测）。日常运行零网络（实测）。**约束：系统 Python 3.9.6 锁死 pytest 8.4.2**（P5/P6/P7） | vitest：npm ci --offline 可离线（缓存预热后 0.27s，37MB node_modules，实测 N1）；首次必须联网一次。node:test：node 自带零安装，离线性完美（N3） | git submodule 钉 commit，官方教程标准用法，一次性联网后完全离线；本体零构建纯脚本（B1/B2） | 零依赖零安装（现状，check.sh:3 依赖预算 bash/awk/grep/sed/git） |
-| **②子进程驱动断言能力** | subprocess.run 捕获退出码/stdout/stderr（P3，实测）；`in` 子串、5 行 helper 词序、tmp_path 替代 mktemp；parametrize 同构用例收敛（1 函数 10 元组实测收敛） | spawnSync 捕获 status/stdout（N2）；toContain 子串、toMatch 正则词序、fs 断言——两框架表达力等价（实测） | @test + run 原生覆盖（$status/$output/$lines）（B3）；子串靠 bats-assert --partial；**oseq 可原样保留经 load 引入，零语义漂移**（判断，B3 依据：测试体就是普通 bash） | 自研 t/tn/oseq 已实现同等能力（现状）；528 条中 475 条为同构「退出码+子串」模式（本仓统计） |
-| **③失败诊断质量** | 最强：assert 重写 + where 链回显实际命令与 stdout；子串失败完整显示期望/实际（长文 -vv 展开）（P4，实测） | vitest：toContain 失败自动 -Expected/+Received diff + 实际全文（实测 N4）；node:test：**不显示实际字符串**，须手写 message 补偿（实测 N4） | 默认输出含用例名+文件+行号+失败命令原文；bats-assert 打 expected/actual（B3/B4）；显著优于现状的 print 式比对（判断） | print 式：仅报「输出不含子串」+ 输出回显，需人工比对（现状） |
-| **④macOS/bash 3.2 宿主兼容** | python3.9.6 + arm64 实测跑通（P5）；但框架线被 Python 版本锁死（见①）。bash 脚本仅作为被测子进程，无兼容问题 | node v22.23.4 + arm64 双框架实测跑通（N5）；vitest engines ^22.12.0——node 小版本下限随大版本抬升（N5） | **官方明确支持 bash 3.2**：README v1.14.0 "for Bash 3.2 or above" + support matrix 列 3.2.57 + CI 矩阵含 bash 3.2 与 macOS runner（B5，三重一手原文）；已知坑：3.2 下 `[[ ]]` 失败不中止用例，须用 `[ ]`（B6） | 宿主即 bash 3.2 本身（现状，坑已实测存在并已注释规避） |
-| **⑤维护成本** | 配置近零、概念 4 个（test_/assert/parametrize/fixture）（P1）；但依赖第二运行时且版本线冻结在 8.4.2（Python 3.9 EOL） | vitest：约一年一次大版本 + 依赖树跟进（N6）；node:test：零依赖零配置，词汇量最小（N3），但缺诊断（见③） | v1.8.2(2022-10)→v1.14.0(2026-07) 活跃发版约年 2–4 minor；零配置文件，CLI flag + 环境变量即全部配置面（B7）；会 bash 的人学习面最小（约 8 个概念，全是 bash 语法本身）（判断） | 零外部维护，但自研助手（4415 行）由本仓自己养——坑即债（现状） |
+| ①安装/离线 | pip+venv；wheelhouse 离线实测通过；锁 8.4.2（P2/P5–P7） | vitest：`npm ci --offline` 可离线，37MB（N1）；node:test：node 自带零安装（N3） | submodule 钉 commit 完全离线；纯脚本零构建（B1/B2） | 零依赖零安装（现状） |
+| ②子进程断言 | subprocess.run + parametrize 收敛（P3） | spawnSync + toContain/match，两框架等价（N2/N4） | `@test`+`run` 原生；oseq 可原样保留（B3） | 自研 t/tn/oseq 等效；475 条 t/tn 同构（本仓统计） |
+| ③失败诊断 | assert 重写+where 链（P4，实测） | vitest：diff+实际全文（N4）；node:test：不显示实际输出（N4） | 行号+失败命令+expected/actual（B3/B4） | print 式人工比对（现状） |
+| ④宿主兼容 | 3.9.6+arm64 实测跑通；框架线被 Python 版本锁死（P5–P7） | node22 双框架实测；vitest engines 抬 node 下限（N5） | bash 3.2 官方支持三重一手（B5）；3.2 下 `[[ ]]` 坑（B6） | 宿主本身（现状） |
+| ⑤维护 | 概念 4 个（P1）；版本线冻结 8.4.2（P6/P7） | vitest：约年一次大版本（N6）；node:test：零配置（N3） | 年 2–4 minor；零配置；学习面最小（B7） | 自研自养，坑即债（现状） |
 
-**矩阵格来源标注**：每格结论的完整来源 URL 见 §6；格内「实测」为本机实跑，
-「判断」为基于所引一手来源的推断。无「来源不足」格——五维度 20 格全部有一手来源
-或本机实测支撑。
+**矩阵格支撑细节**（长句支撑不进格，按 design-docs 密度口径移此处）：
+
+- ① pytest：`pip download` 8 个纯 Python wheel、`--no-index` 装成功、运行零网络
+  （实测）；系统 Python 3.9.6 锁 8.4.2（9.x 需 ≥3.10，3.9 已 EOL）。
+- ① node 系：vitest 缓存预热后 0.27s 装完，首次须联网；node:test 运行期零网络调用。
+- ① bats：submodule 为官方教程标准用法；纯脚本零构建（brew bottle 单 `all` 佐证）。
+- ② pytest：`in` 子串、5 行 helper 词序、tmp_path 替 mktemp；1 函数 10 元组收敛 10 用例。
+- ② node 系：toContain/match/fs 断言两框架表达力实测等价。
+- ② bats：`run` 捕获 `$status/$output/$lines`；oseq 经 `load` 引入零语义漂移
+  （判断，测试体即普通 bash）。
+- ② 现状：475 条 t/tn 同构中 238 条带非空子串断言、237 条纯退出码（§3 口径）。
+- ③ pytest：子串失败显示期望/实际，`-vv` 展开，穿透 helper 报中间变量（实测）。
+- ③ node 系：vitest toContain 失败自动 diff + 实际全文；node:test 消息不含实际
+  字符串，须手写 message。
+- ③ bats：默认输出含用例名+文件+行号+失败命令原文；bats-assert 打 expected/actual，
+  优于现状 print 式（判断）。
+- ④ bats：三重一手——README "for Bash 3.2 or above"、support matrix 列 3.2.57、
+  CI 含 bash 3.2+macOS；已知坑：3.2 下 `[[ ]]` 失败不中止用例，须 `[ ]`。
+- ④ pytest/vitest：bash 脚本仅作被测子进程，无宿主兼容问题；vitest engines
+  `^22.12.0` 随大版本抬 node 下限。
+- ⑤ pytest：近 17 个月 10 个版本，活跃；8.4.2 属无新功能维护线。
+- ⑤ vitest：约 8–11 个月一个大版本（5.0 抬 node 下限至 22.12）。
+- ⑤ bats：年 2–4 minor（v1.8.2→v1.14.0）；零配置；学习面约 8 个概念全为 bash
+  语法（判断）；v1.14.0 `run`+errexit 默认变化须钉 v1.13.x 规避（B7）。
+
+**矩阵格来源标注**：每格结论的完整来源 URL 见 §6。无「来源不足」格——五维度
+20 格全部有一手来源或本机实测支撑。
 
 ## 3. 迁移成本估算（四分组）
 
 统计口径：`grep -cE '^[[:space:]]*(t|tn|oseq) "'`（2026-11-10 实测 run-tests.sh，
-与套件自报 529 相差 1 为套件内部计数器口径，不影响结论）。
+与套件自报 529 相差 1 为套件内部计数器口径，不影响结论）。子串参分布按 t 助手
+positional 语义（$4=substr）标准 shell 词法解析（双引号内 `\"` 转义、`$()`/反引号
+嵌套引号独立配对；21 条含嵌套的 t 行是朴素正则解析的分词失真源）：t 443 = 206
+非空子串 + 220 空串子串 + 17 未传子串参（纯退出码）；tn 32 全带非空子串（负向
+断言须有内容）。空串子串与未传参在助手 `if [ -n "$substr" ]` 分支下同效——均为
+纯退出码断言。
 
 | 分组 | 数量 | 断言形态 | 单用例迁移成本量级 | 小计 |
 |---|---|---|---|---|
-| `t` | 443（442 带子串参） | 退出码+正向子串 | codemod 批量改写 + 10% 抽样人工核，约 1–2 分钟/条 | 8–12 h |
-| `tn` | 32 | 退出码+负向子串 | 同上，refute/assert_failure 直译 | ~1 h |
+| `t` | 443（206 非空子串 + 220 空串子串 + 17 纯退出码） | 退出码[+正向子串] | codemod 批量改写 + 10% 抽样人工核，约 1–2 分钟/条 | 8–12 h |
+| `tn` | 32（全部带非空子串） | 退出码+负向子串 | 同上，refute/assert_failure 直译 | ~1 h |
 | `oseq` | 53 | 多词滑动窗口词序 | **函数原样保留**（load 引入），仅调用处适配，~1 分钟/条 | 1–2 h |
 | 夹具助手 | new_repo×25 / wfile×126 / setfm×32 / fake_cmd×6（调用点）；助手本体一次性重建 | mktemp+git init 夹具、写文件、改 frontmatter、PATH 替身 | 助手重建为 bats load 文件：一次性 4–6 h；调用点多数原样（测试体仍是 bash） | 4–6 h |
 
@@ -87,7 +116,7 @@ python3 3.9.6 / node v22.23.4）实跑验证；「判断」= 依据一手来源�
 1. **门禁行为回归**（迁移期间测试不再测同样的东西）：防护 = 等价红线（§5）——
    断言面索引逐条对号 + 双跑对照不一致即阻塞；codemod diff 抽样 10% 人工核。
 2. **新旧套件并行/切换/回退**：迁移期旧套件保持 canonical（门禁默认仍跑旧套件），
-   bats 套件并行产出对照结果；等价签收后批 3 切换；**回退 = 删 .bats 文件与
+   bats 套件并行产出对照结果；等价签收后批 3 切换；**回退 = 删 `.bats` 文件与
    submodule 即可**——纯测试侧改动，零触碰 check.sh，回退成本接近零。
 3. **选错框架的退出成本**：bats 最低——测试体与助手全是 bash，oseq 等自研函数
    反向搬回旧套件零成本；pytest/vitest 最高——528 条测试体已翻译成第二语言，
@@ -103,6 +132,11 @@ python3 3.9.6 / node v22.23.4）实跑验证；「判断」= 依据一手来源�
   的假绿）后才能继续。
 - **旧套件保留**：等价索引清零且双跑连续一致（建议 ≥2 个完整回归周期）并经
   dev-accept 验收前，旧套件不删。
+
+**落地形态声明（对 spec 实现决策括注的偏离说明）**：spec 括注「旧套件 528 条的
+断言面在报告中建索引」——本报告落盘的是索引的生成方法与统计口径（§3），逐条索引
+清单不在本报告内展开（528 条逐条枚举会使报告膨胀近千行、稀释拍板可读性）；索引
+清单由迁移 spec 的工单按 §3 口径脚本生成，随迁移批 1 一并交付并纳入等价签收。
 
 ## 6. 来源清单（检索日期 2026-11-10）
 
