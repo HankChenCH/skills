@@ -1,10 +1,11 @@
 ---
 id: 20261110-091d
-status: approved
+status: done
 need: 20261110-a98b
 round: 1
 created: 2026-11-10
 approved: 2026-11-10
+done: 2026-11-10
 ---
 # 测试套件框架迁移调研报告（round 1）
 
