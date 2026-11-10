@@ -110,7 +110,7 @@ class CheckRepo:
         path.write_text(content, encoding="utf-8")
         path.chmod(0o755)
 
-    # -- 断言助手（直译 run-tests.sh t/tn/oseq，同一 seam 同一参数面）--
+    # -- 执行与断言（直译 run-tests.sh t/tn/oseq，同一 seam 同一参数面）--
 
     def run(self, cmd: str) -> tuple[int, str]:
         """旧 t/tn 的执行口径：仓库内执行，PATH 前置 .sdlc，stdout+stderr 合并。
@@ -135,44 +135,71 @@ class CheckRepo:
     def t(self, desc: str, want: int, cmd: str, substr: str = "") -> None:
         """旧 t：期望退出码 +（可选）输出包含子串。失败呈现期望/实际全文。"""
         got, out = self.run(cmd)
-        if got != want:
-            raise AssertionError(
-                f"{desc} —— 退出码 {got}，期望 {want}\n"
-                f"命令：{cmd}\n输出全文：\n{out}"
-            )
-        if substr and substr not in out:
-            raise AssertionError(
-                f"{desc} —— 输出不含「{substr}」\n命令：{cmd}\n输出全文：\n{out}"
-            )
+        assert_t(desc, want, cmd, got, out, substr=substr)
 
     def tn(self, desc: str, want: int, cmd: str, absent: str) -> None:
         """旧 tn：期望退出码 + 输出不包含子串。失败呈现期望/实际全文。"""
         got, out = self.run(cmd)
-        if got != want:
-            raise AssertionError(
-                f"{desc} —— 退出码 {got}，期望 {want}\n"
-                f"命令：{cmd}\n输出全文：\n{out}"
-            )
-        if absent in out:
-            raise AssertionError(
-                f"{desc} —— 输出不应包含「{absent}」\n命令：{cmd}\n输出全文：\n{out}"
-            )
+        assert_tn(desc, want, cmd, got, out, absent)
 
     def oseq(self, desc: str, f: str, *words: str) -> None:
-        """旧 oseq：断言文件内容中各词按给定顺序先后出现。"""
+        """旧 oseq：断言文件内容中各词按给定顺序先后出现。
+
+        文件参数是 Python 侧相对 self.root 的路径。注意与旧套件字面的差异：
+        旧 oseq 的文件参数是套件 shell 里的路径字面（"$TMP/…" 等变量在套件
+        shell 求值）；若把旧套件字面直搬到这里会按字面找不到文件——批 2 全量
+        迁移不走本方法（legacy_harness 在会话 shell 内求值文件参数，保持字面
+        零改写），本方法保留给直接以 Python 侧路径调用 oseq 断言的场景。
+        """
         txt = (self.root / f).read_text(
             encoding="utf-8", errors="surrogateescape"
         )
-        ok, message = oseq_text(txt, list(words))
-        if not ok:
-            raise AssertionError(f"{desc} —— {message}")
+        assert_oseq(desc, txt, list(words))
 
 
-@pytest.fixture()
-def repo(tmp_path: Path) -> CheckRepo:
-    """旧 new_repo 直译：临时 git 库 + check.sh/local.sh 装配 + 哑 config.sh。"""
-    root = tmp_path / "fixture"
-    root.mkdir()
+def assert_t(
+    desc: str, want: int, cmd: str, got: int, out: str, substr: str = "", prefix: str = ""
+) -> None:
+    """旧 t 的断言语义（退出码 + 可选输出子串），消息格式批 1 定版。"""
+    head = f"{prefix} " if prefix else ""
+    if got != want:
+        raise AssertionError(
+            f"{head}{desc} —— 退出码 {got}，期望 {want}\n"
+            f"命令：{cmd}\n输出全文：\n{out}"
+        )
+    if substr and substr not in out:
+        raise AssertionError(
+            f"{head}{desc} —— 输出不含「{substr}」\n命令：{cmd}\n输出全文：\n{out}"
+        )
+
+
+def assert_tn(
+    desc: str, want: int, cmd: str, got: int, out: str, absent: str, prefix: str = ""
+) -> None:
+    """旧 tn 的断言语义（退出码 + 输出不含子串），消息格式批 1 定版。"""
+    head = f"{prefix} " if prefix else ""
+    if got != want:
+        raise AssertionError(
+            f"{head}{desc} —— 退出码 {got}，期望 {want}\n"
+            f"命令：{cmd}\n输出全文：\n{out}"
+        )
+    if absent in out:
+        raise AssertionError(
+            f"{head}{desc} —— 输出不应包含「{absent}」\n命令：{cmd}\n输出全文：\n{out}"
+        )
+
+
+def assert_oseq(desc: str, txt: str, words: list[str], prefix: str = "") -> None:
+    """旧 oseq 的断言语义（词序滑动窗口，oseq_text 直译）。"""
+    ok, message = oseq_text(txt, words)
+    if not ok:
+        head = f"{prefix} " if prefix else ""
+        raise AssertionError(f"{head}{desc} —— {message}")
+
+
+def build_fixture_repo(root: Path) -> None:
+    """旧 new_repo（run-tests.sh:107-131）的逐行直译（批 1 评审定版，批 2 复用）。"""
+    root.mkdir(parents=True, exist_ok=True)
     for args in (
         ["git", "init", "-q", "-b", "main"],
         ["git", "config", "user.email", "test@example.com"],
@@ -189,4 +216,11 @@ def repo(tmp_path: Path) -> CheckRepo:
     (root / "README.md").write_text("fixture\n", encoding="utf-8")
     subprocess.run(["git", "add", "README.md"], cwd=root, check=True)
     subprocess.run(["git", "commit", "-qm", "[trivial] init"], cwd=root, check=True)
+
+
+@pytest.fixture()
+def repo(tmp_path: Path) -> CheckRepo:
+    """旧 new_repo 直译：临时 git 库 + check.sh/local.sh 装配 + 哑 config.sh。"""
+    root = tmp_path / "fixture"
+    build_fixture_repo(root)
     return CheckRepo(root)
