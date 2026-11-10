@@ -1,8 +1,9 @@
 ---
 id: 20261110-a98b
-status: confirmed
+status: fulfilled
 created: 2026-11-10
 confirmed: 2026-11-10
+fulfilled: 2026-11-10
 ---
 # 测试套件框架迁移调研
 
