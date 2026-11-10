@@ -72,6 +72,72 @@ class UnclosedQuote(Exception):
     """引号未在行内闭合（多行调用）——当前套件不允许，出现即报错。"""
 
 
+def parse_word_spans(line: str) -> list[str]:
+    """按 bash 词法把一行拆成 word，返回每个 word 的**源码原文**（引号与转义保留）。
+
+    批 2（工票 20261110-897b）新增，供流数据面携带 cmd 的原始形态：旧套件调用点
+    对双引号参数做一次展开（未转义的 $VAR 在传参时求值），解码后的静态字面无法
+    区分「调用点已展开」与「留给 eval 展开」——重放必须以源码原文交回 bash 按调用点
+    语义展开，才能与旧套件的展开链逐字同构。
+    """
+    spans: list[str] = []
+    i = 0
+    n = len(line)
+
+    def read_word(start: int) -> tuple[str, int]:
+        i = start
+        while i < n:
+            c = line[i]
+            if c in " \t":
+                break
+            if c == '"':
+                j = i + 1
+                closed = False
+                while j < n:
+                    ch = line[j]
+                    if ch == "\\":
+                        if j + 1 >= n:
+                            raise UnclosedQuote("行尾孤立反斜杠")
+                        nxt = line[j + 1]
+                        if nxt == "\n":
+                            raise UnclosedQuote("行内反斜杠续行")
+                        j += 2
+                        continue
+                    if ch == '"':
+                        closed = True
+                        j += 1
+                        break
+                    j += 1
+                if not closed:
+                    raise UnclosedQuote("双引号未闭合")
+                i = j
+                continue
+            if c == "'":
+                j = line.find("'", i + 1)
+                if j < 0:
+                    raise UnclosedQuote("单引号未闭合")
+                i = j + 1
+                continue
+            if c == "\\":
+                if i + 1 >= n:
+                    raise UnclosedQuote("行尾孤立反斜杠")
+                if line[i + 1] == "\n":
+                    raise UnclosedQuote("行内反斜杠续行")
+                i += 2
+                continue
+            i += 1
+        return line[start:i], i
+
+    while i < n:
+        while i < n and line[i] in " \t":
+            i += 1
+        if i >= n:
+            break
+        span, i = read_word(i)
+        spans.append(span)
+    return spans
+
+
 def parse_words(line: str) -> list[str]:
     """按 bash 词法把一行拆成 word 列表，返回每个 word 的参数字面。
 
