@@ -40,7 +40,7 @@ uv run --project skills/setup-workspace/tests pytest skills/setup-workspace/test
 | `test_migration.py` | 全量迁移 runner：STREAM 顺序 parametrize（**不支持 -k/--lf 子集运行**——持久会话的状态前置不成立） |
 | `test_oseq_golden.py` | oseq 黄金样本回放：Python 直译 vs 旧 bash 助手真实输出逐组比对（FR-7） |
 | `test_integration_gate.py` | 集成测试：check.sh all 门禁接线（真实协作者 + CHECK_TEST 夹具替身）（FR-9） |
-| `oseq_golden/cases.json` `expected.json` | 黄金样本输入与旧助手真实输出（生成器产出勿手编） |
+| `oseq_golden/cases.json` `expected.json` | 黄金样本输入（27 组文本 + 词序列）与旧助手真实输出（生成器产出勿手编） |
 | `tools/equivalence_index.py` | 等价索引：解析旧 run-tests.sh → 529 条参数级 JSON 清单（528 助手调用 + 1 内联断言），条目 id = `run-tests.sh:<行号>`（2 条用例描述相同，描述不作键） |
 | `tools/generate_legacy_stream.py` | 流数据面生成器：行走 + 行覆盖核算 + 解析器交叉校验 + 幂等再生 |
 | `tools/generate_oseq_golden.py` | 从旧套件 awk 提取 oseq 函数，对 cases.json 逐组运行旧助手产出 expected.json |
