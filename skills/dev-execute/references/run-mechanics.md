@@ -518,8 +518,9 @@ fix 票合回——预演失败既有机制同款），顺序**"修复 → 评�
    保留人工——无人值守运行全绿停在门上等人回来；"沉默不算确认、验收未 passed
    且合并未执行不清理"条例不分档（SKILL.md §8）。
 - 档 1：本确认经**升级提问**在图内承载（收口链入图，SKILL.md §6），问清内容与
-   单向门语义不变——拒绝 → 停在合并确认门，盘上状态即运行状态（票全 implemented、
-   运行分支领先 BASE_REF、worktree 未清），续接按 §5 第 6 条；合并未执行不清理。
+   单向门语义不变——拒绝 → 停在合并确认门，盘上状态即运行状态（验收已 passed、
+   票全 implemented、运行分支领先 BASE_REF、worktree 未清），续接按 §5 第 6 条；
+   验收未 passed 且合并未执行不清理。
 - 本地路径（TRACKER=local 或平台 PR 未建/回落）：在**主工作区**（已在 BASE_REF）
   执行——运行 worktree 占着运行分支，不切走它：
   `git merge --no-ff "run/<spec-id>"`，merge commit 首行讲清合入整张 spec 并带
