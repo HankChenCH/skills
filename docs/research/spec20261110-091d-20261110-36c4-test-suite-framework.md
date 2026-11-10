@@ -6,23 +6,31 @@ created: 2026-11-10
 
 ## 1. 执行摘要（结论速览）
 
-**推荐：bats-core 原地升级路线**（git submodule 钉 v1.13.x 起步）。推荐依据：它是
+**原推荐：bats-core 原地升级路线**（git submodule 钉 v1.13.x 起步）。推荐依据：它是
 四条路线中唯一「运行时不变、夹具不变、测试体仍是 bash」的框架化升级——528 条用例中
 475 条（t 443 + tn 32，占 90.0%）为可 codemod 直译的 t/tn 同构形态（其中 238 条带
 非空子串断言、237 条纯退出码断言，分布见 §3），53 条 oseq 词序断言原样保留零语义
 漂移，其余三条路线的共性否决点见下方各候选结论。
 
+**更正（2026-11-10，uv 盲区）**：pytest 分析原按系统 Python 3.9.6 口径，未评估 uv
+（可托管独立 Python 3.12）——「锁死 8.4.2」论据在 uv 工具链下溶解，本推荐降级为
+两可（bats-core 与 pytest+uv 均可行）；最终路线经用户拍板：pytest+uv（2026-11-10，
+spec 20261110-d145 备注在案）。
+
 各候选一句话结论（对应调研问题）：
 
 - **pytest**：能力舒适区（子进程断言+诊断最强），但对 bash 中心仓库引入第二运行时；
-  且本仓系统 Python 3.9.6 只能用 pytest 8.4.2（9.x 需 ≥3.10，3.9 已 EOL），锁死在
-  无新功能维护线。（来源 P1–P7，实测）
+  系统口径下 Python 3.9.6 只能用 pytest 8.4.2（9.x 需 ≥3.10，3.9 已 EOL）——**更正
+  （2026-11-10，uv 盲区）**：该论断仅按系统 Python 口径成立，uv 托管 Python 3.12
+  后 9.x 可用，「锁死 8.4.2」论据溶解；「引入第二运行时」的代价点不变。（来源
+  P1–P7，实测）
 - **vitest**：断言表达力够、诊断好（toContain 失败自动展示实际全文 diff），代价
   37MB 依赖树 + lockfile + 约一年一次大版本（5.0 已把 node 下限抬到 22.12）；
   其核心卖点（vite transform、组件测试）对纯进程型 bash 用例全部闲置。（来源 N1–N6，实测）
-- **node:test（node 路线内的零依赖变体）**：node 自带零安装、运行期零网络调用，
-  但子串断言失败不显示实际输出（须纪律性手写 message 补偿），诊断短板正中本套件
-  「断言输出子串」的主要用例形态。（来源 N3/N4，实测）
+- **node:test（node 路线内的零依赖变体）**：node 自带零安装、运行期零网络调用。
+  **更正（2026-11-10）**：原称「子串断言失败不显示实际输出」失实——`assert.match`
+  失败实测会显示实际输出，诊断否决理由撤销；零依赖优势不变，路线取舍经用户拍板
+  pytest+uv。（来源 N3/N4，实测）
 - **bash 现状基线**：能用（24.4s 全绿），但痛点是慢性的——每条新用例继承
   eval/引号坑（`run-tests.sh:82-83`、`:3694` 两处已留下 bash 3.2 规避注释），失败
   诊断停留在 print 式子串比对。收益/成本对照见 §3.5。
@@ -38,9 +46,9 @@ python3 3.9.6 / node v22.23.4）实跑验证；「判断」= 依据一手来源�
 |---|---|---|---|---|
 | ①安装/离线 | pip+venv；wheelhouse 离线实测通过；锁 8.4.2（P2/P5–P7） | vitest：`npm ci --offline` 可离线，37MB（N1）；node:test：node 自带零安装（N3） | submodule 钉 commit 完全离线；纯脚本零构建（B1/B2） | 零依赖零安装（现状） |
 | ②子进程断言 | subprocess.run + parametrize 收敛（P3） | spawnSync + toContain/match，两框架等价（N2/N4） | `@test`+`run` 原生；oseq 可原样保留（B3） | 自研 t/tn/oseq 等效；475 条 t/tn 同构（本仓统计） |
-| ③失败诊断 | assert 重写+where 链（P4，实测） | vitest：diff+实际全文（N4）；node:test：不显示实际输出（N4） | 行号+失败命令+expected/actual（B3/B4） | print 式人工比对（现状） |
+| ③失败诊断 | assert 重写+where 链（P4，实测） | vitest：diff+实际全文（N4）；node:test：显示实际输出（2026-11-10 更正，原判「不显示」失实，N4） | 行号+失败命令+expected/actual（B3/B4） | print 式人工比对（现状） |
 | ④宿主兼容 | 3.9.6+arm64 实测跑通；框架线被 Python 版本锁死（P5–P7） | node22 双框架实测；vitest engines 抬 node 下限（N5） | bash 3.2 官方支持三重一手（B5）；3.2 下 `[[ ]]` 坑（B6） | 宿主本身（现状） |
-| ⑤维护 | 概念 4 个（P1）；版本线冻结 8.4.2（P6/P7） | vitest：约年一次大版本（N6）；node:test：零配置（N3） | 年 2–4 minor；零配置；学习面最小（B7） | 自研自养，坑即债（现状） |
+| ⑤维护 | 概念 4 个（P1）；版本线冻结 8.4.2（P6/P7） | vitest：约年一次大版本（N6）；node:test：零配置（N3） | 年 1–2 minor（2026-11-10 更正为实测口径，原记年 2–4）；零配置；学习面最小（B7） | 自研自养，坑即债（现状） |
 
 **矩阵格支撑细节**（长句支撑不进格，按 design-docs 密度口径移此处）：
 
@@ -54,8 +62,9 @@ python3 3.9.6 / node v22.23.4）实跑验证；「判断」= 依据一手来源�
   （判断，测试体即普通 bash）。
 - ② 现状：475 条 t/tn 同构中 238 条带非空子串断言、237 条纯退出码（§3 口径）。
 - ③ pytest：子串失败显示期望/实际，`-vv` 展开，穿透 helper 报中间变量（实测）。
-- ③ node 系：vitest toContain 失败自动 diff + 实际全文；node:test 消息不含实际
-  字符串，须手写 message。
+- ③ node 系：vitest toContain 失败自动 diff + 实际全文；node:test——**更正
+  （2026-11-10）**：`assert.match` 失败消息实测含实际字符串（原记「不含实际
+  字符串、须手写 message」失实）。
 - ③ bats：默认输出含用例名+文件+行号+失败命令原文；bats-assert 打 expected/actual，
   优于现状 print 式（判断）。
 - ④ bats：三重一手——README "for Bash 3.2 or above"、support matrix 列 3.2.57、
@@ -64,8 +73,13 @@ python3 3.9.6 / node v22.23.4）实跑验证；「判断」= 依据一手来源�
   `^22.12.0` 随大版本抬 node 下限。
 - ⑤ pytest：近 17 个月 10 个版本，活跃；8.4.2 属无新功能维护线。
 - ⑤ vitest：约 8–11 个月一个大版本（5.0 抬 node 下限至 22.12）。
-- ⑤ bats：年 2–4 minor（v1.8.2→v1.14.0）；零配置；学习面约 8 个概念全为 bash
+- ⑤ bats：年 1–2 minor（2026-11-10 更正为实测口径；原按 v1.8.2→v1.14.0 区间折算
+  记年 2–4，偏高频）；零配置；学习面约 8 个概念全为 bash
   语法（判断）；v1.14.0 `run`+errexit 默认变化须钉 v1.13.x 规避（B7）。
+
+- **pytest 列 uv 盲区更正（2026-11-10）**：①「锁 8.4.2」、④「框架线被 Python
+  版本锁死」、⑤「版本线冻结 8.4.2」各格均按系统 Python 3.9.6 口径实测成立；uv
+  托管 Python 3.12 后三格不成立（8.4.2 论据溶解，pytest 9.x 可用）。
 
 **矩阵格来源标注**：每格结论的完整来源 URL 见 §6。无「来源不足」格——五维度
 20 格全部有一手来源或本机实测支撑。
@@ -80,12 +94,22 @@ positional 语义（$4=substr）标准 shell 词法解析（双引号内 `\"` �
 断言须有内容）。空串子串与未传参在助手 `if [ -n "$substr" ]` 分支下同效——均为
 纯退出码断言。
 
+「21 条含嵌套」数法定义（嵌套引号配对计数，2026-11-10 补）：对 t 行 cmd 参数
+（第 3 引号参数，保留源转义）单遍扫描，状态 = 双引号开关 d 与命令替换栈 S——
+①替换体外、d=1 时 `\"` 为转义对（跳 2 字符，d 不变；转义规则仅限 `\"`，`\$` 不
+消解后随 `$(`）；②`"` 翻转 d，d 由 1 翻 0 且 S 非空时记 1 个嵌套引号对；③遇
+`$(`（含 `\$(` 形态）或反引号：S 压栈且 d 置 0——替换体内引号上下文独立重置、
+独立配对（反引号不识别单引号抑制）；④遇 `)`（S 非空）弹栈还原 d。行内嵌套引号
+对数 P≥1 记「含嵌套」；443 条 t 行按此复算 P≥1 共 21 条（嵌套对合计 44），与
+原口径一致。
+
 | 分组 | 数量 | 断言形态 | 单用例迁移成本量级 | 小计 |
 |---|---|---|---|---|
 | `t` | 443（206 非空子串 + 220 空串子串 + 17 纯退出码） | 退出码[+正向子串] | codemod 批量改写 + 10% 抽样人工核，约 1–2 分钟/条 | 8–12 h |
 | `tn` | 32（全部带非空子串） | 退出码+负向子串 | 同上，refute/assert_failure 直译 | ~1 h |
 | `oseq` | 53 | 多词滑动窗口词序 | **函数原样保留**（load 引入），仅调用处适配，~1 分钟/条 | 1–2 h |
 | 夹具助手 | new_repo×25 / wfile×126 / setfm×32 / fake_cmd×6（调用点）；助手本体一次性重建 | mktemp+git init 夹具、写文件、改 frontmatter、PATH 替身 | 助手重建为 bats load 文件：一次性 4–6 h；调用点多数原样（测试体仍是 bash） | 4–6 h |
+| **合计** | 529 断言 + 4 助手 + 基建附加项 | — | 表内小计 14–21 h + 基建附加项 7–10 h（2–3 + 3–4 + 2–3）= **21–31 h ≈ 2.6–3.9 人日** | **加缓冲即总量级 3–5 人日（单人口径）** |
 
 基础设施附加项（不在上表）：bats/bats-assert/bats-support 三 submodule + runner
 封装 + setup/teardown（`$BATS_TEST_TMPDIR` 替代 mktemp）2–3 h；双跑对照与等价
@@ -160,7 +184,7 @@ positional 语义（$4=substr）标准 shell 词法解析（双引号内 `\"` �
 - P7: https://pypi.org/project/pytest/8.4.2/ ；https://pypi.org/project/pytest/ （requires-python 元数据）
 
 **node 系（一手 + 本机实测，N 系列）**
-- N1: https://docs.npmjs.com/cli/v11/commands/npm-ci ；https://docs.npmjs.com/cli/v11/using-npm-config （npm ci --offline 本机实测成功，37MB）
+- N1: https://docs.npmjs.com/cli/v11/commands/npm-ci ；https://docs.npmjs.com/cli/v11/using-npm/config （2026-11-10 更正：原址 using-npm-config 已 404；npm ci --offline 本机实测成功，37MB）
 - N2: https://nodejs.org/docs/latest/api/child_process.html
 - N3: https://nodejs.org/docs/latest/api/test.html ；https://nodejs.org/docs/latest/api/assert.html
 - N4: https://vitest.dev/api/expect.html （vitest 与 node:test 诊断输出形态本机实测对照）
@@ -184,3 +208,18 @@ positional 语义（$4=substr）标准 shell 词法解析（双引号内 `\"` �
   （特别是 bats v1.14.x 的 run+errexit 行为与 pytest 8.x 补丁线）。
 - 三份子调研原始材料由三个并行调研代理产出（pytest / node 系 / bats-core 各一），
   关键结论已按 dev-research 纪律回原文核验；pytest/node 系含本机实测复现。
+
+**修订记录（2026-11-10，迁移 spec 20261110-d145 批 3 工票 20261110-2c82 落盘，
+FR-8 六处更正，正文只改相关表述）**：
+① uv 盲区更正——§1 推荐段与 pytest 候选结论、§2 支撑细节注：pytest 分析原按系统
+python3.9.6 口径，「锁死 8.4.2」论据被 uv（托管 Python 3.12）溶解，bats 推荐降级
+为两可，路线经用户拍板 pytest+uv；
+② node:test 否决理由更正——§1 候选结论、§2 ③ 格与支撑细节：`assert.match` 失败
+实测会显示实际输出，原「不显示实际输出」失实，诊断否决理由撤销；
+③ 成本算式补汇总行——§3 表增合计行（表内小计 14–21 h + 基建 7–10 h = 21–31 h，
+加缓冲即 3–5 人日）；
+④ 死链更正——§6 N1：using-npm-config（404）改 using-npm/config；
+⑤ 发版节奏改实测口径——§2 ⑤ 格与支撑细节：bats 年 2–4 minor 改年 1–2 minor
+（验收报告 20261110-9631 残余风险⑥）；
+⑥ 「21 条」口径注补数法定义——§3：嵌套引号配对计数定义落盘，443 条 t 行复算
+P≥1 共 21 条（嵌套对合计 44），与原口径一致。
