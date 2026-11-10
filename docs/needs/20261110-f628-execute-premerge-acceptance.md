@@ -1,6 +1,6 @@
 ---
 id: 20261110-f628
-status: confirmed
+status: fulfilled
 created: 2026-11-10
 confirmed: 2026-11-10
 ---
@@ -62,3 +62,4 @@ confirmed: 2026-11-10
 - D2 → 验收 passed 即放行合并门；fulfilled 确认门保持合并后（去向 FR-2 / FR-5）
 - 目标态陈述（合并候选先验收 → passed → PR/合并门 → 合并 → done → 清理）→ 用户确认（去向 FR-1 / FR-2）
 - 时序保持项（票 done、蒸馏、清扫、spec 置 done 在合并后）→ 用户确认（去向 FR-5）
+fulfilled: 2026-11-11
