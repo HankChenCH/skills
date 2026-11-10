@@ -83,9 +83,14 @@
       "rc": 0
     },
     {
-      "id": "ok-last-occurrence-pos",
+      "id": "ok-first-occurrence-pos",
       "stdout": "ok: golden\n",
       "rc": 0
+    },
+    {
+      "id": "fail-earlier-words-repeated-later-word-missing",
+      "stdout": "FAIL: golden —— 自偏移 22 起未找到「Y」\n",
+      "rc": 1
     },
     {
       "id": "fail-empty-word-increment",

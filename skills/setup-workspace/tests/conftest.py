@@ -41,14 +41,17 @@ def oseq_text(txt: str, words: list[str]) -> tuple[bool, str]:
     """旧 oseq 助手（run-tests.sh:84-105）的 Python 直译。
 
     语义：各词按给定顺序先后出现，滑动窗口做字面匹配，不受换行影响。
-    与 bash 源逐 token 对齐：
+    与 bash 源逐 token 对齐（锚定语义经旧助手真机实测校准）：
 
     - txt 先剥全部尾随换行（旧套件 $(cat file) 会剥掉文件尾的全部换行）；
-    - head 取 rest 中该词**最后一次**出现之前的前缀（bash ${rest%%"${kw}"*}
-      删最长后缀），未出现即失败「自偏移 N 起未找到」；
+    - bash ${rest%%"${kw}"*} 删**最长**后缀：凡匹配 "${kw}*" 的后缀中以
+      kw **首次**出现为起点的那段最长（从首次出现删到串尾），故 head 是
+      rest 中 kw **首次**出现之前的前缀（实测 "loop one loop two loop X"
+      的 head 为空串——从首现整段删除）；未出现即失败「自偏移 N 起未找到」；
     - pos = base + len(head) + 1，pos 不严格大于前词位置即失败「未严格递增」；
-    - rest 却从该词**首次**出现之后滑动（bash ${rest#*"${kw}"} 删最短前缀），
-      base 记账按 len(head) + len(kw)。
+    - bash ${rest#*"${kw}"} 删最短前缀：rest 从该词**首次**出现之后滑动，
+      base 记账按 len(head) + len(kw)——head、pos、base、rest 四者同锚
+      **首次出现**。
 
     空 word 是 bash 模式退化为 "*" 的边角：head 长度按 0 记、rest 不前进。
     返回 (ok, 失败消息)；消息文案与旧助手 echo 的 FAIL 行逐字一致。
@@ -61,7 +64,7 @@ def oseq_text(txt: str, words: list[str]) -> tuple[bool, str]:
         if kw == "":
             head_len = 0 if rest else -1
         else:
-            head_len = rest.rfind(kw)
+            head_len = rest.find(kw)
         if head_len < 0:
             return False, f"自偏移 {base} 起未找到「{kw}」"
         pos = base + head_len + 1
@@ -70,8 +73,7 @@ def oseq_text(txt: str, words: list[str]) -> tuple[bool, str]:
         prev = pos
         base = base + head_len + len(kw)
         if kw != "":
-            first = rest.find(kw)
-            rest = rest[first + len(kw):]
+            rest = rest[head_len + len(kw):]
     return True, ""
 
 
