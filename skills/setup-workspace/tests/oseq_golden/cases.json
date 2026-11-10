@@ -1,0 +1,31 @@
+{
+  "_comment": "oseq 黄金样本输入（spec 20261110-d145 FR-7，工票 20261110-cf8f）。每组 = 文本 + 词序列；期望输出（expected.json）由 tools/generate_oseq_golden.py 调旧套件 run-tests.sh:84-105 的 oseq 助手真实运行产生，Python 重写（conftest.oseq_text）回放必须逐组一致。覆盖：成功路径（按序/跨行/重复词/重叠词/正则元字符字面匹配/词在开头/词含引号空格/多字节/CRLF/无尾换行/多尾换行/空词边角/pos 按最后一次出现记账）与失败路径（词缺失/乱序/命中后缺失/重复词只出现一次/空文件/首词缺失）。",
+  "cases": [
+    { "id": "ok-basic", "txt": "alpha beta gamma\n", "words": ["alpha", "beta", "gamma"] },
+    { "id": "ok-multibyte", "txt": "门禁引擎守护开发流程\n第一句在第二句之前\n", "words": ["门禁引擎", "守护", "第二句"] },
+    { "id": "ok-crossline", "txt": "第一章：规划\n第二章：实现\n第三章：验收\n", "words": ["第一章", "第二章", "第三章"] },
+    { "id": "ok-word-in-middle", "txt": "head marker tail rest\n", "words": ["marker"] },
+    { "id": "ok-five-words", "txt": "a1 b2 c3 d4 e5 f6\n", "words": ["a1", "b2", "c3", "d4", "e5"] },
+    { "id": "ok-repeat-word", "txt": "loop one loop two loop three\n", "words": ["loop", "loop", "loop"] },
+    { "id": "ok-overlap", "txt": "xxababy\n", "words": ["ab", "ab"] },
+    { "id": "ok-regex-metachars", "txt": "cost: 3.5*2 [x] done\n", "words": ["3.5*2", "[x]"] },
+    { "id": "ok-at-start", "txt": "first second third\n", "words": ["first", "third"] },
+    { "id": "ok-with-quotes", "txt": "echo \"hello\" && exit\n", "words": ["\"hello\"", "&&"] },
+    { "id": "ok-with-space", "txt": "总览五节校验在 validate 中\n", "words": ["总览五节", "validate 中"] },
+    { "id": "ok-mixed-cjk-ascii", "txt": "check.sh phase 输出（无）\n", "words": ["check.sh", "phase", "（无）"] },
+    { "id": "ok-no-trailing-newline", "txt": "no newline at end", "words": ["newline", "end"] },
+    { "id": "ok-crlf", "txt": "line one\r\nline two\r\n", "words": ["one", "line two"] },
+    { "id": "ok-tail-newline-strip", "txt": "final word\n\n\n", "words": ["final", "word"] },
+    { "id": "ok-empty-word", "txt": "abc def\n", "words": ["", "def"] },
+    { "id": "ok-last-occurrence-pos", "txt": "abab tail\n", "words": ["ab", "ab", "tail"] },
+    { "id": "fail-empty-word-increment", "txt": "x\n", "words": ["", ""] },
+    { "id": "fail-missing", "txt": "第一行有内容\n第二行也有\n", "words": ["第一行", "不存在的词"] },
+    { "id": "fail-out-of-order", "txt": "先规划后实现\n", "words": ["实现", "规划"] },
+    { "id": "fail-missing-after-progress", "txt": "header body footer\n", "words": ["header", "body", "absent"] },
+    { "id": "fail-duplicate-equal-pos", "txt": "only one marker here\n", "words": ["marker", "marker"] },
+    { "id": "fail-empty-file", "txt": "", "words": ["anything"] },
+    { "id": "fail-first-word-missing", "txt": "something else entirely\n", "words": ["开头词", "else"] },
+    { "id": "fail-multibyte-offset", "txt": "中文第一段落\n中文第二段落\n中文第三段落\n", "words": ["第一段落", "第四段落"] },
+    { "id": "fail-single-line-mid", "txt": "keep this drop that\n", "words": ["this", "keep"] }
+  ]
+}
