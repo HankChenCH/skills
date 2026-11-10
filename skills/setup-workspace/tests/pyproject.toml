@@ -1,13 +1,16 @@
-# setup-workspace pytest 套件工具链（spec 20261110-d145 批 1）。
-# 运行时依赖只有 pytest：等价索引、双跑对照、oseq 黄金回放全部用标准库。
+# setup-workspace pytest 套件工具链（spec 20261110-d145 批 1；批 2 全量迁移）。
+# 运行时依赖只有 pytest：等价索引、流数据面生成、对号签收、双跑对照、注故障
+# 检测、oseq 黄金回放全部用标准库。
 # 首次需联网 `uv sync` 一次，此后 `uv sync --offline` 可重复（need A2 双约束）。
 # 入口两级：本目录内 `uv run pytest`；仓库根
 # `uv run --project skills/setup-workspace/tests pytest skills/setup-workspace/tests`。
+# Python 3.12 为下限且钉在 3.12（uv 自管 cpython-3.12.15 兑现）——requires-python
+# 上界挡 3.13+，套件语义按 3.12 实测口径背书。
 [project]
 name = "sdlc-setup-workspace-tests"
 version = "0.1.0"
 description = "setup-workspace 门禁引擎 pytest 测试套件（uv 锁定环境）"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "pytest>=9,<10",
 ]
