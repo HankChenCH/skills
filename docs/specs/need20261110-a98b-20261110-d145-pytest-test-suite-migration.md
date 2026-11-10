@@ -10,7 +10,8 @@ approved: 2026-11-10
 
 ## 问题陈述
 
-4415 行 bash 测试套件（528 条用例）以自研 t/tn/oseq 助手守护门禁引擎，失败诊断
+4415 行 bash 测试套件（529 条断言：528 条助手用例 + 1 条内联断言）以自研 t/tn/oseq
+助手守护门禁引擎，失败诊断
 停留在 print 式子串比对，且每条新用例持续继承 bash 3.2 的 eval/引号坑（实证注释
 run-tests.sh:82-83、:3694）。调研报告 20261110-36c4 推荐 bats-core，但用户复核
 指出报告的 pytest 分析未评估 uv（只按系统 python3.9.6 口径），该口径被 uv 自管
@@ -41,24 +42,35 @@ uv 盲区更正）。迁移全程旧套件保持 canonical、等价签收前不�
 
 - **工具链（uv 单点）**：tests/ 落 `pyproject.toml` + `uv.lock`（钉 pytest 9.x
   与 Python 3.12）；首次 `uv sync` 联网一次，此后 `uv sync --offline` 可重复
-  （满足 need A2 双约束）；`uv run pytest` 为唯一入口；tests/README 记工具链
-  （uv、锁文件、无其他运行时依赖）。
+  （满足 need A2 双约束）；tests/ 内 `uv run pytest` 为唯一入口；从仓库根（check.sh
+  门禁执行命令所在的工作目录）进入同一锁定环境须显式指项目：`uv run --project
+  skills/setup-workspace/tests pytest …`——uv 只从当前目录向上发现 pyproject
+  （实测 uv 0.13.5：父目录运行报 `No project found`，加 `--project` 报
+  `Found project root`）；工具链本地产物（虚拟环境、pytest 缓存、`__pycache__`）
+  不入库、不得污染工作树状态——迁移全程各工作树 `git status` 须保持干净（编排
+  门禁以干净工作树判收口起点）；tests/README 记工具链（uv、锁文件、无其他运行时
+  依赖、两级入口命令）。
 - **结构映射**：每条 bash 用例 → pytest 测试函数或 parametrize 参数行；夹具
   （new_repo 的 mktemp+git init）→ conftest.py 的 function 级 fixture（tmp_path
   为基）；子进程断言 → `subprocess.run(capture_output=True, text=True)`，显式
   `encoding="utf-8"`，退出码/stdout/文件副作用三类断言直译；oseq 词序语义用
   Python 重写，以旧 oseq 助手对同一输入的输出做黄金样本对照验证零漂移。
-- **等价红线（不变，承接残余风险⑧）**：等价索引脚本枚举旧套件 528 条的断言
-  参数级清单（退出码期望、子串参数、词序序列），新套件逐参数对号；双跑对照
-  逐用例比 pass/fail，抽 10% 旧绿用例注故障验证新断言真红。
+- **等价红线（不变，承接残余风险⑧）**：等价索引脚本枚举旧套件全部 529 条断言的
+  参数级清单（退出码期望、子串参数、词序序列）——全集口径 = 通过计数点：助手调用
+  528 条（t 443 + tn 32 + oseq 53）+ 不经助手的内联断言 1 条（物化演练：`check.sh
+  ticket` 退出码 0 且输出含「已 reviewed」）；索引条数与旧套件自报通过数（529）
+  一致是索引完整性的机械核验。索引条目逐条唯一标识：旧套件有 2 条用例描述完全相同
+  （「FR-1 门禁不沿用未接入即拒的措辞（不要求 check.sh 存在）」出现 2 次），描述
+  不可作唯一键。新套件逐参数对号 529/529；双跑对照逐用例比 pass/fail，抽 10% 旧绿
+  用例注故障验证新断言真红。
 - **批 1 兼宿主实测（承接残余风险⑦）**：批 1 验收含全流程实操记录（uv sync →
   offline 重跑 → pytest 运行 → 人为造败看诊断呈现），实测不过即停批 2/3。
 - **分发物保护（使用方零影响门禁）**：迁移任何提交不得触碰
   `skills/setup-workspace/assets/`；批 3 验收含 `git diff <迁移基点>..HEAD --
   skills/setup-workspace/assets/` 为空的机械核验。
 - **门禁切换**：批 3 把本仓 `.sdlc/config.sh` 的 `CHECK_TEST` 切为
-  `uv run pytest skills/setup-workspace/tests`（config.sh 用户所有，setup 重跑
-  不覆盖）；切换前提 = 等价签收完成。
+  `uv run --project skills/setup-workspace/tests pytest skills/setup-workspace/tests`
+  （config.sh 用户所有，setup 重跑不覆盖）；切换前提 = 等价签收完成。
 - **报告修订（批 3 顺带，含盲区更正）**：① uv 盲区更正——pytest 分析原按系统
   python3.9.6 口径，「锁死 8.4.2」论据被 uv 溶解， bats 推荐降级为两可、路线
   由用户拍板 pytest+uv；② node:test 否决理由更正（`assert.match` 实测显示实际
@@ -81,15 +93,16 @@ uv 盲区更正）。迁移全程旧套件保持 canonical、等价签收前不�
 - [FR-1 | 工单级] Given 批 1 完成，When 实操记录核验，Then uv sync 联网一次 +
   `uv sync --offline` 重跑成功 + pytest 试点子集全绿 + 人为造败呈现重写断言
   表达式与期望/实际全文，pyproject/uv.lock 钉 pytest 9.x 与 Python 3.12 在案。
-- [FR-2 | 工单级] Given 等价索引脚本，When 对旧套件运行，Then 输出 528 条清单
-  （每条含退出码期望、子串参数、词序序列），新套件逐参数对号一致；不一致即阻塞。
+- [FR-2 | 工单级] Given 等价索引脚本，When 对旧套件运行，Then 输出 529 条清单
+  （528 条助手调用 + 1 条内联断言；每条含退出码期望、子串参数、词序序列，条目
+  唯一标识），清单条数与旧套件自报通过数一致，新套件逐参数对号一致；不一致即阻塞。
 - [FR-3 | 工单级] Given 双跑对照，When 同一夹具跑旧套件与 pytest 套件，Then
   逐用例 pass/fail 一致；抽 10% 旧绿用例注故障，新断言真红。
-- [FR-4 | 工单级] Given 批 2 完成，When 全量运行 pytest 套件，Then 528 条全数
+- [FR-4 | 工单级] Given 批 2 完成，When 全量运行 pytest 套件，Then 529 条全数
   对号在案且全绿，旧 run-tests.sh 仍在盘未被删改。
 - [FR-5 | 工单级] Given 批 3 完成，When 检查门禁接线，Then `.sdlc/config.sh` 的
-  `CHECK_TEST` 为 `uv run pytest ...` 且 `check.sh all` 全绿；旧 run-tests.sh 已删；
-  tests/README 工具链清单在案。
+  `CHECK_TEST` 为 `uv run --project skills/setup-workspace/tests pytest ...` 且
+  `check.sh all` 全绿；旧 run-tests.sh 已删；tests/README 工具链清单在案。
 - [FR-6 | 工单级] Given 迁移全程提交，When `git diff <迁移基点>..HEAD --
   skills/setup-workspace/assets/`，Then 输出为空（使用方零影响门禁）。
 - [FR-7 | 工单级] Given oseq Python 重写，When 对黄金样本（旧 oseq 助手真实
@@ -120,3 +133,16 @@ uv 盲区更正）。迁移全程旧套件保持 canonical、等价签收前不�
 assets/ 逐字节不变（FR-6 门禁）、依赖预算不变——直接影响为零；间接渠道（断言
 削弱、dual-copy 守卫弱化）由等价红线覆盖。翻译纪律与等价红线承接残余风险⑧；
 批 1 兼宿主实测承接⑦；报告修订含残余风险①④⑤⑥与 uv 盲区新更正。
+
+**修订记录（2026-11-10，原 approved 版经 dev-execute 开工预检退回后修订，未开工、
+无 worktree）**：两处口径修订，路线、三批划分与 FR 框架不变——
+① 门禁入口命令：原 `CHECK_TEST` 字面量与 tests/ 落点 pyproject 不相容（check.sh
+在仓库根直接 eval，uv 只从当前目录向上发现 pyproject；实测 uv 0.13.5 父目录
+`No project found`、`--project` 下 `Found project root`）——裁定为命令加
+`--project`，pyproject 与 uv.lock 留在 tests/（改动面不变）；同批补工具链本地
+产物（.venv/缓存/__pycache__）不入库、不污染工作树状态的要求（编排门禁以干净
+工作树判收口起点）。② 断言全集：528 为助手调用点数（t 443 + tn 32 + oseq 53），
+套件自报通过 529——多出的 1 条是 run-tests.sh:3398-3406 不经助手的内联断言
+（物化演练：`check.sh ticket` 退出码 0 且输出含「已 reviewed」）——裁定为迁入
+并按 529 计数，索引条数与自报通过数一致作完整性核验；另实测发现 2 条用例描述
+完全相同，补「索引条目逐条唯一标识、描述不可作唯一键」要求。
