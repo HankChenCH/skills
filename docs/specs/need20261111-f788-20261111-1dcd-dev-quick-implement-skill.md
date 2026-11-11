@@ -48,7 +48,7 @@ approved: 2026-11-11
 - **实现（need FR-6）**：单票在分支 `quick/<spec-id>` 上按内联的红绿循环纪律实现；提交节奏与 [#票号] 引用同 dev-implement §3；出口 check.sh all 必须全绿，反复修不绿 → 停，转 dev-fix 或完整链（need 异常流 3）。
 - **快评（need FR-7）**：spawn 独立子代理（与本会话实现上下文隔离），输入 = diff 基线（main…quick/<spec-id>）+ spec 验收场景 + 标准轴清单；产出精简评审报告落 docs/reviews/，frontmatter 契约与既有 review 产物一致（id / status / tickets / branch / created），status: approved 才满足 pre-push 评审覆盖。非 approved → 按意见返工再评，返工环上限两轮；两轮仍 rejected 或模型判定问题超出简单/低风险范畴（二者先到为准）→ 停，三件套已在盘，指路从 dev-spec 修订续走完整链（need 异常流 2 的可验证化）。
 - **交付停点与 Evidence 打包（need FR-8/D6）**：PR 三节模板（Summary / Evidence / Merge Danger），Evidence 含 check.sh all 全绿输出摘要 + spec 验收标准逐条勾（附证据）+ 评审报告摘要；停下等合并确认，**合并单向门由用户亲手点，不自动合并**。dev-accept 不被调用——正式验收需要时手动跑。
-- **自动收尾（need FR-9/ADR 0002/0003）**：合并执行后零交互按序——票 → done（落盘不提交，ADR 0003 裁决 3）→ 清扫该 spec 名下过程档（ticket、review）→ need → fulfilled、spec → done → 蒸馏折回仅在确有蒸馏目标时做（无目标留一句注记）→ 收口为一个 [trivial] 原子提交（内容 = need/spec 状态推进 + 蒸馏若有，纯知识档变更）。need fulfilled 的推进依据 = 验收证据已折叠进 Evidence 并经合并确认显式接受（D6/D7 语义闭环）。
+- **自动收尾（need FR-9/ADR 0002/0003）**：合并执行后零交互按序——票 → done（落盘不提交，ADR 0003 裁决 3）→ 蒸馏折回仅在确有蒸馏目标时做（无目标留一句注记；**先于清扫**——蒸馏来源是过程档，对齐 ADR 0002「蒸馏 → 清扫 → 置 done」固定序与 GLOSSARY 蒸馏/清扫词条）→ 清扫该 spec 名下过程档（ticket、review）→ need → fulfilled、spec → done → 收口为一个 [trivial] 原子提交（内容 = need/spec 状态推进 + 蒸馏若有，纯知识档变更）。need fulfilled 的推进依据 = 验收证据已折叠进 Evidence 并经合并确认显式接受（D6/D7 语义闭环）。
 - **治理同步面**：蓝图新增 §11.24 dev-quick-implement 条目、§8 决策点表加行（人工门 = 开工确认 + 合并确认恰两次）、§10.1 清单 30 → 31、修订记录新条目（v1.36 顺位）；README 技能清单 30 → 31 并在特色段补一句；GLOSSARY（根 + assets 双份，按 docs/standards/dual-copy-assets.md 纪律）项目术语章登记「快通道」词条。sdlc next-mode 路由表不加行、METHOD 零改动、check.sh 与 hooks 资产零改动。
 - **治理顺序**：先蓝图后技能——T1 治理文档（蓝图 + README + GLOSSARY 双份），T2 技能文本 + 临时仓库演练（blocked-by T1）。
 
@@ -74,7 +74,7 @@ approved: 2026-11-11
 - [FR-7 | 工单级] Given 快评首轮 rejected，When 按意见返工再评，Then 返工与重评不加人工交互；两轮仍 rejected 或判定超范畴时停并指路完整链。
 - [FR-8 | 工单级] Given 快评 approved，When PR 准备，Then Summary / Evidence / Merge Danger 三节齐备，Evidence 含全绿输出摘要 + 验收标准逐条勾 + 评审报告摘要；合并确认前技能停住不执行合并。
 - [FR-8 | 集成级 | 承载票 演练票] Given 用户显式确认合并，When 合并执行，Then 合并只发生在显式确认之后；确认拒绝则停在合并门、分支保留。
-- [FR-9 | 工单级] Given 合并执行完成，When 自动收尾，Then 票 done 落盘不提交、过程档（ticket / review）从盘上清扫、need → fulfilled、spec → done、蒸馏无目标时留注记跳过，收口为一个 [trivial] 原子提交且 validate 通过（done spec 名下无过程档残留）。
+- [FR-9 | 工单级] Given 合并执行完成，When 自动收尾，Then 票 done 落盘不提交、蒸馏折回先于清扫（无目标时留注记跳过）、过程档（ticket / review）从盘上清扫、need → fulfilled、spec → done，收口为一个 [trivial] 原子提交且 validate 通过（done spec 名下无过程档残留）。
 - [FR-10 | 工单级] Given 任一次快通道运行完成或被拒，When dev-retro 审计，Then 准入判定（放行的三道门结论 / 拒绝的卡点）可从 spec 备注或对话记录追溯，满足审计输入。
 - [FR-9 | 集成级 | 承载票 演练票] Given 演练仓库走通①准入通过全链，When 全程计数人工交互，Then 恰 2 次（开工确认 + 合并确认），收口后 docs/ 无过程档残留、git log 呈一条实现提交 + 一条收口提交。
 
@@ -98,3 +98,4 @@ approved: 2026-11-11
 - 蓝图同步面：§11.24 新条目、§8 决策点表加行、§10.1 清单 30 → 31、修订记录 v1.36；§7.2 引用矩阵核对（dev-quick-implement 不新增 ref 引用行——纪律内联复用，不装 ref-review/dev-review 技能）；README 30 → 31；GLOSSARY 双份；sdlc / METHOD / check.sh 零改动。
 - 快评报告契约沿用既有 review 产物 frontmatter（id / status / tickets / branch / created），pre-push 覆盖校验零改动——已在 check.sh 读取路径上实证（docs/reviews/ 既有产物同构）。
 - 拆票方案（2026-11-11 拟定，待 dev-plan 确认）：2 片垂直票——T1「快通道治理文档」（蓝图 §11.24/§8/§10.1/修订记录 v1.36 + README + GLOSSARY 双份词条，覆盖 FR-2 rubric 成文面与 FR-10 留痕承载声明；改动面 = 蓝图 + README + GLOSSARY 双份）；T2「dev-quick-implement 技能 + 演练」（SKILL.md 本体 + 静态核验四项 + 临时仓库演练四条，覆盖其余全部场景；blocked-by T1；改动面 = skills/dev-quick-implement/）。集成级 2 条由 T2 演练票承载。
+- 修订（2026-11-12，无人值守运行中 T1 评审标准轴 F1 触发，按 dev-spec 修订纪律自主修订并留痕）：「自动收尾」序修正——蒸馏折回移至清扫**前**（对齐 ADR 0002「蒸馏 → 清扫 → 置 done」固定序与 GLOSSARY 蒸馏/清扫词条：蒸馏来源是过程档，清扫在前会删掉蒸馏来源），FR-9 场景措辞同批对齐；范围与验收语义不变，spec 维持 approved。
