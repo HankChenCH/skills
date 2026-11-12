@@ -2,7 +2,7 @@
 
 **门禁式 SDLC 技能集——把「团队 + AI 协作开发」的流程规矩变成机器门禁。**
 
-31 个技能（30 个已实现，dev-quick-implement 随 spec 20261111-1dcd 建设中）驱动一条脊柱流水线，九类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
+31 个技能（均已实现）驱动一条脊柱流水线，九类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
 
 ```
 need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现）→ review（评审）→ ship（交付）→ accept（验收）
@@ -90,7 +90,7 @@ AI 协作开发的三种常见失控：
 | 技能 | 职责 |
 |---|---|
 | [dev-execute](./skills/dev-execute/SKILL.md) | 整 spec 编排运行：依赖序 worktree 并行实现、逐票评审、一次合并收口 |
-| [dev-quick-implement](./docs/sdlc-skills-blueprint.md) | 快通道（spec 20261111-1dcd 建设中，规格见蓝图 §11.24）：一句话小改动三道门判过即自动补齐三件套，恰 2 次交互交付到合并；准入判定逐门留痕进自产 spec「## 备注」，dev-retro 可审计 |
+| [dev-quick-implement](./skills/dev-quick-implement/SKILL.md) | 快通道（spec 20261111-1dcd 交付，规格见蓝图 §11.24）：一句话小改动三道门判过即自动补齐三件套，恰 2 次交互交付到合并；准入判定逐门留痕进自产 spec「## 备注」，dev-retro 可审计 |
 | [dev-fix](./skills/dev-fix/SKILL.md) | 缺陷分诊定级 → 开 fix 工票 → 送入实现链 |
 | [dev-retro](./skills/dev-retro/SKILL.md) | 复盘：机械审计豁免与绕过信号，沉淀流程改进 |
 
@@ -152,4 +152,4 @@ AI 协作开发的三种常见失控：
 
 ## 项目状态
 
-31 个技能，其中 30 个已实现（含 design-\* 界面设计套件 4 个，spec 0015 交付），dev-quick-implement 随 spec 20261111-1dcd 建设中（治理文档先行，技能文本随后落地）。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。
+31 个技能均已实现（含 design-\* 界面设计套件 4 个，spec 0015 交付；dev-quick-implement 快通道随 spec 20261111-1dcd 交付）。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。
