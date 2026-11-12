@@ -2,7 +2,7 @@
 
 **门禁式 SDLC 技能集——把「团队 + AI 协作开发」的流程规矩变成机器门禁。**
 
-30 个技能（全部已实现）驱动一条脊柱流水线，九类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
+31 个技能（均已实现）驱动一条脊柱流水线，九类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
 
 ```
 need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现）→ review（评审）→ ship（交付）→ accept（验收）
@@ -41,6 +41,7 @@ AI 协作开发的三种常见失控：
 - **MVP 分轮循环**：spec 带 `round`，round 1 只覆盖风险最大的最小范围；验收报告的「残余风险 / 下一轮建议」就是回转点，need 终态 fulfilled 有机械化退出条件。
 - **双轴评审**：标准轴查「写得对不对」（编码标准 + 坏味道基线），Spec 轴查「做的是不是要的」（缺失 / 走样 / 超范围）；两轴独立出具、不互相稀释，阻断清零才放行。
 - **界面述标交付**：design-\* 套件让界面设计从使用者角色约束出发、跟随项目设计基线，产出四态完备（正常/空/加载/错误）的布局方案并过硬指标自查；交付时在 design 产物写「界面设计」节（设计意图 / 角色约束 / 风格跟随声明 / 自查结果）并附可点 HTML 原型，design 的 approved 门即述标评审门——像建筑设计院述标那样「听意图、看界面、提意见」。
+- **小改动快通道**：dev-quick-implement 让「表格字段 A 改 B」一类小而真实的代码改动不必硬走七环节确认链——三道准入门（简单 / 低风险 / 不违反已有 ADR）判过即自动补齐 need、spec、工票三件套，此后只在开工确认与合并确认两个点被打断，其余（实现、全量检查、独立子代理快评、收尾）全自动；准入判定三道门逐门留痕写进自产 spec「## 备注」，dev-retro 可事后审计快通道是否被滥用。
 
 ## 快速上手
 
@@ -60,7 +61,7 @@ AI 协作开发的三种常见失控：
 /dev-clarify → /dev-spec → /dev-plan → /dev-implement → /dev-review → /dev-ship → /dev-accept
 ```
 
-## 技能清单（30 个）
+## 技能清单（31 个）
 
 **总控与初始化**
 
@@ -89,6 +90,7 @@ AI 协作开发的三种常见失控：
 | 技能 | 职责 |
 |---|---|
 | [dev-execute](./skills/dev-execute/SKILL.md) | 整 spec 编排运行：依赖序 worktree 并行实现、逐票评审、一次合并收口 |
+| [dev-quick-implement](./skills/dev-quick-implement/SKILL.md) | 快通道（spec 20261111-1dcd 交付，规格见蓝图 §11.24）：一句话小改动三道门判过即自动补齐三件套，恰 2 次交互交付到合并；准入判定逐门留痕进自产 spec「## 备注」，dev-retro 可审计 |
 | [dev-fix](./skills/dev-fix/SKILL.md) | 缺陷分诊定级 → 开 fix 工票 → 送入实现链 |
 | [dev-retro](./skills/dev-retro/SKILL.md) | 复盘：机械审计豁免与绕过信号，沉淀流程改进 |
 
@@ -150,4 +152,4 @@ AI 协作开发的三种常见失控：
 
 ## 项目状态
 
-30 个技能全部已实现（含 design-\* 界面设计套件 4 个，spec 0015 交付）。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。
+31 个技能均已实现（含 design-\* 界面设计套件 4 个，spec 0015 交付；dev-quick-implement 快通道随 spec 20261111-1dcd 交付）。流程规则的唯一来源是 [docs/METHOD.md](./docs/METHOD.md)，设计真相源是 [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md)（治理规则：先改文档再改技能）。
