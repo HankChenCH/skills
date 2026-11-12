@@ -19,9 +19,15 @@ description: 快通道——把一句话能说清的小而真实的代码改动�
 
 1. **触发即入准入**：用户显式调用并附一句话改动描述 → 直接进入 §3 准入判定。
    不要求 need 编号、不查 sdlc 路由表——附描述即启动。
-2. **重入先行**：docs/ 里已有上一轮快通道留下的草稿三件套（draft need + draft spec + 对应票，
-   或快评未 approved 的报告）且用户要继续 → 从卡住环节续接：开工确认未过 → 回 §5；
-   快评未 approved → 回 §6；合并已执行未收尾 → 跑 §7 收尾序列。禁止新建重复三件套。
+2. **重入先行**：docs/ 里有上一轮快通道的在盘痕迹且用户要继续 → 按在盘签名续接，
+   禁止新建重复三件套：
+   - 草稿三件套（need/spec `draft` + 对应票）→ 开工确认未过 → 回 §5 续呈现；
+   - 已批准三件套（need `confirmed` + spec `approved` + 票 `ready` 或 `in-progress`）→
+     批准后未动工或实现中断 → 回 §6 实现（票 `ready` 先置 `in-progress`）；
+   - 票 `implemented` + 快评报告 `draft`（frontmatter `rounds` = 已用返工轮次）→
+     快评返工中断 → 回 §6 快评续返工，剩余上限 = 2 − rounds，**不重置**；
+   - 快评报告 `blocked` → 按 §6 末条复述卡点，指路从 /dev-spec 修订续走完整链；
+   - 合并已执行未收尾（票 `done` 且过程档未清）→ 跑 §7 收尾序列。
 3. 不附改动描述的空调用 → 停下问"要改什么"，禁止自行挑活、禁止替用户猜改动面。
 
 ## 2. 装载上下文（准入输入）
@@ -85,8 +91,11 @@ round: 1
 created: <date>
 ---
 # <标题>
-## 问题陈述 ## 方案 ## 用户故事 ## 实现决策（模块与契约，不含文件路径与代码）
-## 测试决策（seam 在哪、怎么验）
+## 问题陈述                ← 用户视角的问题，一两句
+## 方案                    ← 用户视角的解决方案，一两句
+## 用户故事                ← 一两条："作为开发者，我想要…，以便…"
+## 实现决策                ← 模块与契约，不含文件路径与代码
+## 测试决策                ← seam 在哪、怎么验
 ## 验收场景                ← [FR-N | 工单级] Given/When/Then 逐条，覆盖 need 全部 FR（孤儿 FR validate 会拦）
 ## 非目标
 ## 备注                    ← 准入判定段：三道门逐门结论 + 一句理由（dev-retro 审计的唯一承载）
@@ -138,21 +147,24 @@ created: <date>
 - **提交节奏**：每完成一条验收标准或一次绿循环即提交，message 首行 `[#票号] 行为摘要`
   （祈使句，只提交源码与测试改动——need/spec 知识档变更统一留收口提交），一次提交只做一件事。
 - **边界**：只做票内的事；实现中发现必要改动超出"简单 / 低风险"范畴 → 停，按 §3 拒绝路径指路。
-- **出口**：`check.sh all` 全绿（反复修不绿 → 停，转 dev-fix 或完整链，不以跳过检查收工），
+- **出口**：`check.sh all` 全绿（反复修不绿 → 停，指路 dev-fix 或完整链，不以跳过检查收工），
   票 frontmatter `status` 改 `implemented`。
 
 **快评**：全绿后 spawn **独立子代理**（与实现上下文隔离），输入 = diff 基线
-（`main…quick/<spec-id>`）+ spec 验收场景 + 标准轴精简清单（CODING_STANDARDS.md
-已文档化的标准优先于基线，lint/编译已强制的跳过；ref-review 坏味道基线在装则附）——
-精简版，不是 dev-review 双轴全文。产出精简评审报告落 docs/reviews/（`check.sh claim
-review <slug>` 取号，frontmatter：id / status / tickets: [<票号>] / branch: quick/<spec-id> /
-created；节：标准轴 findings / Spec 轴 findings（对照 spec 验收场景查缺失、走样、超范围，
-精简）/ 汇总）：
+（主干 `.sdlc/config.sh` 的 BASE_REF…quick/<spec-id>）+ spec 验收场景 + 标准轴精简清单
+（CODING_STANDARDS.md 已文档化的标准优先于基线，lint/编译已强制的跳过）+ 随派发文本附上的
+内联坏味道要点（几条核心反模式信号：重复代码、死代码、过深嵌套、过长函数、魔法值、吞错误）——
+精简版，不是 dev-review 双轴全文，也不装载 ref-review / dev-review 技能（纪律内联复用）。产出精简评审报告落
+docs/reviews/（`check.sh claim review <slug>` 取号，frontmatter：id / status /
+tickets: [<票号>] / branch: quick/<spec-id> / rounds / created；节：标准轴 findings /
+Spec 轴 findings（对照 spec 验收场景查缺失、走样、超范围，精简）/ 汇总）：
 
 - 各轴无阻断 → 报告 `status: approved`（满足 pre-push 评审覆盖）。
-- 有阻断 → `status: draft` 留盘，按意见返工再评，**不加人工交互**，**返工环上限两轮**。
-- 两轮后仍非 approved，或判定问题超出简单 / 低风险范畴（二者先到为准）→ 报告以
-  `status: blocked` 落盘留案，停：三件套已在盘，指路从 /dev-spec 修订续走完整链。
+- 有阻断 → `status: draft` 留盘并把轮次写进盘上（frontmatter `rounds: <N>`，第 N 轮结论
+  落盘即置 N），按意见返工再评，**不加人工交互**，**返工环上限两轮**——已用轮次以盘上
+  `rounds` 为准续算剩余（2 − rounds），中断重入不重置。
+- 两轮后仍非 approved（盘上 rounds = 2），或判定问题超出简单 / 低风险范畴（二者先到为准）
+  → 报告以 `status: blocked` 落盘留案，停：三件套已在盘，指路从 /dev-spec 修订续走完整链。
 
 ## 7. 第五段 · PR 停门（人工 2/2）与自动收尾
 
@@ -166,7 +178,7 @@ created；节：标准轴 findings / Spec 轴 findings（对照 spec 验收场�
 分支与盘上状态保留、不清理。dev-accept 不被调用——验收证据已折叠进 Evidence，
 正式验收需要时手动跑；合并确认即验收证据被显式接受，是收尾推进 need fulfilled 的依据。
 
-**合并执行后零交互按序收尾**（次序固定：蒸馏 → 清扫 → 置 done → 原子提交，禁跳步）：
+**合并执行后零交互按序收尾**（次序固定：票 done → 蒸馏 → 清扫 → 置 done → 原子提交，禁跳步）：
 
 1. 票 frontmatter `status` 改 `done`、追加 `done: <今日>`——**落盘不提交**
    （过程档无可提交内容，ADR 0003 裁决 3）。
@@ -181,8 +193,9 @@ created；节：标准轴 findings / Spec 轴 findings（对照 spec 验收场�
 ## 8. 中断与交接
 
 会话可能在任何时刻结束。凡是停下：准入前 → 对话态重开成本低；
-三件套已产未确认 → 草稿态已在盘，无需额外落盘即停；实现中 → 票保持 `in-progress`、
-进度写进票 `## Progress`（做到哪、下一步、卡在哪）再停；
+草稿三件套未确认 → 草稿态已在盘，无需额外落盘即停（§1.2 续 §5）；
+实现中 → 票保持 `in-progress`、进度写进票 `## Progress`（做到哪、下一步、卡在哪）再停（§1.2 续 §6）；
+快评返工中 → 票 `implemented`、报告 `draft` 且轮次已在盘（frontmatter `rounds`），再停（§1.2 续 §6，剩余上限按 rounds 续算）；
 合并已执行未收尾 → 重入从 §7 收尾序列续跑。状态在盘上，不在对话里。
 
 ## 禁止事项（任何时候）
