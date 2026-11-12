@@ -24,8 +24,9 @@ description: 快通道——把一句话能说清的小而真实的代码改动�
    - 草稿三件套（need/spec `draft` + 对应票）→ 开工确认未过 → 回 §5 续呈现；
    - 已批准三件套（need `confirmed` + spec `approved` + 票 `ready` 或 `in-progress`）→
      批准后未动工或实现中断 → 回 §6 实现（票 `ready` 先置 `in-progress`）；
-   - 票 `implemented` + 快评报告 `draft`（frontmatter `rounds` = 已用返工轮次）→
-     快评返工中断 → 回 §6 快评续返工，剩余上限 = 2 − rounds，**不重置**；
+   - 票 `implemented`（快评报告未产出或 `draft`，frontmatter `rounds` = 已用返工轮次）→
+     实现出口后中断或快评返工中断 → 回 §6 快评（报告未产出则先评首轮），
+     剩余上限 = 2 − rounds，**不重置**；
    - 快评报告 `blocked` → 按 §6 末条复述卡点，指路从 /dev-spec 修订续走完整链；
    - 合并已执行未收尾（票 `done` 且过程档未清）→ 跑 §7 收尾序列。
 3. 不附改动描述的空调用 → 停下问"要改什么"，禁止自行挑活、禁止替用户猜改动面。
@@ -160,8 +161,9 @@ tickets: [<票号>] / branch: quick/<spec-id> / rounds / created；节：标准�
 Spec 轴 findings（对照 spec 验收场景查缺失、走样、超范围，精简）/ 汇总）：
 
 - 各轴无阻断 → 报告 `status: approved`（满足 pre-push 评审覆盖）。
-- 有阻断 → `status: draft` 留盘并把轮次写进盘上（frontmatter `rounds: <N>`，第 N 轮结论
-  落盘即置 N），按意见返工再评，**不加人工交互**，**返工环上限两轮**——已用轮次以盘上
+- 有阻断 → `status: draft` 留盘并把轮次写进盘上（frontmatter `rounds: <N>`——**首轮评审
+  落盘置 `rounds: 0`，此后每个返工轮结论落盘 +1**；首轮即 approved 时 rounds 缺省
+  `rounds: 0`），按意见返工再评，**不加人工交互**，**返工环上限两轮**——已用轮次以盘上
   `rounds` 为准续算剩余（2 − rounds），中断重入不重置。
 - 两轮后仍非 approved（盘上 rounds = 2），或判定问题超出简单 / 低风险范畴（二者先到为准）
   → 报告以 `status: blocked` 落盘留案，停：三件套已在盘，指路从 /dev-spec 修订续走完整链。
