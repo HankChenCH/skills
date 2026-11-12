@@ -1,8 +1,9 @@
 ---
 id: 20261111-f788
-status: confirmed
+status: fulfilled
 created: 2026-11-11
 confirmed: 2026-11-11
+fulfilled: 2026-11-12
 ---
 # dev-quick-implement：小改动快速实现通道
 
