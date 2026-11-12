@@ -48,10 +48,11 @@ confirmed: 2026-11-11
 
 ## 假设与风险
 
-- **A1 准入自判可能误放行**（判定过松，把不简单的改动放进快车道）：代价中——污染主干风险由合并门人工兜底，但审计成本上升；不确定度中。兜底 = 留痕 + retro 审计。**round 1 靶心之一：准入 rubric 文本质量与拒绝案例积累。**
-- **A2 独立子代理快评弱于人工评审**：代价低——合并门仍有人看 Evidence；不确定度低。评审报告摘要进 Evidence 使人可抽检。
-- **A3 假设 [trivial] 语义不变**（typo/纯文档继续走豁免通道），quick-implement 只吃「小但真改代码」地带，两通道互补不重叠。
-- **A4 假设现有机械门禁零改动即可承载**：commit-msg 要求 [#YYYYMMDD-4hex] 票状态合法——quick 票按正常状态机流转（ready → in-progress → implemented → done）即满足；pre-push 要求 implemented 票有 approved 评审覆盖——子代理快评报告即评审产物，满足。无需改 check.sh。
+- **A1 准入自判可能误放行**（判定过松，把不简单的改动放进快车道）：代价中——污染主干风险由合并门人工兜底，但审计成本上升；不确定度中。兜底 = 留痕 + retro 审计。**round 1 靶心之一：准入 rubric 文本质量与拒绝案例积累。**【验证：验证通过（20261112-cbb6）——rubric 三道门+硬拒项成文且可走查，演练②拒绝路径零产物；残余：误放行只能靠留痕+retro 事后兜底，无法证明零误放行 → round 2 案例积累维持既记候选（自产 spec「## 备注」即案例库）】
+- **A2 独立子代理快评弱于人工评审**：代价低——合并门仍有人看 Evidence；不确定度低。评审报告摘要进 Evidence 使人可抽检。【验证：验证通过（20261112-cbb6）——演练③实证返工环消化真实缺口（round 1 rejected → 返工 → round 2 approved）零额外交互】
+- **A3 假设 [trivial] 语义不变**（typo/纯文档继续走豁免通道），quick-implement 只吃「小但真改代码」地带，两通道互补不重叠。【验证：验证通过（20261112-cbb6）——check.sh 全量零改动 diff 实证，豁免语义未触碰】
+- **A4 假设现有机械门禁零改动即可承载**：commit-msg 要求 [#YYYYMMDD-4hex] 票状态合法——quick 票按正常状态机流转（ready → in-progress → implemented → done）即满足；pre-push 要求 implemented 票有 approved 评审覆盖——子代理快评报告即评审产物，满足。无需改 check.sh。【验证：验证通过（20261112-cbb6）——演练①③ pre-push 实跑通过，快评报告契约同构既有 review 产物】
+- **残余风险（验收折回，20261112-cbb6）**：①rubric 误放行事后兜底（见 A1，不阻塞）；②SKILL.md 快评报告 `rounds` 字段超出 check.sh 现行枚举——validate 容忍未知字段，若未来收紧未知字段校验会破契约（影响低，收紧时须同批）；③蓝图 §11.24 快评 frontmatter 字段清单（五字段）与 SKILL.md（六字段含 rounds）轻不对称（瑕疵，blueprint 补 rounds 一句为小修候选）。**下一轮建议**：round 2 = rubric 误放行案例积累（运营性，随用随积，无需立即开轮）；蓝图补 rounds 一句（小修候选，归蓝图维护）。
 
 ## 范围与非目标
 

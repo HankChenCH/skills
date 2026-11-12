@@ -1,10 +1,11 @@
 ---
 id: 20261111-1dcd
-status: approved
+status: done
 need: 20261111-f788
 round: 1
 created: 2026-11-11
 approved: 2026-11-11
+done: 2026-11-12
 ---
 # dev-quick-implement：小改动快速实现通道（快通道）
 
