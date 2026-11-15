@@ -43,6 +43,12 @@ jobs:
       - name: Install expect for interactive e2e (missing expect would fail those tests red)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends expect
 
+      - name: Install pnpm for dsh integration tests (official dsh plugin command forwards to pnpm)
+        # fix 20261115-1a89：ubuntu runner 不预装 pnpm，官方 dsh plugin 命令转发 pnpm 执行，
+        # 缺装时 spawn ENOENT 使 FR-5 集成测试红（Actions run 43722887029）。装了就真跑
+        # （与 expect 同款定夺：给测试补前置门跳过会让集成覆盖永久缺失）。钉主版本 12。
+        run: npm install -g pnpm@12
+
       - name: Install dependencies
         run: npm ci
 
