@@ -16,6 +16,7 @@
   "engines": {
     "node": ">=24.9.0"
   },
+  "packageManager": "pnpm@12.15.0",
   "scripts": {
     "test": "node --test test/unit/*.test.ts test/e2e/*.test.ts",
     "test:unit": "node --test test/unit/*.test.ts",

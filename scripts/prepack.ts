@@ -63,7 +63,7 @@ function runPrepack(): void {
     const emitted = collectFiles(path.join(packageRoot, 'src'), '.js');
     const binJsExists = fs.existsSync(path.join(packageRoot, 'bin', 'infra.js'));
     if (!binJsExists || emitted.length === 0) {
-      console.error('✗ prepack：typescript 不可解析且编译产物缺失——发布打包前先 npm install（devDependencies 含 typescript）');
+      console.error('✗ prepack：typescript 不可解析且编译产物缺失——发布打包前先 pnpm install（devDependencies 含 typescript）');
       process.exit(1);
     }
     console.log('• prepack：编译产物已在位（tarball 解包目录重打包场景），跳过编译');

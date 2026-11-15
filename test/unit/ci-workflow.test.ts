@@ -1,18 +1,25 @@
-// CI 回归门 workflow 的静态校验（spec 20261115-f650 测试决策 seam ②，FR-2 工单级）。
+// CI 回归门 workflow 的静态校验（spec 20261115-f650 测试决策 seam ②，FR-2 工单级；
+// pnpm 迁移随 spec 20261115-ed9f FR-4 更新契约——依赖安装步换 pnpm）。
 // seam = .github/workflows/regression-gate.yml 文件本身——声明式工件的外部可观察面，
 // 断言只打在文件解析后的结构与原文上，不执行任何步骤。
 // 期望值全部来自 spec CI workflow 契约字面（触发 push+pull_request、node 24 经 .nvmrc、
 // 步骤链 checkout → node setup → 依赖安装 → tsc --noEmit → 全量测试 → verify:pack、
 // 无 secrets 键），不从实现推导。
+// pnpm 契约（spec 20261115-ed9f，RQ2 方案）：依赖安装 = pnpm install --frozen-lockfile
+// （显式传参留痕——CI 本就自动 frozen；incompatible lockfile / pnpm-lock.yaml 漏提交
+// 直接红，RQ2 异常流 A #6 的正确红）；pnpm 版本两处钉——全局安装步钉主版本 12（兼供
+// dsh 集成测试转发），packageManager 字段钉精确版 12.15.0（lockfile
+// packageManagerDependencies 记账，frozen 安装强制对齐）；setup-node 缓存随 pnpm
+// lockfile（cache: pnpm），故全局 pnpm 安装步须先于 setup-node。
 // 解析器 = 本文件内置的 YAML 子集解析器（块映射 / 块序列 / 字面块标量 / flow 序列 /
-// 全行注释）：仓依赖树无 YAML 库且本票改动面禁止改 package.json，故以子集解析器承载
-// 「yaml 可解析」这一 seam 检查；解析失败带行号显式报错（坏缩进、tab、非 key 行都拒绝）。
+// 全行注释）：仓依赖树无 YAML 库，以子集解析器承载「yaml 可解析」这一 seam 检查；
+// 解析失败带行号显式报错（坏缩进、tab、非 key 行都拒绝）。
 // 环境缺失处置的取证口径：dsh 集成测试自带前置门（node/registry 不满足显式 skip 报因，
 // 见 test/e2e/dsh-plugin-integration.test.ts）；交互 e2e 的 expect 缺失时红（runInteractive
 // throw，非假绿）——workflow 内显式 apt 安装 expect 使交互段真跑（design 定夺：装了就真跑，
 // runner 镜像不保证预装 expect）。
 // 评审加固项同为 seam 契约：actions 钉完整 commit SHA（可变 tag 非供应链信任锚）、
-// verify 步骤 shell: bash（-eo pipefail，npm pack 失败不被 tail 掩码）、解析器拒重复键
+// verify 步骤 shell: bash（-eo pipefail，pnpm pack 失败不被 tail 掩码）、解析器拒重复键
 // 与非法块标量缩进（坏点一律带行号显式报错）。
 
 import { test } from 'node:test';
@@ -290,9 +297,14 @@ test('node 24 取版声明在位：setup-node 读 .nvmrc，且 .nvmrc 钉住 nod
   );
   const nvmrc = fs.readFileSync(path.join(packageRoot, '.nvmrc'), 'utf8').trim();
   assert.match(nvmrc, /^24\./, `.nvmrc 须钉住 node 24 主版本（spec：node 24），实际：${nvmrc}`);
+  assert.equal(
+    setup.with['cache'],
+    'pnpm',
+    `setup-node 缓存须随 pnpm lockfile（cache: pnpm）——依赖管理已迁 pnpm（spec 20261115-ed9f FR-4），npm 缓存无 lockfile 可依，实际 with：${JSON.stringify(setup.with)}`
+  );
 });
 
-test('步骤链契约齐备且有序：checkout → node setup → npm ci → typecheck → test → verify:pack', () => {
+test('步骤链契约齐备且有序：checkout → node setup → pnpm install --frozen-lockfile → typecheck → test → verify:pack', () => {
   const steps = readWorkflowSteps(readWorkflowDoc());
   const chain: Array<{ label: string; match: (s: Step) => boolean }> = [
     {
@@ -303,16 +315,19 @@ test('步骤链契约齐备且有序：checkout → node setup → npm ci → ty
       label: 'node setup（uses 钉完整 commit SHA）',
       match: (s) => typeof s.uses === 'string' && /^actions\/setup-node@[0-9a-f]{40}$/.test(s.uses),
     },
-    { label: '依赖安装 npm ci', match: (s) => s.run === 'npm ci' },
-    { label: 'typecheck（tsc --noEmit 经脚本）', match: (s) => s.run === 'npm run typecheck' },
-    { label: '全量测试 npm test', match: (s) => s.run === 'npm test' },
     {
-      label: 'verify:pack 对账（先 npm pack 出 tarball 再对账；shell: bash 带 -eo pipefail，pack 失败不被 tail 掩码）',
+      label: '依赖安装（pnpm install --frozen-lockfile；frozen 显式留痕，incompatible lockfile 红 = 防漂移的正确行为，RQ2 异常流 A #6）',
+      match: (s) => s.run === 'pnpm install --frozen-lockfile',
+    },
+    { label: 'typecheck（tsc --noEmit 经脚本）', match: (s) => s.run === 'pnpm run typecheck' },
+    { label: '全量测试 pnpm test', match: (s) => s.run === 'pnpm test' },
+    {
+      label: 'verify:pack 对账（先 pnpm pack 出 tarball 再对账；shell: bash 带 -eo pipefail，pack 失败不被 tail 掩码；pnpm 12 起 `pnpm run` 原样转发 `--`，传参不带 `--`——本机 12.15.0 实测）',
       match: (s) =>
         typeof s.run === 'string' &&
         s.shell === 'bash' &&
-        s.run.includes('npm pack') &&
-        s.run.includes('npm run verify:pack --'),
+        s.run.includes('pnpm pack') &&
+        s.run.includes('pnpm run verify:pack'),
     },
   ];
   let cursor = -1;
@@ -335,18 +350,20 @@ test('交互 e2e 的 expect 前置由安装步骤真实供应（装了就真跑�
     expectIdx >= 0,
     '缺 expect 安装步骤（apt-get install expect）——ubuntu runner 不保证预装 expect，缺装时交互 e2e 直接红而非跳过'
   );
-  const testIdx = steps.findIndex((s) => s.run === 'npm test');
+  const testIdx = steps.findIndex((s) => s.run === 'pnpm test');
   assert.ok(
     expectIdx < testIdx,
-    'expect 安装步骤必须先于 npm test——否则交互 e2e 跑时 expect 仍未就绪'
+    'expect 安装步骤必须先于 pnpm test——否则交互 e2e 跑时 expect 仍未就绪'
   );
 });
 
 test('dsh 集成段的 pnpm 前置由安装步骤真实供应（官方 dsh plugin 命令转发 pnpm 执行）', () => {
   // 缺陷钉住（fix 票 20261115-1a89）：Actions 首跑红——既有 FR-5 集成测试真跑段经官方
   // dsh plugin add 转发 pnpm，runner PATH 无 pnpm 时 spawn ENOENT 使安装中止（exit 127），
-  // 断言红（run 43722887029）。pnpm 安装步骤必须先于 npm test，装了就真跑（与 expect
+  // 断言红（run 43722887029）。pnpm 安装步骤必须先于 pnpm test，装了就真跑（与 expect
   // 同款定夺：补前置门跳过会让集成覆盖永久缺失）。
+  // pnpm 迁移后本步身兼两职（spec 20261115-ed9f FR-4）：dsh 集成前置 + setup-node
+  // cache: pnpm 的取版前置——故顺序契约加一条：先于 setup-node。
   const steps = readWorkflowSteps(readWorkflowDoc());
   const pnpmIdx = steps.findIndex(
     (s) => typeof s.run === 'string' && /npm\s+install\s+-g\s+pnpm@/.test(s.run)
@@ -355,10 +372,17 @@ test('dsh 集成段的 pnpm 前置由安装步骤真实供应（官方 dsh plugi
     pnpmIdx >= 0,
     '缺 pnpm 安装步骤（npm install -g pnpm@<主版本>）——runner 镜像不预装 pnpm，缺装时官方 dsh plugin 命令转发 pnpm 执行即 ENOENT，FR-5 集成测试红'
   );
-  const testIdx = steps.findIndex((s) => s.run === 'npm test');
+  const testIdx = steps.findIndex((s) => s.run === 'pnpm test');
   assert.ok(
     pnpmIdx < testIdx,
-    'pnpm 安装步骤必须先于 npm test——否则 dsh 集成测试跑时 pnpm 仍未就绪'
+    'pnpm 安装步骤必须先于 pnpm test——否则 dsh 集成测试跑时 pnpm 仍未就绪'
+  );
+  const setupIdx = steps.findIndex(
+    (s) => typeof s.uses === 'string' && s.uses.startsWith('actions/setup-node@')
+  );
+  assert.ok(
+    pnpmIdx < setupIdx,
+    'pnpm 安装步骤必须先于 setup-node——setup-node 的 cache: pnpm 需要 pnpm 已在 PATH，缺装时该步骤红'
   );
 });
 
