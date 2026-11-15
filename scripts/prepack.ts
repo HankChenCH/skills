@@ -65,16 +65,24 @@ function collectMemberNodeModules(): string[] {
 // 暂存键 = 仓库相对路径的 / → __ 编码（单层 stash 目录，还原时解码回原位）
 const stashKeyOf = (absPath: string): string => path.relative(packageRoot, absPath).split(path.sep).join('__');
 
-export function restoreStashedNodeModules(): number {
-  if (!fs.existsSync(STASH_DIR)) return 0;
+export function restoreStashInto(stashDir: string, root: string): number {
+  if (!fs.existsSync(stashDir)) return 0;
   let restored = 0;
-  for (const entry of fs.readdirSync(STASH_DIR)) {
-    const dest = path.join(packageRoot, ...entry.split('__'));
-    fs.renameSync(path.join(STASH_DIR, entry), dest);
+  for (const entry of fs.readdirSync(stashDir)) {
+    const dest = path.join(root, ...entry.split('__'));
+    // 还原守卫：dest 已存在（上次 pack 中途失败残留 stash 后 pnpm install 重建了成员依赖
+    // 目录）先移除再移回——暂存物是 pack 时点原物，重建物由同一 lockfile 决定、内容等价，
+    // 覆盖即恢复 pack 前状态；不处置则 rename 对非空目录抛 ENOTEMPTY 裸栈且重试复现。
+    if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
+    fs.renameSync(path.join(stashDir, entry), dest);
     restored += 1;
   }
-  fs.rmdirSync(STASH_DIR);
+  fs.rmdirSync(stashDir);
   return restored;
+}
+
+export function restoreStashedNodeModules(): number {
+  return restoreStashInto(STASH_DIR, packageRoot);
 }
 
 function stashMemberNodeModules(): number {
