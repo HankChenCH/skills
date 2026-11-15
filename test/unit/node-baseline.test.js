@@ -30,3 +30,14 @@ test('包 engines.node 基线不低于官方 dsh 要求的 24.9.0', async () => 
     `engines.node 基线 ${pkg.engines.node} 低于官方 dsh 要求的 >=24.9.0`
   );
 });
+
+test('.nvmrc 声明的进场版本满足包 engines 基线（fnm use 后不落在基线之下）', async () => {
+  const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
+  const floor = versionFloorOf(pkg.engines.node);
+  const nvmrc = (await readFile(new URL('../../.nvmrc', import.meta.url), 'utf8')).trim();
+  const declared = versionFloorOf(`>=${nvmrc}`);
+  assert.ok(
+    noLowerThan(declared, floor),
+    `.nvmrc 声明 ${nvmrc} 低于包 engines 基线 ${pkg.engines.node}，fnm use 后将落在基线之下`
+  );
+});
