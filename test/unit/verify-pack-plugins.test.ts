@@ -47,7 +47,12 @@ async function stageTarball(
   for (const host of await readdir(agentsDir)) {
     const hostPlugins = path.join(agentsDir, host, 'plugins');
     for (const plugin of await readdir(hostPlugins)) {
-      await cp(path.join(hostPlugins, plugin), path.join(stage, 'agents', host, 'plugins', plugin), { recursive: true });
+      // fixture 模拟 pack 产物语义：成员依赖目录（node_modules）不随包——真实 pack 永不卷入
+      //（票 20261115-cf39 起插件包 devDependencies 自持 typescript，仓库目录落盘 node_modules）
+      await cp(path.join(hostPlugins, plugin), path.join(stage, 'agents', host, 'plugins', plugin), {
+        recursive: true,
+        filter: (source) => !source.includes('node_modules'),
+      });
     }
   }
   if (omitPlugin) {

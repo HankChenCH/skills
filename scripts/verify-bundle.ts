@@ -1,21 +1,41 @@
 #!/usr/bin/env node
-// 插件包 bundle 清单校验器（spec 20261115-495e FR-2，规范文档 docs/plugin-assets.md §1.2/§1.4）。
-// 接口窄：进插件包目录，出缺陷清单（空 = 通过）。核对 §1.2 清单四要素与 §1.4 两项附录——
+// 插件包 bundle 清单校验器（spec 20261115-495e FR-2，规范文档 docs/plugin-assets.md §1.2/§1.4；
+// 双态口径归 spec 20261115-ed9f 插件预编译契约，票 20261115-cf39）。
+// 接口窄：进插件包目录（源码态）或发布 tarball（发布态），出缺陷清单（空 = 通过）。
+//
+// 源码态（collectBundleDefects，仓库插件目录）——核对 §1.2 清单四要素与 §1.4 两项附录：
 //   1. package.json type: "module"（要素表第 1 行：插件模块按 ESM 加载，CJS 形态宿主加载即抛错）；
 //   2. package.json 声明 dsh.bundle.patch（缺它装进 profile 只作普通依赖、不进插件树，need F1）；
 //   3. files 清单含 patch 文件（npm 白名单外文件不随包分发，清单缺文件 = 装出去的包坏）；
 //   4. patch 清单为官方 loader 可解析的 PatchOptions[]（要素表第 4 行「以包名引用自己」的官方
 //      形态，ticket 20261115-f158 取证：顶层须 YAML 数组、元素须映射、insert 元素须 id + name、
 //      引用名 = 包名）；
-//   5. 插件模块导出 name 与 apply(ctx)（§1.4 附录二；main 直指模块作为定位入口随查，main 允许
-//      .ts 形态——spec 20261115-f650 demo 插件 .ts 化契约；静态读源码，套件约定 ESM + 内联导出，
-//      照抄 demo 即在此形态内。导出识别在剥注释后的文本上做：.ts 文档注释天然引用导出名、
-//      type 声明形似导出，裸正则会误放行幽灵导出）。
-// scripts/verify-pack.ts 的插件侧复用本实现；独立调用：
+//   5. 插件模块导出 name 与 apply(ctx)（§1.4 附录二；main 直指模块作为定位入口随查；main 允许
+//      .ts 形态——源码态语义映射：仓库声明 index.ts，发布打包时由包内 prepack 换载为编译产物
+//      index.js（FR-7 回退，spec 20261115-ed9f），故 .ts main 在源码态合法；.js main 亦合法
+//      （换载后目录态）。静态读源码，套件约定 ESM + 内联导出，照抄 demo 即在此形态内。
+//      导出识别在剥注释后的文本上做：.ts 文档注释天然引用导出名、type 声明形似导出，裸正则
+//      会误放行幽灵导出）。
 //
-//   node scripts/verify-bundle.ts <插件包目录>...
+// 发布态（collectPublishedBundleDefects / collectTarballBundleDefects，插件包自有 registry
+// tarball——dsh 官方命令安装的消费者拿到的就是它）——FR-7 证伪定案（node 拒载 node_modules 下
+// .ts，ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING 无旗标逃生，证伪报告
+// docs/research/dsh-ts-loading/fr7-dsh-ts-loading-falsification.md）后发布面必须 .js 形态：
+//   1–5. 四要素语义同源码态（模块从 .js 编译产物解析导出）；
+//   6. main 须指 .js（main 指 .ts 即 FR-7 证伪形态，缺陷引用证伪报告）；
+//   7. files 白名单须含编译产物（main 入口）；
+//   8. 目录内无 .ts 源码残留（spec 预编译契约：发布 tarball 不含 .ts）。
+// tarball 入口按 pnpm/npm pack 产物 package/ 单包布局解包后走目录口径。
+//
+// scripts/verify-pack.ts 的插件侧复用源码态实现（根初始化器包内嵌插件目录 = 编目数据，
+// 源码态语义；发布态口径供插件包 publish 面把关）。独立调用：
+//
+//   node scripts/verify-bundle.ts <插件包目录>...          # 源码态
+//   node scripts/verify-bundle.ts --tarball <tarball>...   # 发布态
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -344,7 +364,45 @@ function stripComments(source: string): string {
 
 export { stripComments };
 
+// 源码态口径：仓库插件目录（main 允许 .ts——语义映射到发布态 index.js，见文件头注 5）
 export function collectBundleDefects(pluginDir: string): string[] {
+  return collectBundleDefectsFor(pluginDir, false);
+}
+
+// 发布态口径：插件包自有 registry tarball 解包后的目录（或等价发布态目录）。
+// FR-7 回退后发布面必须 .js 形态：main 指 .js、files 含编译产物、无 .ts 源码。
+export function collectPublishedBundleDefects(pluginDir: string): string[] {
+  return collectBundleDefectsFor(pluginDir, true);
+}
+
+// 发布态 tarball 入口：pnpm/npm pack 产物 package/ 单包布局，解包到临时目录后走发布态目录口径。
+export function collectTarballBundleDefects(tarballPath: string): string[] {
+  if (!fs.existsSync(tarballPath)) {
+    return [`tarball 不存在：${tarballPath}`];
+  }
+  const list = spawnSync('tar', ['-tzf', tarballPath], { encoding: 'utf8' });
+  if (list.status !== 0) {
+    return [`tarball 无法读取（${tarballPath}，${(list.stderr ?? '').trim()}）`];
+  }
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'verify-bundle-tarball-'));
+  try {
+    const extract = spawnSync('tar', ['-xzf', tarballPath, '-C', workDir], { encoding: 'utf8' });
+    if (extract.status !== 0) {
+      return [`tarball 解包失败（${tarballPath}，${(extract.stderr ?? '').trim()}）`];
+    }
+    const packageDir = path.join(workDir, 'package');
+    if (!fs.existsSync(packageDir)) {
+      return [`tarball 缺 package/ 目录（非 pack 产物布局）——${tarballPath}`];
+    }
+    return collectPublishedBundleDefects(packageDir);
+  } finally {
+    fs.rmSync(workDir, { recursive: true, force: true });
+  }
+}
+
+// 双态判定单点：published = false 源码态 / true 发布态。两态差异只在 main 形态要求
+// （发布态须 .js）、files 含编译产物与 .ts 残留禁入三项；四要素语义两态同源。
+function collectBundleDefectsFor(pluginDir: string, published: boolean): string[] {
   let pkg: PluginPackageJson;
   try {
     pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf8'));
@@ -352,16 +410,17 @@ export function collectBundleDefects(pluginDir: string): string[] {
     return [`${pluginDir}：package.json 无法读取（${error.message}）`];
   }
   const name = pkg.name;
+  const displayName = name ?? path.basename(pluginDir);
   const defects: string[] = [];
 
   if (!name) {
-    defects.push(`${path.basename(pluginDir)}：package.json 缺 name——patch 引用名无从对账`);
+    defects.push(`${displayName}：package.json 缺 name——patch 引用名无从对账`);
   }
 
-  // 要素 1：type 须为 module（§1.2 要素表第 1 行）
+  // 要素 1：type 须为 module（§1.2 要素表第 1 行；两态同查）
   if (pkg.type !== 'module') {
     defects.push(
-      `${name ?? path.basename(pluginDir)}：package.json 缺 type: "module"——插件模块按 ESM 加载，CJS 形态宿主加载即抛错（实际：${pkg.type ?? '缺'}）`,
+      `${displayName}：package.json 缺 type: "module"——插件模块按 ESM 加载，CJS 形态宿主加载即抛错（实际：${pkg.type ?? '缺'}）`,
     );
   }
 
@@ -371,12 +430,12 @@ export function collectBundleDefects(pluginDir: string): string[] {
   const patchTarget =
     typeof patchDeclared === 'string' && patchDeclared !== '' ? normalizeEntry(patchDeclared) : null;
   if (!patchTarget) {
-    defects.push(`${name ?? path.basename(pluginDir)}：package.json 缺 dsh.bundle.patch 声明——没有它装进 profile 只作普通依赖、不进插件树`);
+    defects.push(`${displayName}：package.json 缺 dsh.bundle.patch 声明——没有它装进 profile 只作普通依赖、不进插件树`);
   }
 
   // 要素 3：files 清单含 patch 文件
+  const files = Array.isArray(pkg.files) ? pkg.files.map(normalizeEntry) : null;
   if (patchTarget) {
-    const files = Array.isArray(pkg.files) ? pkg.files.map(normalizeEntry) : null;
     if (!files) {
       defects.push(`${name}：package.json 缺 files 清单——patch 文件不会随包分发`);
     } else if (!files.includes(patchTarget)) {
@@ -397,27 +456,60 @@ export function collectBundleDefects(pluginDir: string): string[] {
     }
   }
 
-  // 要素 5：插件模块导出 name 与 apply(ctx)
+  // 要素 5：插件模块导出 name 与 apply(ctx)。源码态 main 允许 .ts（语义映射）；发布态
+  // 须 .js——FR-7 证伪定案：node 对 node_modules 下 .ts 一律拒绝剥类型，.ts 主入口的
+  // 发布包装进 profile 后宿主必拒载。
   const mainEntry =
     typeof pkg.main === 'string' && pkg.main !== '' ? normalizeEntry(pkg.main) : null;
   if (!mainEntry) {
-    defects.push(`${name ?? path.basename(pluginDir)}：package.json 缺 main——无法定位插件模块入口`);
+    defects.push(`${displayName}：package.json 缺 main——无法定位插件模块入口`);
   } else {
+    if (published && !mainEntry.endsWith('.js')) {
+      defects.push(
+        `${displayName}：发布态 main 须指编译产物 .js——main 指 .ts 是 FR-7 证伪形态` +
+          `（node 拒载 node_modules 下 .ts：ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING，无旗标逃生；` +
+          `见 docs/research/dsh-ts-loading/fr7-dsh-ts-loading-falsification.md）——实际：${mainEntry}`,
+      );
+    }
+    if (published && files && !files.includes(mainEntry)) {
+      defects.push(
+        `${name}：发布态 files 清单缺编译产物 ${mainEntry}——白名单外文件不随包分发，装出去的包没有入口`,
+      );
+    }
     let source;
     try {
       source = fs.readFileSync(path.join(pluginDir, mainEntry), 'utf8');
     } catch (error) {
-      defects.push(`${name ?? path.basename(pluginDir)}：插件模块文件读不到（${mainEntry}，${error.message}）`);
+      defects.push(`${displayName}：插件模块文件读不到（${mainEntry}，${error.message}）`);
     }
     if (source !== undefined) {
       // 导出识别在剥注释后的文本上做（.ts 形态适配，票 20261115-e692）：注释字样不算导出
       const stripped = stripComments(source);
       if (!/\bexport\s+(?:const|let|var)\s+name\b/.test(stripped)) {
-        defects.push(`${name ?? path.basename(pluginDir)}：插件模块（${mainEntry}）未导出 name`);
+        defects.push(`${displayName}：插件模块（${mainEntry}）未导出 name`);
       }
       if (!/\bexport\s+(?:(?:async\s+)?function|(?:const|let|var))\s+apply\b/.test(stripped)) {
-        defects.push(`${name ?? path.basename(pluginDir)}：插件模块（${mainEntry}）未导出 apply(ctx)`);
+        defects.push(`${displayName}：插件模块（${mainEntry}）未导出 apply(ctx)`);
       }
+    }
+  }
+
+  // 发布态 8：目录内无 .ts 源码残留（spec 预编译契约：发布 tarball 不含 .ts）。
+  // 解包目录无 node_modules（pack 永不卷入），全树扫描。
+  if (published) {
+    const tsFiles: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (full.endsWith('.ts')) tsFiles.push(path.relative(pluginDir, full));
+      }
+    };
+    walk(pluginDir);
+    for (const tsFile of tsFiles.sort()) {
+      defects.push(
+        `${displayName}：发布态目录残留 .ts 源码 ${tsFile}（spec 预编译契约：发布 tarball 不含 .ts）`,
+      );
     }
   }
 
@@ -425,8 +517,29 @@ export function collectBundleDefects(pluginDir: string): string[] {
 }
 
 function runCli(args: string[]): number {
+  // 发布态模式：--tarball 后接插件包自有 tarball（pnpm pack 产物）
+  if (args[0] === '--tarball') {
+    const tarballs = args.slice(1);
+    if (tarballs.length === 0) {
+      console.error('用法：node scripts/verify-bundle.ts --tarball <插件包 tarball>...');
+      return 1;
+    }
+    let failed = 0;
+    for (const tarball of tarballs) {
+      const defects = collectTarballBundleDefects(tarball);
+      if (defects.length > 0) {
+        failed += 1;
+        console.error(`✗ 发布态 tarball 校验不过：${tarball}`);
+        for (const defect of defects) console.error(`  - ${defect}`);
+      } else {
+        console.log(`✓ 发布态校验通过（.js 形态、四要素齐备、无 .ts 源码）：${tarball}`);
+      }
+    }
+    return failed > 0 ? 1 : 0;
+  }
   if (args.length === 0) {
-    console.error('用法：node scripts/verify-bundle.ts <插件包目录>...');
+    console.error('用法：node scripts/verify-bundle.ts <插件包目录>...（源码态）');
+    console.error('      node scripts/verify-bundle.ts --tarball <插件包 tarball>...（发布态）');
     return 1;
   }
   let failed = 0;

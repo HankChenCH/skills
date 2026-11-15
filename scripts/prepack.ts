@@ -33,6 +33,69 @@ export function collectResidualTsSpecifiers(source: string): string[] {
   return specifiers;
 }
 
+// ---- workspace 成员依赖目录暂存（票 20261115-cf39）----
+// 背景：插件包 devDependencies 自持工具链（FR-7 预编译契约，spec 20261115-ed9f 明文）后，
+// pnpm install 在 agents/*/plugins/*/ 成员目录落盘 node_modules。根 files 白名单卷 agents/
+// 整树，pack 会把成员依赖目录连同符号链接一起卷入包（RQ2 异常流 A #3 的卷入通道——
+// RQ2 缓解前提「成员零运行时依赖」被 FR-7 契约打破），verify:pack 查 1.5（包内禁
+// node_modules）会正确拒绝，发布流与 CI verify 步骤随之红。
+// 处置比照本文件清单换载先例：pack 前把成员 node_modules 移到根 .prepack-stash/
+//（.gitignore 兜底），postpack 原位还原；幂等守卫：上次 pack 中途失败残留的暂存先
+// 还原再重新暂存，不叠改。查 1.5 守卫本体不动（它继续拦真坏包）。
+const STASH_DIR = path.join(packageRoot, '.prepack-stash');
+
+// 枚举 agents/<宿主>/plugins/<插件目录>/node_modules 的现存成员依赖目录
+function collectMemberNodeModules(): string[] {
+  const agentsDir = path.join(packageRoot, 'agents');
+  if (!fs.existsSync(agentsDir)) return [];
+  const found: string[] = [];
+  for (const host of fs.readdirSync(agentsDir, { withFileTypes: true })) {
+    if (!host.isDirectory()) continue;
+    const pluginsDir = path.join(agentsDir, host.name, 'plugins');
+    if (!fs.existsSync(pluginsDir)) continue;
+    for (const plugin of fs.readdirSync(pluginsDir, { withFileTypes: true })) {
+      if (!plugin.isDirectory()) continue;
+      const nodeModules = path.join(pluginsDir, plugin.name, 'node_modules');
+      if (fs.existsSync(nodeModules)) found.push(nodeModules);
+    }
+  }
+  return found.sort();
+}
+
+// 暂存键 = 仓库相对路径的 / → __ 编码（单层 stash 目录，还原时解码回原位）
+const stashKeyOf = (absPath: string): string => path.relative(packageRoot, absPath).split(path.sep).join('__');
+
+export function restoreStashInto(stashDir: string, root: string): number {
+  if (!fs.existsSync(stashDir)) return 0;
+  let restored = 0;
+  for (const entry of fs.readdirSync(stashDir)) {
+    const dest = path.join(root, ...entry.split('__'));
+    // 还原守卫：dest 已存在（上次 pack 中途失败残留 stash 后 pnpm install 重建了成员依赖
+    // 目录）先移除再移回——暂存物是 pack 时点原物，重建物由同一 lockfile 决定、内容等价，
+    // 覆盖即恢复 pack 前状态；不处置则 rename 对非空目录抛 ENOTEMPTY 裸栈且重试复现。
+    if (fs.existsSync(dest)) fs.rmSync(dest, { recursive: true, force: true });
+    fs.renameSync(path.join(stashDir, entry), dest);
+    restored += 1;
+  }
+  fs.rmdirSync(stashDir);
+  return restored;
+}
+
+export function restoreStashedNodeModules(): number {
+  return restoreStashInto(STASH_DIR, packageRoot);
+}
+
+function stashMemberNodeModules(): number {
+  // 幂等守卫：上次 pack 中途失败残留的暂存先还原，再基于仓库原态重新暂存
+  restoreStashedNodeModules();
+  const members = collectMemberNodeModules();
+  fs.mkdirSync(STASH_DIR, { recursive: true });
+  for (const member of members) {
+    fs.renameSync(member, path.join(STASH_DIR, stashKeyOf(member)));
+  }
+  return members.length;
+}
+
 function collectFiles(root: string, extension: string): string[] {
   const files: string[] = [];
   const walk = (dir: string): void => {
@@ -68,6 +131,12 @@ function runPrepack(): void {
     }
     console.log('• prepack：编译产物已在位（tarball 解包目录重打包场景），跳过编译');
     process.exit(0);
+  }
+
+  // ---- 成员依赖目录暂存：根包打包面不卷 agents/ 下成员 node_modules（查 1.5 前置）----
+  const stashed = stashMemberNodeModules();
+  if (stashed > 0) {
+    console.log(`✓ prepack：成员依赖目录已暂存（${stashed} 处 node_modules，postpack 原位还原）`);
   }
 
   // ---- 编译：src/ + bin/ 同路径 emit（无 outDir；rootDir 取输入公共根 = 包根）----

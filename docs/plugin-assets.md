@@ -22,8 +22,8 @@
 | 要素 | 值 | 作用 |
 |---|---|---|
 | `type` | `"module"` | 插件模块按 ESM 加载 |
-| `main` | 直指插件模块（.ts 形态零构建直发，如 `"index.ts"`——spec 20261115-f650 demo 插件 .ts 化契约） | 宿主加载插件的入口 |
-| `files` | 含 `cordis.patch.yml` 与模块文件 | npm 白名单外文件不随包分发，清单缺文件 = 装出去的包坏 |
+| `main` | 源码态直指插件模块源码（如 `"index.ts"`）；发布打包时由包内 prepack 换载为编译产物 `index.js`（FR-7 证伪回退，见 §1.4 发布面预编译） | 宿主加载插件的入口 |
+| `files` | 源码态含 `cordis.patch.yml` 与模块源码；发布态（tarball）为编译产物 `index.js` + `cordis.patch.yml`、不含 .ts 源码 | npm 白名单外文件不随包分发，清单缺文件 = 装出去的包坏 |
 | `dsh` | `{"bundle": {"patch": "./cordis.patch.yml"}}` | dsh 识别插件的凭据；缺它见 §2.2 警告 |
 
 随四要素一并要求两项声明：
@@ -47,11 +47,18 @@
 
 （两条错误码均为 RQ2 调研问①内联实测原文；确需绕过时 `--no-git-checks` 显式声明。）与 dev-release「发布前干净树」纪律同向，只是从纪律升级为机械门。
 
+**发布面预编译（FR-7 证伪回退，插件包发布前必经）**：node 对 node_modules 下 .ts 一律拒绝剥类型（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`，官方有意设计、无旗标逃生；端到端实测定案见 `docs/research/dsh-ts-loading/fr7-dsh-ts-loading-falsification.md`）——插件源码态保持 .ts（仓库零构建直跑不变），发布 tarball 必须 .js 形态。插件包自带 `prepack`/`postpack` 钩子（选 prepack：pnpm pack/publish 都执行，pack 产物即 .js）：prepack tsc emit `index.js` + 打包清单换载发布态（main → index.js、files → 编译产物 + cordis.patch.yml、不含 .ts 源码），postpack 还原仓库树（编译产物与清单备份经 .gitignore 兜底不入库）。publish 前对插件包 tarball 跑发布态校验：
+
+```bash
+node scripts/verify-bundle.ts --tarball <插件包 tarball>   # main 指 .js、files 白名单两件、无 .ts 源码、四要素齐备
+```
+
 **双包发布顺序 = 先插件包，后初始化器。** 初始化器的菜单条目与安装转发都以 registry 包名为准——先发初始化器、插件包未上 registry，使用者勾选即装失败。命令序列（RQ2 件 2；`--access public` 必带，scope 包默认 restricted）：
 
 ```bash
 # 前提：干净树 + master/main 分支（上方两道门）
-pnpm --filter @hankchen/dsh-demo pack
+pnpm --filter @hankchen/dsh-demo pack                          # prepack 钩子出 .js 形态 tarball
+node scripts/verify-bundle.ts --tarball hankchen-dsh-demo-<版本>.tgz   # 发布态校验（上方一节）
 pnpm --filter @hankchen/dsh-demo publish --access public   # 先发插件包
 pnpm pack                                                  # 后发初始化器，对账先行
 pnpm run verify:pack hankchen-infra-<版本>.tgz
@@ -124,5 +131,6 @@ dsh plugin --profile <名> add <包>
 
 1. `agents/<宿主>/plugins/<目录名>/` 建完整 npm 包：package.json 过 §1.2 四要素 + `engines.dsh` + `description`；
 2. 插件模块导出 `name` + `apply(ctx)`；`cordis.patch.yml` 以包名引用自己（照抄 `agents/dsh/plugins/dsh-demo/`）；
-3. **先发插件包**（`pnpm publish --access public`，过 §1.4 两道 git 门），**再发初始化器**（§1.4 双包顺序）；
-4. 初始化器发布对账三查过（§1.4）方可 publish。
+3. 发布面预编译照抄 demo 的 `prepack`/`postpack` 钩子（§1.4：emit 编译产物 + 清单换载/还原，devDependencies 自持 typescript）；
+4. **先发插件包**（pack 后过 `verify-bundle --tarball` 发布态校验，`pnpm publish --access public`，过 §1.4 两道 git 门），**再发初始化器**（§1.4 双包顺序）；
+5. 初始化器发布对账三查过（§1.4）方可 publish。

@@ -2,6 +2,8 @@
 // 无并存 .js 源文件。期望值独立来源 = 工票改动面与豁免清单（src/ bin/ scripts/ test/ 与
 // agents/dsh/plugins/dsh-demo；node_modules 与编译产物不在仓库树常态内——编译 .js 仅存在于发布面
 // tarball，postpack 清理 + .gitignore 兜底；interactive.exp 为 expect(1) Tcl 脚本，非 JS）。
+// node_modules 跳过（票 20261115-cf39）：插件包 devDependencies 自持 typescript 后，pnpm install
+// 在成员目录落盘 node_modules（gitignore 排除、非源码）——walker 照走会把依赖内的 .js 误计 offender。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,6 +21,7 @@ function collectFiles(root: string): string[] {
   const files: string[] = [];
   const walk = (dir: string): void => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules') continue; // 依赖目录非源码（gitignore 同口径）
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
       else files.push(full);
