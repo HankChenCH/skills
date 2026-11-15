@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { collectBundleDefects } from '../../scripts/verify-bundle.mjs';
+import { collectBundleDefects } from '../../scripts/verify-bundle.ts';
 
 const PLUGIN_NAME = '@hankchen/dsh-demo';
 

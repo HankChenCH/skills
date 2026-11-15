@@ -15,7 +15,17 @@ const FLAGS = [
   '-h, --help',
 ];
 
-export function renderHelp() {
+// 解析结果：解析器逐旗标增量构造（单对象增量写），故 skills/plugins/profile 为可选；
+// mode='skills' 时 skills 恒非空数组、mode='plugins' 时 plugins 恒非空数组——由解析内
+// 的「需要至少一个名字」显式报错保证，消费侧无需再防空。
+export interface ParsedArgs {
+  mode: 'interactive' | 'help' | 'all' | 'skills' | 'plugins';
+  skills?: string[];
+  plugins?: string[];
+  profile?: string | null;
+}
+
+export function renderHelp(): string {
   return `@hankchen/infra —— 套件资产初始化 CLI
 
 用法（在目标 git 项目根目录执行）：
@@ -42,7 +52,7 @@ export function renderHelp() {
   - 重跑本命令 = 按当前包内容覆盖刷新已装资产并更新锁文件，无重复堆积`;
 }
 
-function mergeValues(existing, value, flag) {
+function mergeValues(existing: string[] | undefined, value: string | undefined, flag: string): string[] {
   if (value === undefined || value === '') {
     throw new Error(`${flag} 需要至少一个名字（如 ${flag} a,b）`);
   }
@@ -50,8 +60,8 @@ function mergeValues(existing, value, flag) {
   return [...new Set(merged)];
 }
 
-export function parseArgs(argv) {
-  const parsed = { mode: 'interactive' };
+export function parseArgs(argv: string[]): ParsedArgs {
+  const parsed: ParsedArgs = { mode: 'interactive' };
   let i = 0;
   while (i < argv.length) {
     const arg = argv[i];

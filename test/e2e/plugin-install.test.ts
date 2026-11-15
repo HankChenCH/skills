@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const BIN = path.join(packageRoot, 'bin', 'infra.js');
+const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 const PKG = '@hankchen/dsh-demo';
 // 插件版本唯一来源 = 仓库插件包 package.json（shim 模拟官方安装当前包的实际版本，
 // 断言与之共用；版本升位零改动，ticket 20261115-f158：0.1.0 → 0.1.1）

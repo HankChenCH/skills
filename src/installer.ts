@@ -10,15 +10,38 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { expandSymlinkRule } from './asset-map.js';
+import { expandSymlinkRule } from './asset-map.ts';
 import {
   PACKAGE_NAME,
   fingerprintSkillDir,
   readLockfile,
   writeLockfile,
-} from './lockfile.js';
+} from './lockfile.ts';
+import type { InfraLockfile } from './lockfile.ts';
 
-function availableEntries(sourceRoot) {
+// 可安装行的结构化入参：安装流程只消费这四个字段（copy 行与合成行同构，表驱动分发）。
+interface InstallRow {
+  type: string;
+  sourceDir: string;
+  installTarget: string;
+  symlinkRule: string;
+}
+
+export interface InstallConflict {
+  linkPath: string;
+  agentDir: string;
+  skill: string;
+}
+
+export interface InstallAssetsResult {
+  installedSkills: string[];
+  linkedAgentDirs: string[];
+  skippedAgentDirs: { dir: string; reason: string }[];
+  conflicts: InstallConflict[];
+  lockfile?: InfraLockfile;
+}
+
+function availableEntries(sourceRoot: string): string[] {
   if (!fs.existsSync(sourceRoot)) {
     throw new Error(`来源目录不存在：${sourceRoot}`);
   }
@@ -29,7 +52,23 @@ function availableEntries(sourceRoot) {
     .sort();
 }
 
-export function installAssets({ row, packageRoot, projectRoot, agentDirs, selected, packageVersion, now }) {
+export function installAssets({
+  row,
+  packageRoot,
+  projectRoot,
+  agentDirs,
+  selected,
+  packageVersion,
+  now,
+}: {
+  row: InstallRow;
+  packageRoot: string;
+  projectRoot: string;
+  agentDirs: string[];
+  selected: string[];
+  packageVersion: string;
+  now: string;
+}): InstallAssetsResult {
   if (!Array.isArray(selected) || selected.length === 0) {
     throw new Error('未选择任何条目：selected 为空，拒绝安装');
   }
@@ -40,7 +79,7 @@ export function installAssets({ row, packageRoot, projectRoot, agentDirs, select
     throw new Error(`以下条目不在来源目录 ${row.sourceDir}/ 中：${missing.join('、')}；可用条目：${available.join('、')}`);
   }
 
-  const result = {
+  const result: InstallAssetsResult = {
     installedSkills: [],
     linkedAgentDirs: [],
     skippedAgentDirs: [],
@@ -48,7 +87,7 @@ export function installAssets({ row, packageRoot, projectRoot, agentDirs, select
   };
 
   const targetRoot = path.join(projectRoot, row.installTarget);
-  const lockfile = readLockfile(projectRoot) ?? { package: PACKAGE_NAME, packageVersion, skills: {} };
+  const lockfile: InfraLockfile = readLockfile(projectRoot) ?? { package: PACKAGE_NAME, packageVersion, skills: {} };
   lockfile.package = PACKAGE_NAME;
   lockfile.packageVersion = packageVersion;
 

@@ -15,10 +15,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assertPluginPreconditions, commandExists } from '../../src/dsh-command.js';
+import { assertPluginPreconditions, commandExists } from '../../src/dsh-command.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const BIN = path.join(packageRoot, 'bin', 'infra.js');
+const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 // 期望值独立来源：包名/版本运行时读仓库内包清单（发布后与 registry 最新版对账），不写死字面量
 const DEMO_PKG = JSON.parse(fs.readFileSync(path.join(packageRoot, 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
 const PKG = DEMO_PKG.name;

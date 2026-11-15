@@ -6,7 +6,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-function readProfilePackage(profilePath) {
+// profile package.json 的对账相关切片（官方写入的两落点；其余键不进核对范围）。
+interface ProfilePackage {
+  dependencies?: Record<string, string>;
+  dsh?: { profile?: { bundles?: string[] } };
+}
+
+export interface ReconcileResult {
+  ok: true;
+  version: string;
+}
+
+function readProfilePackage(profilePath: string): ProfilePackage {
   const pkgFile = path.join(profilePath, 'package.json');
   let raw;
   try {
@@ -23,9 +34,12 @@ function readProfilePackage(profilePath) {
   }
 }
 
-export function reconcilePluginInstall({ profilePath, packageName }) {
+export function reconcilePluginInstall({ profilePath, packageName }: {
+  profilePath: string;
+  packageName: string;
+}): ReconcileResult {
   const pkg = readProfilePackage(profilePath);
-  const missing = [];
+  const missing: string[] = [];
   const version = pkg.dependencies?.[packageName];
   if (version === undefined) {
     missing.push('dependencies 依赖行');
@@ -40,5 +54,6 @@ export function reconcilePluginInstall({ profilePath, packageName }) {
         `安装未通过官方格式核对`,
     );
   }
-  return { ok: true, version };
+  // 对账通过 = dependencies 依赖行已核存在，version 必为 string（undefined 已进 missing 并抛出）
+  return { ok: true, version: version as string };
 }

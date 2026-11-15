@@ -6,12 +6,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export function profilesRoot({ env = process.env, homedir = os.homedir() } = {}) {
+export function profilesRoot({ env = process.env, homedir = os.homedir() }: {
+  env?: Record<string, string | undefined>;
+  homedir?: string;
+} = {}): string {
   const home = env.DSH_HOME ?? path.join(homedir, '.dsh');
   return path.join(home, 'profiles');
 }
 
-export function listProfiles(root) {
+export function listProfiles(root: string): string[] {
   if (!fs.existsSync(root)) {
     return [];
   }

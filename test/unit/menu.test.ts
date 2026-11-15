@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { typeOptions, skillOptions } from '../../src/menu.js';
-import { parseArgs, renderHelp } from '../../src/cli-args.js';
-import { ASSET_MAP } from '../../src/asset-map.js';
+import { typeOptions, skillOptions } from '../../src/menu.ts';
+import { parseArgs, renderHelp } from '../../src/cli-args.ts';
+import { ASSET_MAP } from '../../src/asset-map.ts';
 
 // ---------- 菜单构造（第一层由映射表生成，占位行带占位提示） ----------
 

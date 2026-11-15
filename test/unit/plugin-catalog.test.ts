@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { listPlugins } from '../../src/catalog.js';
-import { ASSET_MAP, findRow } from '../../src/asset-map.js';
+import { listPlugins } from '../../src/catalog.ts';
+import { ASSET_MAP, findRow } from '../../src/asset-map.ts';
 
 // 插件编目（spec 20261115-495e 实现决策「插件编目」）：command 类行的菜单条目来自
 // 来源目录下各插件包的 package.json——name 为条目正名（registry 名，非目录名）、

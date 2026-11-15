@@ -7,7 +7,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export function listEntries(packageRoot, row) {
+// 编目函数只消费行的 sourceDir 字段（结构化入参，不钉整行型——copy/command 行均可编目）。
+interface SourceDirRow {
+  sourceDir: string;
+}
+
+export interface PluginCatalogEntry {
+  name: string;
+  description: string;
+}
+
+export function listEntries(packageRoot: string, row: SourceDirRow): string[] {
   const sourceRoot = path.join(packageRoot, row.sourceDir);
   if (!fs.existsSync(sourceRoot)) {
     throw new Error(`包内来源目录缺失：${row.sourceDir}/（包内容不完整，疑似发布对账失败）`);
@@ -19,8 +29,8 @@ export function listEntries(packageRoot, row) {
     .sort();
 }
 
-export function readDescriptions(packageRoot, row, names) {
-  const descriptions = {};
+export function readDescriptions(packageRoot: string, row: SourceDirRow, names: string[]): Record<string, string> {
+  const descriptions: Record<string, string> = {};
   for (const name of names) {
     const skillMd = path.join(packageRoot, row.sourceDir, name, 'SKILL.md');
     descriptions[name] = '';
@@ -36,13 +46,13 @@ export function readDescriptions(packageRoot, row, names) {
   return descriptions;
 }
 
-export function listPlugins(packageRoot, row) {
+export function listPlugins(packageRoot: string, row: SourceDirRow): PluginCatalogEntry[] {
   const sourceRoot = path.join(packageRoot, row.sourceDir);
   if (!fs.existsSync(sourceRoot)) {
     throw new Error(`包内来源目录缺失：${row.sourceDir}/（包内容不完整，疑似发布对账失败）`);
   }
-  const defects = [];
-  const plugins = [];
+  const defects: string[] = [];
+  const plugins: PluginCatalogEntry[] = [];
   const dirs = fs
     .readdirSync(sourceRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -50,7 +60,7 @@ export function listPlugins(packageRoot, row) {
     .sort();
   for (const dir of dirs) {
     const pkgFile = path.join(sourceRoot, dir, 'package.json');
-    let pkg = null;
+    let pkg: Record<string, unknown> | null = null;
     try {
       pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
     } catch (err) {

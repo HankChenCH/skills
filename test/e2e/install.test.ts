@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const BIN = path.join(packageRoot, 'bin', 'infra.js');
+const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 const REPO_SKILLS = path.join(packageRoot, 'skills');
 
 // 交互路径勾选目标（按技能名排序后的下标）：design-brief=1、dev-clarify=5，两者 references/ 齐备

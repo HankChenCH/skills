@@ -1,0 +1,126 @@
+#!/usr/bin/env node
+// 发布面预编译（spec 20261115-f650 拍板 D8 运行中修订，票 20261115-d437）：仓库内零构建直跑
+// 不变，仅发布面在打包前把 src/ 与 bin/ 的 .ts 编译为同路径 .js 进 tarball——node 对
+// node_modules 下 .ts 一律拒绝剥类型（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING，官方有
+// 意设计、无旗标逃生），npm install / npx 消费路径全命中，故 tarball 必须含可直跑 .js。
+// tarball 形态：bin/infra.js（编译产物；publishConfig 使打包清单 bin 直指它）+ src/*.js +
+// 全部 .ts 源码（导航可读）；skills/plugins 清单与路径不变。
+// 幂等门：tarball 解包目录重打包（install.test.js [FR-5] 双版本消费链）无 devDependencies
+// 且编译产物已随包在位 → 跳过编译；否则 typescript 编译 + 错误诊断（非零即中止打包）。
+// 发出物 specifier 改写：源码间导入用显式 .ts 扩展名（仓内剥类型直跑所需），编译 .js 中的
+// 相对 .ts specifier 一律改写为 .js（NodeNext 形态，tsc emit 保留原 specifier 故需后处理）。
+// 仓库树常态零构建直跑：postpack 清理发出物；.gitignore 兜底 pack 中途失败不入 git。
+
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const BUILD_DIRS = ['src', 'bin'];
+
+function collectFiles(root: string, extension: string): string[] {
+  const files: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (full.endsWith(extension)) {
+        files.push(full);
+      }
+    }
+  };
+  walk(root);
+  return files.sort();
+}
+
+// 发出物路径 = 源文件同路径换 .js 后缀（无 outDir 同路径 emit）
+const emittedJsPaths = (tsPaths: string[]): string[] =>
+  tsPaths.map((file) => file.replace(/\.ts$/, '.js'));
+
+// ---- 幂等门：无 typescript 可解析（tarball 解包目录重打包）→ 要求编译产物已在位并跳过 ----
+let typescript: typeof import('typescript');
+try {
+  typescript = createRequire(import.meta.url)('typescript');
+} catch {
+  const emitted = collectFiles(path.join(packageRoot, 'src'), '.js');
+  const binJsExists = fs.existsSync(path.join(packageRoot, 'bin', 'infra.js'));
+  if (!binJsExists || emitted.length === 0) {
+    console.error('✗ prepack：typescript 不可解析且编译产物缺失——发布打包前先 npm install（devDependencies 含 typescript）');
+    process.exit(1);
+  }
+  console.log('• prepack：编译产物已在位（tarball 解包目录重打包场景），跳过编译');
+  process.exit(0);
+}
+
+// ---- 编译：src/ + bin/ 同路径 emit（无 outDir；rootDir 取输入公共根 = 包根）----
+// allowImportingTsExtensions 与 emit 在 config 层互斥（诊断 5096），此处经 compiler API 显式
+// 组合并过滤该已知配置码一条——源码形态 = .ts specifier（仓内剥类型直跑所需），发出物由
+// 下方改写步骤统一翻成 .js。其余全部错误诊断照常拦门，不静默。
+const fileNames = BUILD_DIRS.flatMap((rel) => collectFiles(path.join(packageRoot, rel), '.ts'));
+const program = typescript.createProgram(fileNames, {
+  target: typescript.ScriptTarget.ES2023,
+  module: typescript.ModuleKind.NodeNext,
+  moduleResolution: typescript.ModuleResolutionKind.NodeNext,
+  strict: true,
+  useUnknownInCatchVariables: false,
+  erasableSyntaxOnly: true,
+  skipLibCheck: true,
+  allowImportingTsExtensions: true,
+  noEmit: false,
+  declaration: false,
+});
+
+const diagnostics = typescript
+  .getPreEmitDiagnostics(program)
+  .filter(
+    (diagnostic) =>
+      diagnostic.category === typescript.DiagnosticCategory.Error && diagnostic.code !== 5096,
+  );
+if (diagnostics.length > 0) {
+  console.error(`✗ prepack：编译诊断 ${diagnostics.length} 条，中止打包：`);
+  for (const diagnostic of diagnostics) {
+    const position = diagnostic.file
+      ? `${path.relative(packageRoot, diagnostic.file.fileName)}:${typescript.getLineAndCharacterOfPosition(diagnostic.file, diagnostic.start ?? 0).line + 1}`
+      : '（无文件）';
+    console.error(`  - ${position}：${typescript.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`);
+  }
+  process.exit(1);
+}
+
+const emitResult = program.emit();
+const emitErrors = emitResult.diagnostics.filter(
+  (diagnostic) => diagnostic.category === typescript.DiagnosticCategory.Error,
+);
+if (emitResult.emitSkipped || emitErrors.length > 0) {
+  console.error(`✗ prepack：emit 未完成（emitSkipped=${emitResult.emitSkipped}，emit 错误 ${emitErrors.length} 条），中止打包`);
+  for (const diagnostic of emitErrors) {
+    console.error(`  - ${typescript.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`);
+  }
+  process.exit(1);
+}
+
+// ---- 发出物 specifier 改写：相对 .ts → .js（仅 import/export ... from 与动态 import 的字面量）----
+const SPECIFIER_TS = /(\bfrom\s*(['"])(\.\.?\/[^'"]*))\.ts(\2)/g;
+const DYNAMIC_IMPORT_TS = /(\bimport\s*\(\s*(['"])(\.\.?\/[^'"]*))\.ts(\2)/g;
+let rewrittenFiles = 0;
+for (const jsPath of emittedJsPaths(fileNames)) {
+  const before = fs.readFileSync(jsPath, 'utf8');
+  const after = before.replace(SPECIFIER_TS, '$1.js$4').replace(DYNAMIC_IMPORT_TS, '$1.js$4');
+  if (after !== before) {
+    fs.writeFileSync(jsPath, after);
+    rewrittenFiles += 1;
+  }
+}
+
+// ---- 出口把关：bin 编译产物必须保住 shebang（npx / .bin 直跑形态依赖它）----
+const binJs = fs.readFileSync(path.join(packageRoot, 'bin', 'infra.js'), 'utf8');
+if (!binJs.startsWith('#!')) {
+  console.error('✗ prepack：bin/infra.js 丢失 shebang——npx/.bin 直跑形态会坏，中止打包');
+  process.exit(1);
+}
+
+console.log(
+  `✓ prepack：发布面编译完成（${fileNames.length} 个 .ts → 同路径 .js；specifier 改写 ${rewrittenFiles} 个文件）`,
+);

@@ -13,3 +13,9 @@ __pycache__/
 # @hankchen/infra npm 包本地产物（工票 20261115-975c）
 node_modules/
 *.tgz
+
+# 发布面预编译产物（spec 20261115-f650 D8 修订，票 20261115-d437：prepack emit 同路径 .js
+# 进 tarball，postpack 清理仓库树；gitignore 兜底 pack 中途失败场景，npm pack 的 files
+# 清单不受 ignore 规则影响，编译 .js 照常进包）
+bin/*.js
+src/*.js

@@ -80,7 +80,7 @@ test('插件模块真实可加载：导出 name=包名 与 apply(ctx)，apply �
 });
 
 test('demo 包通过 bundle 校验器（四要素齐备）', async () => {
-  const { collectBundleDefects } = await import('../../scripts/verify-bundle.mjs');
+  const { collectBundleDefects } = await import('../../scripts/verify-bundle.ts');
   const { fileURLToPath } = await import('node:url');
   assert.deepEqual(collectBundleDefects(fileURLToPath(PLUGIN_DIR)), []);
 });

@@ -9,7 +9,7 @@ import {
   commandExists,
   resolveExecutor,
   assertPluginPreconditions,
-} from '../../src/dsh-command.js';
+} from '../../src/dsh-command.ts';
 
 // 命令组装器（spec 20261115-495e 实现决策「命令组装与执行」拍板 D2 +「前置检查」异常流 A/B）。
 // 期望值字面量取 spec 原文：官方命令 = `plugin --profile <名> add <包>`；

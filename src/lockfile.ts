@@ -11,7 +11,27 @@ import path from 'node:path';
 export const LOCKFILE_NAME = '.infra-lock.json';
 export const PACKAGE_NAME = '@hankchen/infra';
 
-function* walkFiles(dir) {
+export interface SkillLockEntry {
+  fingerprint: string;
+  installedAt: string;
+}
+
+export interface PluginLockEntry {
+  version: string;
+  profile: string;
+  installedAt: string;
+}
+
+// plugins 区 20261115-495e 起新增：读旧格式锁文件（无 plugins 键）时为 undefined，
+// 写侧以 `lockfile.plugins ?? {}` 合并补齐（插件安装编排）。
+export interface InfraLockfile {
+  package: string;
+  packageVersion: string;
+  skills: Record<string, SkillLockEntry>;
+  plugins?: Record<string, PluginLockEntry>;
+}
+
+function* walkFiles(dir: string): Generator<string> {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -22,7 +42,7 @@ function* walkFiles(dir) {
   }
 }
 
-export function fingerprintSkillDir(skillDir) {
+export function fingerprintSkillDir(skillDir: string): string {
   const hash = crypto.createHash('sha256');
   for (const file of walkFiles(skillDir)) {
     const relPath = path.relative(skillDir, file).split(path.sep).join('/');
@@ -33,11 +53,11 @@ export function fingerprintSkillDir(skillDir) {
   return hash.digest('hex');
 }
 
-export function lockfilePath(projectRoot) {
+export function lockfilePath(projectRoot: string): string {
   return path.join(projectRoot, LOCKFILE_NAME);
 }
 
-export function readLockfile(projectRoot) {
+export function readLockfile(projectRoot: string): InfraLockfile | null {
   const file = lockfilePath(projectRoot);
   if (!fs.existsSync(file)) {
     return null;
@@ -54,6 +74,6 @@ export function readLockfile(projectRoot) {
   return parsed;
 }
 
-export function writeLockfile(projectRoot, lockfile) {
+export function writeLockfile(projectRoot: string, lockfile: InfraLockfile): void {
   fs.writeFileSync(lockfilePath(projectRoot), `${JSON.stringify(lockfile, null, 2)}\n`, 'utf8');
 }

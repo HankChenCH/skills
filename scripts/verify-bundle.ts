@@ -9,16 +9,25 @@
 //      引用名 = 包名）；
 //   5. 插件模块导出 name 与 apply(ctx)（§1.4 附录二；main 直指模块作为定位入口随查，
 //      静态读源码，套件约定 ESM + 内联导出，照抄 demo 即在此形态内）。
-// scripts/verify-pack.mjs 的插件侧复用本实现；独立调用：
+// scripts/verify-pack.ts 的插件侧复用本实现；独立调用：
 //
-//   node scripts/verify-bundle.mjs <插件包目录>...
+//   node scripts/verify-bundle.ts <插件包目录>...
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// 被校验插件包 package.json 的清单切片（四要素相关字段；其余键不进核对范围）。
+interface PluginPackageJson {
+  name?: string;
+  type?: string;
+  files?: string[];
+  main?: string;
+  dsh?: { bundle?: { patch?: string } };
+}
+
 // package.json 里的声明值（'./cordis.patch.yml'）与 files 条目（'cordis.patch.yml'）同法归一后再比对
-function normalizeEntry(entry) {
+function normalizeEntry(entry: string): string {
   return entry.replace(/^\.\//, '');
 }
 
@@ -34,7 +43,29 @@ function normalizeEntry(entry) {
 //     缺陷消息「must be a top-level YAML array of loader patch entries」）；逐元素字段按类型契约。
 // 读取范围声明：块状形态（官方文档、官方 profile patch 模板注释与 demo 所写）。流式形态
 // （insert: [...]）按空列表读——空列表插不进任何条目、引用不到自己，交给引用检查报缺。
-function stripQuotes(value) {
+
+// 块状 YAML 行的统一中间形态：缩进列数 + 去空白文本。
+interface PatchLine {
+  indent: number;
+  text: string;
+}
+
+// insert 列表项：EntryOptions 的键值切片（核对只取 id/name，其余键原样保留不判）。
+type InsertEntry = Record<string, string>;
+
+// readPatchItem 的三态结果：映射（含 insert 切片或 null = 无 insert 键）/ 标量 / 读不出。
+type PatchItem =
+  | { kind: 'mapping'; insert: InsertEntry[] | null }
+  | { kind: 'scalar' }
+  | { kind: 'unreadable' };
+
+// readPatchOverlay 的三态结果：顶层数组（items）/ 顶层映射（官方拒绝的旧形态）/ 读不出。
+type PatchOverlay =
+  | { form: 'array'; items: PatchItem[] }
+  | { form: 'mapping'; firstKey: string }
+  | { form: 'unreadable' };
+
+function stripQuotes(value: string): string {
   const v = value.trim();
   if (v.length >= 2 && ((v.startsWith("'") && v.endsWith("'")) || (v.startsWith('"') && v.endsWith('"')))) {
     return v.slice(1, -1);
@@ -43,20 +74,20 @@ function stripQuotes(value) {
 }
 
 // 'key:' 或 'key: value'；键允许带引号。不匹配返回 null。
-function splitKeyValue(text) {
+function splitKeyValue(text: string): { key: string; value: string } | null {
   const match = text.match(/^('[^']*'|"[^"]*"|[^:]+):(.*)$/);
   if (!match) return null;
   return { key: stripQuotes(match[1]), value: match[2].trim() };
 }
 
-function isDashLine(line) {
+function isDashLine(line: PatchLine): boolean {
   return line.text === '-' || line.text.startsWith('- ');
 }
 
 // 读一个 insert 列表项：头内容 + 与头内容对齐的续行键。返回 { id, name, ... } 或 null（非映射元素）。
-function readInsertEntry(dashLine, bodyLines) {
-  const entry = {};
-  let keyIndent = null;
+function readInsertEntry(dashLine: PatchLine, bodyLines: PatchLine[]): InsertEntry | null {
+  const entry: InsertEntry = {};
+  let keyIndent: number | null = null;
   if (dashLine.text !== '-') {
     keyIndent = dashLine.indent + 2;
     const headPair = splitKeyValue(dashLine.text.slice(2));
@@ -79,16 +110,17 @@ function readInsertEntry(dashLine, bodyLines) {
 //   { kind: 'mapping', insert: [{ id, name }] | null }——insert 为 null 表示无 insert 键；
 //   { kind: 'scalar' }——非映射元素（官方拒绝：entry must be a mapping）；
 //   { kind: 'unreadable' }——块状方言读不出键值结构。
-function readPatchItem(dashLine, bodyLines) {
-  let keyIndent = null;
-  let insert = null;
-  let insertListIndent = null;
-  let entryBody = null;
-  const finishEntry = () => {
+function readPatchItem(dashLine: PatchLine, bodyLines: PatchLine[]): PatchItem {
+  let keyIndent: number | null = null;
+  let insert: InsertEntry[] | null = null;
+  let insertListIndent: number | null = null;
+  let entryBody: { dash: PatchLine; rest: PatchLine[] } | null = null;
+  const finishEntry = (): boolean => {
     if (entryBody) {
       const parsed = readInsertEntry(entryBody.dash, entryBody.rest);
       if (!parsed) return false;
-      insert.push(parsed);
+      // entryBody 只在 insert 列表开列后写入，此处 insert 必非 null
+      insert!.push(parsed);
       entryBody = null;
     }
     return true;
@@ -121,10 +153,10 @@ function readPatchItem(dashLine, bodyLines) {
     return { kind: 'scalar' }; // 裸破折号无续行：空元素，非键值映射
   }
   for (const line of bodyLines) {
-    if (entryBody && (isDashLine(line) || line.indent <= insertListIndent)) {
+    if (entryBody && (isDashLine(line) || line.indent <= insertListIndent!)) {
       if (!finishEntry()) return { kind: 'unreadable' };
     }
-    if (insert !== null && isDashLine(line) && line.indent >= insertListIndent) {
+    if (insert !== null && isDashLine(line) && line.indent >= insertListIndent!) {
       if (entryBody) {
         if (!finishEntry()) return { kind: 'unreadable' };
       }
@@ -155,26 +187,26 @@ function readPatchItem(dashLine, bodyLines) {
 //   { form: 'array', items: readPatchItem 结果数组 }（空文档 = 空数组：插不进条目，交给引用检查）
 //   { form: 'mapping', firstKey }（顶层映射 = 官方拒绝的旧形态）
 //   { form: 'unreadable' }（混合/怪异缩进等块状方言读不出的形态）
-function readPatchOverlay(patchText) {
-  const lines = patchText
+function readPatchOverlay(patchText: string): PatchOverlay {
+  const lines: PatchLine[] = patchText
     .split('\n')
-    .map((raw) => ({ indent: raw.match(/^\s*/)[0].length, text: raw.trim() }))
+    .map((raw) => ({ indent: raw.match(/^\s*/)![0].length, text: raw.trim() }))
     .filter((line) => line.text !== '' && !line.text.startsWith('#'));
   if (lines.length === 0) return { form: 'array', items: [] };
   const minIndent = Math.min(...lines.map((line) => line.indent));
   const shallow = lines.filter((line) => line.indent === minIndent);
   if (shallow.some((line) => !isDashLine(line))) {
-    const keyLine = shallow.find((line) => !isDashLine(line));
+    const keyLine = shallow.find((line) => !isDashLine(line))!;
     const first = splitKeyValue(keyLine.text);
     if (first && shallow.every((line) => !isDashLine(line))) {
       return { form: 'mapping', firstKey: first.key };
     }
     return { form: 'unreadable' };
   }
-  const items = [];
+  const items: PatchItem[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].indent !== minIndent) continue;
-    const body = [];
+    const body: PatchLine[] = [];
     for (let j = i + 1; j < lines.length && lines[j].indent > minIndent; j++) body.push(lines[j]);
     items.push(readPatchItem(lines[i], body));
   }
@@ -183,8 +215,8 @@ function readPatchOverlay(patchText) {
 
 // 要素 4：官方可解析的 PatchOptions[] 结构 + 引用名 = 包名。结构缺陷与引用缺陷不连带
 // 重复计——结构坏时引用检查无从谈起，只报结构缺陷（与要素 2/3 的连带抑制同法）。
-function collectPatchDefects(name, patchTarget, patchText) {
-  const defects = [];
+function collectPatchDefects(name: string, patchTarget: string, patchText: string): string[] {
+  const defects: string[] = [];
   const overlay = readPatchOverlay(patchText);
   if (overlay.form === 'mapping') {
     defects.push(
@@ -239,15 +271,15 @@ function collectPatchDefects(name, patchTarget, patchText) {
   return defects;
 }
 
-export function collectBundleDefects(pluginDir) {
-  let pkg;
+export function collectBundleDefects(pluginDir: string): string[] {
+  let pkg: PluginPackageJson;
   try {
     pkg = JSON.parse(fs.readFileSync(path.join(pluginDir, 'package.json'), 'utf8'));
   } catch (error) {
     return [`${pluginDir}：package.json 无法读取（${error.message}）`];
   }
   const name = pkg.name;
-  const defects = [];
+  const defects: string[] = [];
 
   if (!name) {
     defects.push(`${path.basename(pluginDir)}：package.json 缺 name——patch 引用名无从对账`);
@@ -317,9 +349,9 @@ export function collectBundleDefects(pluginDir) {
   return defects;
 }
 
-function runCli(args) {
+function runCli(args: string[]): number {
   if (args.length === 0) {
-    console.error('用法：node scripts/verify-bundle.mjs <插件包目录>...');
+    console.error('用法：node scripts/verify-bundle.ts <插件包目录>...');
     return 1;
   }
   let failed = 0;

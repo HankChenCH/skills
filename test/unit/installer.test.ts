@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { installAssets } from '../../src/installer.js';
-import { readLockfile, lockfilePath, LOCKFILE_NAME } from '../../src/lockfile.js';
+import { installAssets } from '../../src/installer.ts';
+import { readLockfile, lockfilePath, LOCKFILE_NAME } from '../../src/lockfile.ts';
 
 // 测试用映射行：与 ASSET_MAP 技能行同构（表驱动分发用合成行复验，见末测试）
 const SKILL_ROW = {

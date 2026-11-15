@@ -4,9 +4,16 @@
 // command 行显示官方命令转发语义，占位行显示「占位 · 本轮不可安装」（选中后由 CLI 显式退出、零动作）。
 // 第二层 = 条目多选，按名排序、带描述提示（技能与插件共用）。
 
-import { isCommandRow, isInstallableRow } from './asset-map.js';
+import { isCommandRow, isInstallableRow } from './asset-map.ts';
+import type { AssetRow } from './asset-map.ts';
 
-export function typeOptions(map) {
+export interface MenuOption {
+  value: string;
+  label: string;
+  hint: string;
+}
+
+export function typeOptions(map: AssetRow[]): MenuOption[] {
   return map.map((row) => ({
     value: row.type,
     label: row.type,
@@ -18,7 +25,7 @@ export function typeOptions(map) {
   }));
 }
 
-export function skillOptions(names, descriptions) {
+export function skillOptions(names: string[], descriptions: Record<string, string>): MenuOption[] {
   return [...names].sort().map((name) => ({
     value: name,
     label: name,

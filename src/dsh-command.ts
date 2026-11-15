@@ -7,20 +7,26 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // 官方 @deepseek-ai/dsh 的 node 前置（need 20261115-339e F4；包 engines 与 .nvmrc 已对齐同值）
-export const NODE_FLOOR = [24, 9, 0];
+export const NODE_FLOOR: number[] = [24, 9, 0];
 
 // 官方保留 profile 名：官方 CLI 拒绝对其做插件管理（need F4），初始化器执行前同样拒装
-export const RESERVED_PROFILES = ['desktop'];
+export const RESERVED_PROFILES: string[] = ['desktop'];
 
 export const DSH_COMMAND = 'dsh';
 export const DSH_NPM_PACKAGE = '@deepseek-ai/dsh';
 
 // --yes 裁量：npx 对未缓存包在 TTY 下默认弹安装确认，会卡死「免交互/脚本化复现」场景
 // （本特性目标即免交互）；只影响 npx 自身的拉取确认，不改变转发的官方命令语义。
-export const NPX_LAUNCH_FLAGS = ['--yes'];
+export const NPX_LAUNCH_FLAGS: string[] = ['--yes'];
+
+// 执行体 = 官方命令的启动形态：直跑命令 + 前置 launcher 元素（npx 形态含 --yes 与包名）。
+export interface Executor {
+  command: string;
+  launcher: string[];
+}
 
 // PATH 探测：逐目录 accessSync(X_OK)。探测结果作为入参注入组装器，测试注入探测结果而非真扫 PATH。
-export function commandExists(name, { pathEnv = process.env.PATH } = {}) {
+export function commandExists(name: string, { pathEnv = process.env.PATH }: { pathEnv?: string | undefined } = {}): boolean {
   const dirs = (pathEnv ?? '').split(path.delimiter).filter(Boolean);
   return dirs.some((dir) => {
     try {
@@ -32,21 +38,24 @@ export function commandExists(name, { pathEnv = process.env.PATH } = {}) {
   });
 }
 
-export function resolveExecutor(dshInPath) {
+export function resolveExecutor(dshInPath: boolean): Executor {
   if (dshInPath) {
     return { command: DSH_COMMAND, launcher: [] };
   }
   return { command: 'npx', launcher: [...NPX_LAUNCH_FLAGS, DSH_NPM_PACKAGE] };
 }
 
-export function buildPluginCommand(executor, profile, packageName) {
+export function buildPluginCommand(executor: Executor, profile: string, packageName: string): {
+  command: string;
+  args: string[];
+} {
   return {
     command: executor.command,
     args: [...executor.launcher, 'plugin', '--profile', profile, 'add', packageName],
   };
 }
 
-function parseVersionParts(nodeVersion) {
+function parseVersionParts(nodeVersion: string): number[] {
   const match = String(nodeVersion).match(/^v?(\d+)\.(\d+)\.(\d+)/);
   if (!match) {
     throw new Error(`无法解析 node 版本：「${nodeVersion}」`);
@@ -54,7 +63,7 @@ function parseVersionParts(nodeVersion) {
   return match.slice(1, 4).map(Number);
 }
 
-function atLeast(version, floor) {
+function atLeast(version: number[], floor: number[]): boolean {
   for (let i = 0; i < floor.length; i += 1) {
     if (version[i] !== floor[i]) {
       return version[i] > floor[i];
@@ -64,7 +73,7 @@ function atLeast(version, floor) {
 }
 
 // 前置检查（异常流 A/B）：node 版本与保留 profile 名。两检查都必须在任何官方命令执行前发生。
-export function assertPluginPreconditions({ nodeVersion, profile }) {
+export function assertPluginPreconditions({ nodeVersion, profile }: { nodeVersion: string; profile: string }): void {
   const parts = parseVersionParts(nodeVersion);
   if (!atLeast(parts, NODE_FLOOR)) {
     throw new Error(

@@ -13,7 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const VERIFY_PACK = path.join(packageRoot, 'scripts', 'verify-pack.mjs');
+const VERIFY_PACK = path.join(packageRoot, 'scripts', 'verify-pack.ts');
 
 async function makeTempRoot(t) {
   const root = await mkdtemp(path.join(tmpdir(), 'verify-pack-plugins-'));

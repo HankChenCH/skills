@@ -10,10 +10,37 @@
 //   （registry 名，非目录名）。字段：type、sourceDir（枚举插件目录）。
 //   占位行：仅 type，菜单显示但不可安装（机制不变）。
 
+// 行模型（TS 迁移，票 20261115-d437）：按 mechanism 判别的 union。
+// 占位行用 `?: undefined` 补齐同名字段，使 union 成员的公共字段访问保持总型一致
+//（runtime 对象形态与迁移前逐字段相同，不新增任何键）。
+export interface CopyRow {
+  type: string;
+  mechanism: 'copy';
+  sourceDir: string;
+  installTarget: string;
+  symlinkRule: string;
+}
+
+export interface CommandRow {
+  type: string;
+  mechanism: 'command';
+  sourceDir: string;
+}
+
+export interface PlaceholderRow {
+  type: string;
+  mechanism?: undefined;
+  sourceDir?: undefined;
+  installTarget?: undefined;
+  symlinkRule?: undefined;
+}
+
+export type AssetRow = CopyRow | CommandRow | PlaceholderRow;
+
 export const SKILLS_TYPE = '技能';
 export const PLUGINS_TYPE = '插件';
 
-export const ASSET_MAP = [
+export const ASSET_MAP: AssetRow[] = [
   {
     type: SKILLS_TYPE,
     mechanism: 'copy',
@@ -31,18 +58,23 @@ export const ASSET_MAP = [
   },
 ];
 
-export function isCommandRow(row) {
+export function isCommandRow(row: AssetRow): row is CommandRow {
   return row.mechanism === 'command';
 }
 
-export function isInstallableRow(row) {
+export function isInstallableRow(row: AssetRow): row is CopyRow | CommandRow {
   if (isCommandRow(row)) {
     return Boolean(row.sourceDir);
   }
   return Boolean(row.installTarget) && Boolean(row.symlinkRule);
 }
 
-export function findRow(map, typeName) {
+// 按类型名取映射行；已知类型名（SKILLS_TYPE/PLUGINS_TYPE 字面量）走重载返回窄行型，
+// 未知类型名（交互菜单运行时取值）返回总型，调用侧以 isCommandRow/isInstallableRow 判别收窄。
+export function findRow(map: AssetRow[], typeName: typeof SKILLS_TYPE): CopyRow;
+export function findRow(map: AssetRow[], typeName: typeof PLUGINS_TYPE): CommandRow;
+export function findRow(map: AssetRow[], typeName: string): AssetRow;
+export function findRow(map: AssetRow[], typeName: string): AssetRow {
   const row = map.find((entry) => entry.type === typeName);
   if (!row) {
     const available = map.map((entry) => entry.type).join('、');
@@ -51,6 +83,6 @@ export function findRow(map, typeName) {
   return row;
 }
 
-export function expandSymlinkRule(rule, agentDir, skillName) {
+export function expandSymlinkRule(rule: string, agentDir: string, skillName: string): string {
   return rule.replaceAll('<agentDir>', agentDir).replaceAll('<skillName>', skillName);
 }
