@@ -154,3 +154,18 @@ test('patch 文件为顶层数组但 insert 元素缺 id 即拒绝，缺陷点�
   assert.match(defects[0], /insert/);
   assert.match(defects[0], /\bid\b/);
 });
+
+test('裸 dash 后缩进键的合法块状形态放行且引用检查通过（官方 loader 可解析）', async (t) => {
+  const dir = await writeValidPlugin(await makeTempRoot(t));
+  // 破折号单独一行、元素键在后续缩进行：标准块状 YAML，官方 loadOverlayPatches 正常解析
+  await writeFile(
+    path.join(dir, 'cordis.patch.yml'),
+    `-\n  insert:\n    - id: dsh-demo-load-log\n      name: '${PLUGIN_NAME}'\n`,
+  );
+  const defects = collectBundleDefects(dir);
+  assert.deepEqual(
+    defects,
+    [],
+    `合法块状形态不应报缺陷（含引用检查），实际：${JSON.stringify(defects)}`,
+  );
+});

@@ -103,6 +103,22 @@ function readPatchItem(dashLine, bodyLines) {
     } else {
       return { kind: 'mapping', insert: null };
     }
+  } else if (bodyLines.length > 0) {
+    // 裸破折号（键在后续缩进行）与「- 键: 值」同行形态同为合法块状映射，走同一段键识别：
+    // 首个续行定元素键缩进；首行为破折号（元素是列表）或非键值文本则非映射（官方拒绝形态）
+    const first = bodyLines[0];
+    if (isDashLine(first)) return { kind: 'scalar' };
+    const firstPair = splitKeyValue(first.text);
+    if (!firstPair) return { kind: 'scalar' };
+    keyIndent = first.indent;
+    if (firstPair.key === 'insert') {
+      insert = [];
+      insertListIndent = keyIndent;
+    } else {
+      return { kind: 'mapping', insert: null };
+    }
+  } else {
+    return { kind: 'scalar' }; // 裸破折号无续行：空元素，非键值映射
   }
   for (const line of bodyLines) {
     if (entryBody && (isDashLine(line) || line.indent <= insertListIndent)) {
