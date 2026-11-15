@@ -169,6 +169,9 @@ importers:
       '@clack/prompts':
         specifier: ^1.9.0
         version: 1.9.0
+      commander:
+        specifier: ^15.1.0
+        version: 15.1.0
     devDependencies:
       '@types/node':
         specifier: ^26.6.6
@@ -191,6 +194,10 @@ packages:
 
   '@types/node@26.6.6':
     resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
+
+  commander@15.1.0:
+    resolution: {integrity: sha512-cgnQ88TRrWcC7pVq46RzJVRMktu3W2RcbnoidnfBsl1bmDCBwJS/udcIZpKoCrbAYYaCqsz1yZCVIgbIaU3ddQ==}
+    engines: {node: '>=22.12.0'}
 
   fast-string-truncated-width@3.0.3:
     resolution: {integrity: sha512-0jjjIEL6+0jag3l2XWWizO64/aZVtpiGE3t0Zgqxv0DPuxiMjvB3M24fCyhZUO4KomJQPj3LTSUnDP3GpdwC0g==}
@@ -231,6 +238,8 @@ snapshots:
   '@types/node@26.6.6':
     dependencies:
       undici-types: 8.9.0
+
+  commander@15.1.0: {}
 
   fast-string-truncated-width@3.0.3: {}
 

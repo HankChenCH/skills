@@ -31,8 +31,8 @@ import { listProfiles, profilesRoot } from '../src/dsh-profiles.ts';
 import { AGENT_DIRS } from '../src/agent-dirs.ts';
 import { listEntries, listPlugins, readDescriptions } from '../src/catalog.ts';
 import { skillOptions, typeOptions } from '../src/menu.ts';
-import { parseArgs, renderHelp } from '../src/cli-args.ts';
-import type { ParsedArgs } from '../src/cli-args.ts';
+import { parseArgs, renderHelp } from '../src/cli.ts';
+import type { ParsedArgs } from '../src/cli.ts';
 import { LOCKFILE_NAME } from '../src/lockfile.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -243,7 +243,7 @@ async function main(argv: string[]): Promise<number> {
       return 1;
     }
     // 解析不变量：plugins 模式下 plugins 恒非空数组、profile 过上面 null 门后恒为 string
-    //（ParsedArgs 为增量构造的可选形态，见 cli-args ParsedArgs 注）。
+    //（ParsedArgs 为增量构造的可选形态，见 cli ParsedArgs 注）。
     return runPluginInstall({ plugins: args.plugins as string[], profile: args.profile as string });
   }
 
