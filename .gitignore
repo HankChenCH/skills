@@ -24,3 +24,4 @@ bin/*.js
 src/**/*.js
 agents/dsh/plugins/dsh-demo/index.js
 package.json.prepack-bak
+.prepack-stash/
