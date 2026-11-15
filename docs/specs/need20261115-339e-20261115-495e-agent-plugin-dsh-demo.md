@@ -1,10 +1,11 @@
 ---
 id: 20261115-495e
-status: approved
+status: done
 need: 20261115-339e
 round: 1
 created: 2026-11-15
 approved: 2026-11-15
+done: 2026-11-15
 ---
 # infra 第二类资产「插件」：dsh demo 插件 + 命令转发安装（round 1 全 FR）
 
@@ -61,13 +62,13 @@ round 1 = need 全 FR 最小闭环（need FR-1～FR-6）：
 
 - [FR-1 | 工单级] Given 两层菜单第一层，When 检视类型项，Then 「插件」可选、「技能」行为不变、「规范」显示占位不可选且位列第三。
 - [FR-1 | 工单级] Given 选「插件」类型，When 第二层展示，Then 条目 = demo 插件（正名为包名 `@hankchen/dsh-demo`，提示为包 description），支持空格多选批量勾选。
-- [FR-3 | 工单级] Given 勾选插件与目标 profile，When 确认安装且 `dsh` 在 PATH，Then 按条目顺序逐条执行 `dsh plugin --profile <名> add @hankchen/dsh-demo`；`dsh` 不在 PATH 时执行体为 `npx @deepseek-ai/dsh`（执行体注入断言组装形态，不实跑）。
+- [FR-3 | 工单级] Given 勾选插件与目标 profile，When 确认安装且 `dsh` 在 PATH，Then 按条目顺序逐条执行 `dsh plugin --profile <名> add @hankchen/dsh-demo`；`dsh` 不在 PATH 时执行体为 `npx @deepseek-ai/dsh`（执行体注入断言组装形态，不实跑）。〔实际边界（验收 20261115-967d）：官方落盘 profile 依赖行为语义化范围（实测 `^0.1.1`）非精确版本，对账与锁件记录实际落盘原文。〕
 - [FR-3 | 工单级] Given `$DSH_HOME` 指向临时目录且其 profiles/ 下有 ≥2 个 profile，When 交互选择目标 profile，Then 列表为该目录既有项按名排序；选 `desktop` 则拒装并说明官方保留名行为，进程不进入安装。
 - [FR-3 | 工单级] Given node 版本 < 24.9.0（可用注入或环境模拟），When 发起插件安装，Then 拒装并报当前版本与 fnm/nvm 升级指引，不执行任何官方命令（need 异常流 A）。
 - [FR-1 | 工单级] When 带 `--plugins @hankchen/dsh-demo --profile <名>` 跑，Then 免交互完成与交互路径一致的安装；缺 `--profile` 则报错并列出既有 profile；`--help` 列两旗标与示例。
 - [FR-5 | 工单级] Given fixture profile（package.json 已含依赖行与 `dsh.profile.bundles` 行），When 运行安装后对账，Then 摘要记成功并记录实际落盘版本；Given fixture 缺 bundles 行，Then 报错指明缺失落点与 profile 路径（need 异常流 C 的失败呈现口径同此条）。
 - [FR-5 | 工单级] When 安装完成，Then `.infra-lock.json` 插件区出现该插件（包名/版本/profile/安装时间），技能区既有条目不变；重跑安装后插件区按对账结果刷新、无重复条目。
-- [FR-2 | 工单级] Given demo 插件目录，When 运行 bundle 校验器，Then 四要素（`dsh.bundle.patch`、`files` 含 cordis.patch.yml、patch 引用名 = 包名、模块导出 name+apply）齐备即通过；人为移除任一要素即拒绝并列出缺陷。
+- [FR-2 | 工单级] Given demo 插件目录，When 运行 bundle 校验器，Then 四要素（`dsh.bundle.patch`、`files` 含 cordis.patch.yml、patch 引用名 = 包名、模块导出 name+apply）齐备即通过；人为移除任一要素即拒绝并列出缺陷。〔实际边界（验收 20261115-967d）：cordis.patch.yml 须为官方 loader 可解析的顶层数组形态（PatchOptions[]，insert 元素 id+name 必填）——0.1.0 顶层映射形态被官方拒装，经 fix 20261115-f158 修复；校验器增核该结构。〕
 - [FR-2 | 工单级] When 检视发布对账，Then 包内 plugins/ 清单 = 仓库 plugins/ 清单，且每个插件目录过 bundle 校验，不满足即拒绝发布（现有 skills 对账行为不变）。
 - [FR-4 | 工单级] Given 《插件资产规范》文档，When 检索，Then 含生产约定（仓库布局、清单四要素、双包发布顺序、新宿主接入模式）与运行时形态（dsh 格式逐字段）两层；Given README，When 检索插件安装，Then 有两层菜单用法、`--plugins`/`--profile` 示例、node ≥24.9.0 前置、registry 受限缓解路径、desktop 例外（need 异常流 A/B/C 对外口径）。
 - [FR-6 | 工单级] When 检视仓库基线声明，Then 包 engines.node = `>=24.9.0`、版本声明文件与 CI 运行时同步为 24 系；且现有全量测试（技能侧 49 例 + 本轮新增）在新基线全绿。
