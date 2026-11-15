@@ -131,21 +131,30 @@ test(`[FR-5|集成级] 经 npx 执行体真实安装 ${PKG}：profile 两落点 
     0,
     `首次安装应成功退出（${first.error?.message ?? `signal ${first.signal}`}）：${first.stdout}${first.stderr}`,
   );
-  const summary = `已安装插件${PKG}@${probe.version}→dshprofile${PROFILE}（对账：依赖行+bundles行齐备）`;
-  assert.ok(plainText(first.stdout).includes(summary), `完成摘要应记对账成功，实际输出：${first.stdout}`);
 
-  // profile package.json 两落点（docs/plugin-assets.md §2.3：dependencies 依赖行 + dsh.profile.bundles 行）
+  // profile package.json 两落点（docs/plugin-assets.md §2.3：dependencies 依赖行 + dsh.profile.bundles 行）。
+  // 依赖行落盘形态以官方语义为准（实装观测 = 语义化范围 ^x.y.z，非精确版本）：断言「落点齐备」，
+  // 不钉范围字面；实际安装版本另经 profile 内 node_modules 的包清单对 registry 版本钉死。
   const profilePkg = readProfilePkg(dshHome);
-  assert.equal(profilePkg.dependencies[PKG], probe.version, '依赖行应记实际安装版本');
+  const depRange = profilePkg.dependencies?.[PKG];
+  assert.ok(typeof depRange === 'string' && depRange.length > 0, '依赖行应落盘（官方写入的依赖声明）');
+  const installedPkg = JSON.parse(
+    fs.readFileSync(path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...PKG.split('/'), 'package.json'), 'utf8'),
+  );
+  assert.equal(installedPkg.version, probe.version, 'profile 内实装版本应等于 registry 发布版本');
   assert.ok(
     Array.isArray(profilePkg.dsh?.profile?.bundles) && profilePkg.dsh.profile.bundles.includes(PKG),
     'bundles 行应含包名',
   );
 
-  // 锁文件插件区四元组：包名 / 版本 / profile / 安装时间
+  // 完成摘要：CLI 忠实记录实际落盘值（依赖行原文）并宣告对账成功
+  const summary = `已安装插件${PKG}@${depRange}→dshprofile${PROFILE}（对账：依赖行+bundles行齐备）`;
+  assert.ok(plainText(first.stdout).includes(summary), `完成摘要应记对账成功，实际输出：${first.stdout}`);
+
+  // 锁文件插件区四元组：包名 / 版本（= 对账读到的依赖行原文）/ profile / 安装时间
   const lockfile = readLockfile(projectRoot);
   assert.deepEqual(Object.keys(lockfile.plugins), [PKG], '锁文件插件区应恰含该包一条');
-  assert.equal(lockfile.plugins[PKG].version, probe.version);
+  assert.equal(lockfile.plugins[PKG].version, depRange);
   assert.equal(lockfile.plugins[PKG].profile, PROFILE);
   assert.match(lockfile.plugins[PKG].installedAt, /^\d{4}-\d{2}-\d{2}T/, '安装时间应为 ISO 时间戳');
 
@@ -158,13 +167,20 @@ test(`[FR-5|集成级] 经 npx 执行体真实安装 ${PKG}：profile 两落点 
   );
   assert.ok(plainText(second.stdout).includes(summary), '重复安装后完成摘要仍应对账成功');
 
-  // 官方幂等语义为准：bundles 只断言「含包名」，不钉官方去重细节
+  // 官方幂等语义为准：依赖行/实装版本不变，bundles 只断言「含包名」，不钉官方去重细节
   const profilePkgAfter = readProfilePkg(dshHome);
-  assert.equal(profilePkgAfter.dependencies[PKG], probe.version, '重复安装后依赖行版本不变');
+  assert.equal(profilePkgAfter.dependencies[PKG], depRange, '重复安装后依赖行不变');
+  assert.equal(
+    JSON.parse(
+      fs.readFileSync(path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...PKG.split('/'), 'package.json'), 'utf8'),
+    ).version,
+    probe.version,
+    '重复安装后实装版本不变',
+  );
   assert.ok(profilePkgAfter.dsh.profile.bundles.includes(PKG), '重复安装后 bundles 行仍含包名');
 
   const lockfileAfter = readLockfile(projectRoot);
   assert.deepEqual(Object.keys(lockfileAfter.plugins), [PKG], '重复安装后锁文件无重复条目');
-  assert.equal(lockfileAfter.plugins[PKG].version, probe.version);
+  assert.equal(lockfileAfter.plugins[PKG].version, depRange);
   assert.equal(lockfileAfter.plugins[PKG].profile, PROFILE);
 });
