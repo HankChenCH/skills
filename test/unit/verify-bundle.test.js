@@ -104,6 +104,21 @@ test('patch 清单未以包名引用自己即拒绝，缺陷点名包名', async
   assert.match(defects[0], new RegExp(PLUGIN_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 });
 
+test('插件模块未导出 name 与 apply 即拒绝，缺陷逐一点名', async (t) => {
+  const dir = await writeValidPlugin(await makeTempRoot(t));
+  await writeFile(path.join(dir, 'index.js'), `export const version = '0.1.0';\n`);
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 2, `应报 name 与 apply 两项，实际：${JSON.stringify(defects)}`);
+  assert.ok(
+    defects.some((d) => /未导出 name/.test(d)),
+    `缺陷应点名未导出 name：${JSON.stringify(defects)}`,
+  );
+  assert.ok(
+    defects.some((d) => /未导出 apply/.test(d)),
+    `缺陷应点名未导出 apply：${JSON.stringify(defects)}`,
+  );
+});
+
 test('patch 文件为顶层映射（官方 0.2.2-rc.1 拒绝的旧形态）即拒绝，缺陷点名顶层须为数组', async (t) => {
   const dir = await writeValidPlugin(await makeTempRoot(t));
   // 发布包 0.1.0 实际带出的坏形态：顶层 packages: 映射（官方报错全文见 ticket 20261115-f158）
