@@ -10,7 +10,7 @@
     "bin",
     "src",
     "skills",
-    "plugins",
+    "agents",
     "scripts"
   ],
   "engines": {

@@ -31,7 +31,7 @@ import { fileURLToPath } from 'node:url';
 import { assertPluginPreconditions, commandExists } from '../../src/dsh-command.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const PLUGIN_DIR = path.join(packageRoot, 'plugins', 'dsh-demo');
+const PLUGIN_DIR = path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo');
 // 期望值独立来源：包名/版本/engines 运行时读仓库内插件包清单，不写死字面量
 const DEMO_PKG: {
   name: string;

@@ -1,8 +1,8 @@
 # agents/ 扩展资产布局规范
 
-本规范定稿 `agents/<宿主>/<机制>/` 目录模式（need 20261115-fc48 FR-1 round 1 深度），输入 = RQ4 宿主普查报告的分类学（`docs/research/host-survey/20261115-agent-host-extension-survey.md`，T1–T8 机制类型 + 49 宿主逐个目录约定）。治理规则「先改文档再改技能」（`docs/concepts.md` 单一真相源）：本册先行定稿，目录迁移折 round 2 按本册执行——**本册描述目标态，落定前仓库根不存在 `agents/` 目录**。
+本规范定稿 `agents/<宿主>/<机制>/` 目录模式（need 20261115-fc48 FR-1 round 1 深度），输入 = RQ4 宿主普查报告的分类学（`docs/research/host-survey/20261115-agent-host-extension-survey.md`，T1–T8 机制类型 + 49 宿主逐个目录约定）。治理规则「先改文档再改技能」（`docs/concepts.md` 单一真相源）：本册先行定稿，目录迁移折 round 2 按本册执行——**本册描述目标态；round 2 迁移票（20261115-30f2）落地后 `agents/` 已是仓库现状，本册即现态描述**。
 
-与本册并行的现行文档：`docs/plugin-assets.md` 是插件资产的生产约定与 dsh 运行时形态，描述**当前** `plugins/` 顶层布局；本册描述**目标** `agents/` 布局。两者时间态不同，迁位落地时 plugin-assets.md 按 §4.3 引用面清单回改。升格进 `CODING_STANDARDS.md` 索引属后续 design 票事，本册落定时不改索引。
+`docs/plugin-assets.md` 是插件资产的生产约定与 dsh 运行时形态，已按 §4.3 引用面清单回改至 `agents/` 布局（20261115-30f2），与本册同述现态：本册管宿主分层模式与机制枚举，plugin-assets.md 管插件包形态与发布纪律。升格进 `CODING_STANDARDS.md` 索引属后续 design 票事，本册落定时不改索引。
 
 ## 一、目录模式定义
 
@@ -150,7 +150,7 @@ agents/<宿主>/<机制>/<条目>
 - `--plugins` 旗标与示例文本（`README.md:113–114`、`src/cli-args.ts:37`、`bin/infra.ts:242`、`test/unit/menu.test.ts`）：旗标名是 CLI 表面，非目录路径。
 - 包名 `@hankchen/dsh-demo` 全部引用（`test/unit/plugin-install`、`dsh-command`、`reconcile`、`verify-bundle`、`menu` 等测试与包内文件）：条目正名是包名（plugin-assets §1.1），不随目录迁位变。
 - `.infra-lock.json` 记账（`src/lockfile.ts`、`src/plugin-install.ts`）：插件区按包名记账，无仓库内路径。
-- CI workflow：步骤调 `npm run verify:pack` 命令名不变；本分支尚无 `.github/` 目录，无引用面。
+- CI workflow：步骤调 `npm run verify:pack` 命令名不变；`.github/workflows/regression-gate.yml` 已在位（spec 20261115-f650 FR-2 交付），全部步骤只调命令名（npm ci / npm run typecheck / npm test / npm pack + npm run verify:pack），无 `plugins/` 目录路径引用——本行清单初稿「本分支尚无 .github/ 目录」系时序过期表述，已修正（残余 #2 核销，票 20261115-30f2）。
 - 历史知识档不回改：`docs/needs/`、`docs/specs/`、`docs/research/`（rq2 报告结论节已自注「round 1 后为 agents/ 布局时改 patterns」）。
 
 ### 4.5 need FR-1 引用清单核对结论

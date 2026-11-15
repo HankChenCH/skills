@@ -1,4 +1,4 @@
-// demo 插件包（plugins/dsh-demo/）的外部可观察面，期望值逐条来自 spec 20261115-495e
+// demo 插件包（agents/dsh/plugins/dsh-demo/）的外部可观察面，期望值逐条来自 spec 20261115-495e
 // 实现决策与 docs/plugin-assets.md §1.2–§1.3、need 20261115-339e F1/F3/F4、
 // fix 票 20261115-f158（patch 清单官方顶层数组形态取证 + 版本 0.1.1）：
 // 包形态四要素、engines 声明、patch 清单官方形态且以包名引用自己、模块真实可加载并打加载日志。
@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const PLUGIN_NAME = '@hankchen/dsh-demo';
-const PLUGIN_DIR = new URL('../../plugins/dsh-demo/', import.meta.url);
+const PLUGIN_DIR = new URL('../../agents/dsh/plugins/dsh-demo/', import.meta.url);
 
 async function readPluginFile(name: string) {
   return readFile(new URL(name, PLUGIN_DIR), 'utf8');

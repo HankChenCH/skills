@@ -16,7 +16,7 @@ const PKG = '@hankchen/dsh-demo';
 // 插件版本唯一来源 = 仓库插件包 package.json（shim 模拟官方安装当前包的实际版本，
 // 断言与之共用；版本升位零改动，ticket 20261115-f158：0.1.0 → 0.1.1）
 const PLUGIN_VERSION = JSON.parse(
-  fs.readFileSync(path.join(packageRoot, 'plugins', 'dsh-demo', 'package.json'), 'utf8'),
+  fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo', 'package.json'), 'utf8'),
 ).version;
 
 // shim 模拟官方命令（docs/plugin-assets.md §2.3 两落点语义）：记录完整 argv，
@@ -271,8 +271,8 @@ test('[FR-1] 交互第二层条目以正名呈现、提示为包 description，�
   const dshHome = makeDshHome(t, ['dev']);
   const shimDir = makeShimDir(t, ['dsh']);
   const shimLog = makeShimLog(t);
-  // 期望字面独立来源：plugins/dsh-demo/package.json（正名 = name、提示 = description、版本随包）
-  const demoPkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
+  // 期望字面独立来源：agents/dsh/plugins/dsh-demo/package.json（正名 = name、提示 = description、版本随包）
+  const demoPkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
 
   // 第一层 DOWN 到插件 → ENTER；第二层 SPACE 勾选 → ENTER；第三层回车选 dev
   const picked = await runInteractiveIn(

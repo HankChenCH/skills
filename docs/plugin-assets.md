@@ -5,14 +5,14 @@
 - **一、生产约定**（维护者照抄）：插件源码在套件仓库怎么摆、package.json 清单怎么写、怎么发布、怎么接入下一个 agent 宿主。
 - **二、运行时形态**（逐字段事实）：首个宿主 DeepSeek Harness（dsh）官方插件格式的逐字段要求与安装机制。以 need 20261115-339e 背景节内联查证结论 F1/F2（2026-11-15，官方文档与本机 profile 实测）为据，不臆造格式细节；官方格式演进时以官方文档与 demo 实测回改本文。
 
-活样例：`plugins/dsh-demo/`——demo 插件 `@hankchen/dsh-demo`，内容为 dsh 官方「Your first plugin」最小形态（导出 `name` + `apply(ctx)` 打一条加载日志）。本文档与 demo 源码互为印证：文档写约定，源码给实例；若实现与本文有出入，以合入后的实现为准回改文档。
+活样例：`agents/dsh/plugins/dsh-demo/`——demo 插件 `@hankchen/dsh-demo`，内容为 dsh 官方「Your first plugin」最小形态（导出 `name` + `apply(ctx)` 打一条加载日志）。本文档与 demo 源码互为印证：文档写约定，源码给实例；若实现与本文有出入，以合入后的实现为准回改文档。
 
 ## 一、生产约定（套件侧）
 
 ### 1.1 仓库布局
 
-- 插件源码放仓库根 `plugins/<插件目录名>/`，**每个目录各自是完整的 npm 包**（有自己的 package.json，语义化版本独立演进）。
-- 包根 = 仓库根（ADR 20261115-f143）：初始化器包 `@hankchen/infra` 的 `files` 清单加入 `plugins`（与 skills 同法），新增插件目录自动随包分发，无需改安装器代码。
+- 插件源码放 `agents/<宿主>/<机制段>/<插件目录名>/`（agents/ 布局规范 docs/standards/agents-layout.md，宿主段 = 宿主标识如 `dsh`，机制段当前为 `plugins`），**每个插件目录各自是完整的 npm 包**（有自己的 package.json，语义化版本独立演进）。
+- 包根 = 仓库根（ADR 20261115-f143）：初始化器包 `@hankchen/infra` 的 `files` 清单加入 `agents`（与 skills 同法），`agents/` 两级布局下的新增宿主与插件目录自动随包分发，无需改安装器代码。
 - **条目正名是包名，不是目录名**：菜单条目、安装转发、锁文件记账一律取插件包 package.json 的 `name`（registry 名，如 `@hankchen/dsh-demo`）；`description` 取为菜单提示语。
 
 ### 1.2 package.json 清单四要素
@@ -34,7 +34,7 @@
 ### 1.3 插件模块与 patch 清单
 
 - 插件模块导出 `name`（取包名字符串）与 `apply(ctx)`；demo 的 apply 只打一条含插件名的加载日志（真实功能设计是后续轮的事，need 非目标 1）。
-- `cordis.patch.yml` 随包携带，**以包名引用自己**（patch 声明作用于 `@hankchen/dsh-demo` 自己）；具体行结构以 `plugins/dsh-demo/cordis.patch.yml` 为准，本文不重抄。
+- `cordis.patch.yml` 随包携带，**以包名引用自己**（patch 声明作用于 `@hankchen/dsh-demo` 自己）；具体行结构以 `agents/dsh/plugins/dsh-demo/cordis.patch.yml` 为准，本文不重抄。
 
 ### 1.4 发布纪律（双包顺序）
 
@@ -44,7 +44,7 @@
 
 发布初始化器前，对账在既有技能清单核对之外扩展两查，任一不满足拒绝发布（退出码 1）：
 
-1. **包内 plugins/ 清单 = 仓库 plugins/ 清单**（与 skills 对账同法，`scripts/verify-pack.mjs` 的插件侧扩展）；
+1. **包内 agents/*/plugins/ 清单 = 仓库 agents/*/plugins/ 清单**（与 skills 对账同法，按 `<宿主>/<插件目录名>` 复合键两侧同法构造，`scripts/verify-pack.ts` 的插件侧扩展）；
 2. **每个插件目录过 bundle 清单校验**——四要素齐备（§1.2）、`cordis.patch.yml` 引用名 = 包名、模块导出 name + apply。
 
 技能侧既有对账行为不变。
@@ -53,7 +53,7 @@
 
 接入下一个 agent 宿主只做三件事，不改安装流程骨架（映射表表驱动，承 need 20261114-1f2f FR-4 既定扩展点）：
 
-1. **映射表加一行 command 类行**。映射表每行声明「安装机制」——copy 类行（技能：文件拷贝 + 软链，落项目文件）行为不变；command 类行（插件：来源目录枚举 + 官方命令转发，不落项目文件）字段 = 类型名、来源目录（枚举该宿主的插件目录）。
+1. **映射表加一行 command 类行**。映射表每行声明「安装机制」——copy 类行（技能：文件拷贝 + 软链，落项目文件）行为不变；command 类行（插件：来源目录枚举 + 官方命令转发，不落项目文件）字段 = 类型名、来源目录（插件枚举根，两级枚举 `agents/<宿主>/plugins/`）。
 2. **命令适配**。在命令组装处声明该宿主的官方安装命令形态（dsh = `plugin --profile <名> add <包>`，见 §2.3），前置检查与安装后对账的读法按宿主官方机制对应调整。
 3. **插件包照抄本规范**。仓库布局、发布纪律照 §1.1–§1.4；§二 的运行时形态只对 dsh 有效，新宿主换成其官方格式逐字段重写。
 
@@ -102,7 +102,7 @@ dsh plugin --profile <名> add <包>
 
 ## 三、照抄检查单（新插件包）
 
-1. `plugins/<目录名>/` 建完整 npm 包：package.json 过 §1.2 四要素 + `engines.dsh` + `description`；
-2. 插件模块导出 `name` + `apply(ctx)`；`cordis.patch.yml` 以包名引用自己（照抄 `plugins/dsh-demo/`）；
+1. `agents/<宿主>/plugins/<目录名>/` 建完整 npm 包：package.json 过 §1.2 四要素 + `engines.dsh` + `description`；
+2. 插件模块导出 `name` + `apply(ctx)`；`cordis.patch.yml` 以包名引用自己（照抄 `agents/dsh/plugins/dsh-demo/`）；
 3. **先发插件包**（`npm publish --access public`），**再发初始化器**（§1.4 双包顺序）；
 4. 初始化器发布对账两查过（§1.4）方可 publish。

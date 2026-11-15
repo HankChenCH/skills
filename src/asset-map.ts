@@ -7,7 +7,8 @@
 //     installTarget 安装目标（项目内相对路径）
 //     symlinkRule   agent 目录软链规则；<agentDir> 与 <skillName> 为展开占位符
 //   command 类行（插件）：官方命令转发，不落项目文件；条目正名取各包 package.json name
-//   （registry 名，非目录名）。字段：type、sourceDir（枚举插件目录）。
+//   （registry 名，非目录名）。字段：type、sourceDir（插件枚举根，两级枚举
+//   agents/<宿主>/plugins/——agents/ 布局规范 docs/standards/agents-layout.md §3.3）。
 //   占位行：仅 type，菜单显示但不可安装（机制不变）。
 
 // 行模型（TS 迁移，票 20261115-d437）：按 mechanism 判别的 union。
@@ -51,7 +52,7 @@ export const ASSET_MAP: AssetRow[] = [
   {
     type: PLUGINS_TYPE,
     mechanism: 'command',
-    sourceDir: 'plugins',
+    sourceDir: 'agents',
   },
   {
     type: '规范',

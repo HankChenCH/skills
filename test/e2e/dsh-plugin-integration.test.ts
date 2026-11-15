@@ -20,7 +20,7 @@ import { assertPluginPreconditions, commandExists } from '../../src/dsh-command.
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 // 期望值独立来源：包名/版本运行时读仓库内包清单（发布后与 registry 最新版对账），不写死字面量
-const DEMO_PKG = JSON.parse(fs.readFileSync(path.join(packageRoot, 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
+const DEMO_PKG = JSON.parse(fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
 const PKG = DEMO_PKG.name;
 const PROFILE = 'infra-it'; // 测试 profile 名固定（可重复确定；非官方保留名）
 
