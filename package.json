@@ -1,0 +1,26 @@
+{
+  "name": "@hankghchen/infra",
+  "version": "0.1.0",
+  "description": "套件资产初始化 CLI：把本仓库的技能资产安装进目标 git 项目（.agents/skills/ + agent 目录软链 + .infra-lock.json 记账）",
+  "type": "module",
+  "bin": {
+    "infra": "bin/infra.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skills"
+  ],
+  "engines": {
+    "node": ">=20.12.0"
+  },
+  "scripts": {
+    "test": "node --test test/unit/*.test.js test/e2e/*.test.js",
+    "test:unit": "node --test test/unit/*.test.js",
+    "test:e2e": "node --test test/e2e/*.test.js",
+    "verify:pack": "node scripts/verify-pack.mjs"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.9.0"
+  }
+}
