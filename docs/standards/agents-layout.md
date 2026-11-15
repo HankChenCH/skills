@@ -98,7 +98,7 @@ agents/<宿主>/<机制>/<条目>
 
 ### 3.4 原子性与结构性成立
 
-- **原子性**：目录迁移、`files` 切换、verify-pack 路径切换、编目两级化、测试路径常量更新属同一条 round 2 迁移票，同一提交序列原子落地——任一项单独先行，对账或编目必红。发布命令序列本身不变（`npm pack` → `verify:pack` → `npm publish` → annotated tag）。
+- **原子性**：目录迁移、`files` 切换、`verify-pack` 路径切换、编目两级化、测试路径常量更新属同一条 round 2 迁移票，同一提交序列原子落地——任一项单独先行，对账或编目必红。发布命令序列本身不变（`npm pack` → `verify:pack` → `npm publish` → annotated tag）。
 - **结构性成立**：`agents/` 在仓库根 + `files` 白名单含 `agents` → 打包产物即仓库原文件，对账是机械校验而非流程纪律（ADR 20261115-f143 同构论据）。
 - CI 步骤（spec 20261115-f650 FR-2 契约）调用 `npm run verify:pack`，命令名不变——脚本内路径变更不波及 workflow 与 README 发布节命令行。
 
@@ -155,7 +155,7 @@ agents/<宿主>/<机制>/<条目>
 
 ### 4.5 need FR-1 引用清单核对结论
 
-- need FR-1 原列「4 个测试文件」；grep 实证为 **6 个**（asset-map、plugin-catalog、plugin-package、verify-pack-plugins、e2e/plugin-install、e2e/dsh-plugin-integration）——本清单以实证为准。
+- need FR-1 原列「4 个测试文件」；grep 实证为 **6 个**（`asset-map`、`plugin-catalog`、`plugin-package`、`verify-pack-plugins`、`e2e/plugin-install`、`e2e/dsh-plugin-integration`）——本清单以实证为准。
 - need FR-1 原列「README 发布节」；grep 实证 README 无 `plugins/` 目录路径引用（仅旗标名与包名）——**免改**，留痕免改依据于 §4.4。
 
 ## 附：宿主注记表
