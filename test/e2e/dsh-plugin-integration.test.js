@@ -92,6 +92,13 @@ function readProfilePkg(dshHome) {
   return JSON.parse(fs.readFileSync(path.join(dshHome, 'profiles', PROFILE, 'package.json'), 'utf8'));
 }
 
+// profile node_modules 下实装包的清单：scoped 包名 → 目录路径的截段只在此处定义
+//（parse-normalization 规则 1），执行段与幂等段共用同一读取口径。
+function readInstalledManifest(dshHome) {
+  const manifestPath = path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...PKG.split('/'), 'package.json');
+  return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+}
+
 function readLockfile(projectRoot) {
   return JSON.parse(fs.readFileSync(path.join(projectRoot, '.infra-lock.json'), 'utf8'));
 }
@@ -138,9 +145,7 @@ test(`[FR-5|集成级] 经 npx 执行体真实安装 ${PKG}：profile 两落点 
   const profilePkg = readProfilePkg(dshHome);
   const depRange = profilePkg.dependencies?.[PKG];
   assert.ok(typeof depRange === 'string' && depRange.length > 0, '依赖行应落盘（官方写入的依赖声明）');
-  const installedPkg = JSON.parse(
-    fs.readFileSync(path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...PKG.split('/'), 'package.json'), 'utf8'),
-  );
+  const installedPkg = readInstalledManifest(dshHome);
   assert.equal(installedPkg.version, probe.version, 'profile 内实装版本应等于 registry 发布版本');
   assert.ok(
     Array.isArray(profilePkg.dsh?.profile?.bundles) && profilePkg.dsh.profile.bundles.includes(PKG),
@@ -170,13 +175,7 @@ test(`[FR-5|集成级] 经 npx 执行体真实安装 ${PKG}：profile 两落点 
   // 官方幂等语义为准：依赖行/实装版本不变，bundles 只断言「含包名」，不钉官方去重细节
   const profilePkgAfter = readProfilePkg(dshHome);
   assert.equal(profilePkgAfter.dependencies[PKG], depRange, '重复安装后依赖行不变');
-  assert.equal(
-    JSON.parse(
-      fs.readFileSync(path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...PKG.split('/'), 'package.json'), 'utf8'),
-    ).version,
-    probe.version,
-    '重复安装后实装版本不变',
-  );
+  assert.equal(readInstalledManifest(dshHome).version, probe.version, '重复安装后实装版本不变');
   assert.ok(profilePkgAfter.dsh.profile.bundles.includes(PKG), '重复安装后 bundles 行仍含包名');
 
   const lockfileAfter = readLockfile(projectRoot);
