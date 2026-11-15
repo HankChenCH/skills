@@ -163,7 +163,7 @@ test('锁文件记录包版本 + 逐技能指纹/安装时间；先前安装的�
 
   const lockfile = readLockfile(projectRoot);
   assert.deepEqual(Object.keys(lockfile.skills).sort(), ['alpha', 'beta']);
-  assert.equal(lockfile.package, '@hankghchen/infra');
+  assert.equal(lockfile.package, '@hankchen/infra');
   assert.equal(lockfile.packageVersion, '0.1.0');
   assert.match(lockfile.skills.alpha.fingerprint, /^[0-9a-f]{64}$/);
   assert.equal(lockfile.skills.beta.installedAt, '2026-11-15T00:00:00Z');

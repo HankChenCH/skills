@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// @hankghchen/infra 入口：旗标模式（--all / --skills）直通安装器；
+// @hankchen/infra 入口：旗标模式（--all / --skills）直通安装器；
 // 无旗标进两层交互菜单（clack：第一层选资产类型，第二层勾选技能）。
 // 交互、占位、取消、空选路径全部零落盘；安装路径由映射表驱动（src/asset-map.js）。
 
@@ -28,7 +28,7 @@ if (process.stdin.isTTY) {
 }
 
 async function interactiveSelect() {
-  clack.intro(`@hankghchen/infra v${packageVersion} · 套件资产初始化`);
+  clack.intro(`@hankchen/infra v${packageVersion} · 套件资产初始化`);
 
   const type = await clack.select({
     message: '选择要安装的资产类型',
@@ -87,7 +87,7 @@ async function main(argv) {
     args = parseArgs(argv);
   } catch (err) {
     console.error(`✗ ${err.message}`);
-    console.error('  运行 npx @hankghchen/infra --help 查看全部旗标与示例。');
+    console.error('  运行 npx @hankchen/infra --help 查看全部旗标与示例。');
     return 1;
   }
   if (args.mode === 'help') {

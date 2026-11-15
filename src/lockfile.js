@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const LOCKFILE_NAME = '.infra-lock.json';
-export const PACKAGE_NAME = '@hankghchen/infra';
+export const PACKAGE_NAME = '@hankchen/infra';
 
 function* walkFiles(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {

@@ -9,14 +9,14 @@
 const FLAGS = ['--all', '--skills <名[,名...]> [-a, -b, ...]', '-h, --help'];
 
 export function renderHelp() {
-  return `@hankghchen/infra —— 套件资产初始化 CLI
+  return `@hankchen/infra —— 套件资产初始化 CLI
 
 用法（在目标 git 项目根目录执行）：
-  npx @hankghchen/infra                      # 进入两层交互菜单（选类型 → 勾选技能）
-  npx @hankghchen/infra@<semver>             # 指定版本安装（锁文件记录该版本）
-  npx @hankghchen/infra --all                # 免交互安装全部技能
-  npx @hankghchen/infra --skills dev-spec,dev-plan   # 免交互安装指定技能
-  npx @hankghchen/infra --skills dev-spec --skills ref-testing       # 可重复出现，取并集
+  npx @hankchen/infra                      # 进入两层交互菜单（选类型 → 勾选技能）
+  npx @hankchen/infra@<semver>             # 指定版本安装（锁文件记录该版本）
+  npx @hankchen/infra --all                # 免交互安装全部技能
+  npx @hankchen/infra --skills dev-spec,dev-plan   # 免交互安装指定技能
+  npx @hankchen/infra --skills dev-spec --skills ref-testing       # 可重复出现，取并集
 
 旗标：
   --all                       安装技能类型全部条目（免交互）

@@ -10,6 +10,6 @@ docs/overviews/
 __pycache__/
 *.pyc
 
-# @hankghchen/infra npm 包本地产物（工票 20261115-975c）
+# @hankchen/infra npm 包本地产物（工票 20261115-975c）
 node_modules/
 *.tgz
