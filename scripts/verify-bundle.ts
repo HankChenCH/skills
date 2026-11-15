@@ -283,7 +283,8 @@ function collectPatchDefects(name: string, patchTarget: string, patchText: strin
 // 套件约定 ESM + 内联导出（见要素 5 头注），在此约定内正则匹配足够。
 // 字符串感知：'…'、"…"、`…` 内的 // 与 /* 不开注释（插件模块日志串含 URL 属常态）；转义对
 // （\\、\' 等）不终结字符串。已知边界：模板串按到闭反引号为止、不展开 ${} 内嵌引号——超出
-// 套件插件模块形态（照抄 demo 即在此形态内），误判影响有界（漏认一个导出会被引用检查兜住）。
+// 套件插件模块形态（照抄 demo 即在此形态内）。误判两方向均有界：漏认方向 = 校验器误报未导出
+// （fail-loud 有界）；漏剥方向 = 静默放行，由宿主真实加载链兜底（集成承载票 20261115-13c4）。
 function stripComments(source: string): string {
   type State = 'code' | 'single' | 'double' | 'template' | 'line' | 'block';
   let state: State = 'code';

@@ -38,7 +38,8 @@ test('src/ bin/ scripts/ test/ 与 plugins/dsh-demo 全部为 .ts，无并存 .j
   assert.deepEqual(
     offenders,
     [],
-    `TS 线收尾断言失败：源码目录存在非 .ts 脚本文件（expect(1) Tcl 豁免不含 .js）：\n${offenders.join('\n')}`,
+    `TS 线收尾断言失败：源码目录存在非 .ts 脚本文件（expect(1) Tcl 豁免不含 .js）：\n${offenders.join('\n')}\n` +
+      `若为 prepack 编译残留（发布中断未走 postpack 还原），先清理编译产物再复跑（node scripts/postpack.ts）`,
   );
 });
 

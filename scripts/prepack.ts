@@ -130,24 +130,24 @@ function runPrepack(): void {
     }
   }
 
-    // ---- 出口把关：emit 产物残留相对 .ts specifier 即逐条列出中止打包（d437 评审延后项）----
-    // 改写只覆盖 from/动态 import 两形；未覆盖形态（裸副作用 import '…' 等）若残留，安装消费
-    // 链在 node_modules 下命中 node 拒剥类型（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING）。
-    const residuals: string[] = [];
-    for (const jsPath of emittedJsPaths(fileNames)) {
-      for (const specifier of collectResidualTsSpecifiers(fs.readFileSync(jsPath, 'utf8'))) {
-        residuals.push(`${path.relative(packageRoot, jsPath)}：${specifier}`);
-      }
+  // ---- 出口把关：emit 产物残留相对 .ts specifier 即逐条列出中止打包（d437 评审延后项）----
+  // 改写只覆盖 from/动态 import 两形；未覆盖形态（裸副作用 import '…' 等）若残留，安装消费
+  // 链在 node_modules 下命中 node 拒剥类型（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING）。
+  const residuals: string[] = [];
+  for (const jsPath of emittedJsPaths(fileNames)) {
+    for (const specifier of collectResidualTsSpecifiers(fs.readFileSync(jsPath, 'utf8'))) {
+      residuals.push(`${path.relative(packageRoot, jsPath)}：${specifier}`);
     }
-    if (residuals.length > 0) {
-      console.error(`✗ prepack：emit 产物残留相对 .ts specifier ${residuals.length} 处——安装消费链会在 node_modules 下命中 node 拒剥类型，中止打包：`);
-      for (const line of residuals) {
-        console.error(`  - ${line}`);
-      }
-      process.exit(1);
+  }
+  if (residuals.length > 0) {
+    console.error(`✗ prepack：emit 产物残留相对 .ts specifier ${residuals.length} 处——安装消费链会在 node_modules 下命中 node 拒剥类型，中止打包：`);
+    for (const line of residuals) {
+      console.error(`  - ${line}`);
     }
+    process.exit(1);
+  }
 
-    // ---- 出口把关：bin 编译产物必须保住 shebang（npx / .bin 直跑形态依赖它）----
+  // ---- 出口把关：bin 编译产物必须保住 shebang（npx / .bin 直跑形态依赖它）----
   const binJs = fs.readFileSync(path.join(packageRoot, 'bin', 'infra.js'), 'utf8');
   if (!binJs.startsWith('#!')) {
     console.error('✗ prepack：bin/infra.js 丢失 shebang——npx/.bin 直跑形态会坏，中止打包');
