@@ -20,6 +20,13 @@ test('占位类型选项带「本轮不可安装」提示，可安装类型显�
   assert.match(skills.hint, /\.agents\/skills/);
 });
 
+test('插件类型选项提示为官方命令转发语义，不显示 undefined 安装目标', () => {
+  const options = typeOptions(ASSET_MAP);
+  const plugins = options.find((o) => o.value === '插件');
+  assert.ok(!plugins.hint.includes('undefined'), `插件提示不得含 undefined：${plugins.hint}`);
+  assert.match(plugins.hint, /官方命令/);
+});
+
 test('第二层技能选项按名排序并带描述', () => {
   const options = skillOptions(['beta', 'alpha'], { alpha: 'A 描述', beta: 'B 描述' });
   assert.deepEqual(options.map((o) => o.value), ['alpha', 'beta']);
