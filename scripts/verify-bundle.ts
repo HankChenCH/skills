@@ -341,6 +341,8 @@ function stripComments(source: string): string {
   return out;
 }
 
+export { stripComments };
+
 export function collectBundleDefects(pluginDir: string): string[] {
   let pkg: PluginPackageJson;
   try {

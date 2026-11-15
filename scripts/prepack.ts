@@ -16,9 +16,22 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stripComments } from './verify-bundle.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const BUILD_DIRS = ['src', 'bin'];
+
+// 残留相对 .ts specifier 收集（出口把关的判定单点，可独立测试——票 20261115-e692，d437 评审
+// 20261115-4293 延后项）：在剥注释后的源码上匹配引号字符串里以 ./ 或 ../ 开头、.ts 结尾的
+// 导入说明符。emit 未设 removeComments、注释字样不得触发把关；模板串不是合法导入说明符
+// 形态，不在匹配面。改写步骤只覆盖 from 与动态 import 两形，本把关对一切形态兜底。
+export function collectResidualTsSpecifiers(source: string): string[] {
+  const specifiers: string[] = [];
+  for (const match of stripComments(source).matchAll(/(['"])(\.\.?\/[^'"\n]*\.ts)\1/g)) {
+    specifiers.push(match[2]!);
+  }
+  return specifiers;
+}
 
 function collectFiles(root: string, extension: string): string[] {
   const files: string[] = [];
@@ -117,7 +130,24 @@ function runPrepack(): void {
     }
   }
 
-  // ---- 出口把关：bin 编译产物必须保住 shebang（npx / .bin 直跑形态依赖它）----
+    // ---- 出口把关：emit 产物残留相对 .ts specifier 即逐条列出中止打包（d437 评审延后项）----
+    // 改写只覆盖 from/动态 import 两形；未覆盖形态（裸副作用 import '…' 等）若残留，安装消费
+    // 链在 node_modules 下命中 node 拒剥类型（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING）。
+    const residuals: string[] = [];
+    for (const jsPath of emittedJsPaths(fileNames)) {
+      for (const specifier of collectResidualTsSpecifiers(fs.readFileSync(jsPath, 'utf8'))) {
+        residuals.push(`${path.relative(packageRoot, jsPath)}：${specifier}`);
+      }
+    }
+    if (residuals.length > 0) {
+      console.error(`✗ prepack：emit 产物残留相对 .ts specifier ${residuals.length} 处——安装消费链会在 node_modules 下命中 node 拒剥类型，中止打包：`);
+      for (const line of residuals) {
+        console.error(`  - ${line}`);
+      }
+      process.exit(1);
+    }
+
+    // ---- 出口把关：bin 编译产物必须保住 shebang（npx / .bin 直跑形态依赖它）----
   const binJs = fs.readFileSync(path.join(packageRoot, 'bin', 'infra.js'), 'utf8');
   if (!binJs.startsWith('#!')) {
     console.error('✗ prepack：bin/infra.js 丢失 shebang——npx/.bin 直跑形态会坏，中止打包');
