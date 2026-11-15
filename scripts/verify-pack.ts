@@ -1,15 +1,19 @@
 #!/usr/bin/env node
-// 发布前机械对账：npm pack 产物里的资产清单必须 = 仓库清单，不等即拒绝（退出码 1）。
+// 发布前机械对账：pnpm pack 产物里的资产清单必须 = 仓库清单，不等即拒绝（退出码 1）。
 // 技能侧（spec 20261115-8975）：包内技能清单 = 仓库 skills/ 清单。
 // 插件侧两查（spec 20261115-495e FR-2，docs/plugin-assets.md §1.4；agents/ 两级布局随
 // spec 20261115-ed9f 迁移，agents-layout.md §3.2——对账键为 <宿主>/<插件目录名> 复合键，
 // 两侧同法构造，报错消息点名宿主段）：
 //   查 1 包内 agents/*/plugins/ 清单 = 仓库 agents/*/plugins/ 清单；
+//   查 1.5 包内禁 node_modules（spec 20261115-ed9f FR-4，RQ2 报告异常流 A #3 / 问④ f）：
+//       workspace 形态下 pnpm install 在成员目录生成的 node_modules 若被根 files 白名单
+//       卷入包，装出去即悬空链接/异机路径的结构性坏包——逐条列出即拒绝；
 //   查 2 每个仓库插件目录过 bundle 清单校验（复用 scripts/verify-bundle.ts；
 //       查 1 成立时包内内容 = 仓库内容，校验仓库目录即校验发出去的内容）。
-// 发布流程属单向门，本入口供 dev-release / 维护者在 `npm pack` 之后、`npm publish` 之前调用：
+// 发布流程属单向门，本入口供 dev-release / 维护者在 `pnpm pack` 之后、`pnpm publish` 之前调用
+// （pnpm 12 起 `pnpm run` 原样转发 `--`，传参不带 `--`）：
 //
-//   npm run verify:pack -- <tarball 路径>       # 例：hankchen-infra-0.1.0.tgz
+//   pnpm run verify:pack <tarball 路径>       # 例：hankchen-infra-0.1.0.tgz
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,7 +27,7 @@ const AGENTS_DIR = path.join(packageRoot, 'agents');
 
 const tarball = process.argv[2];
 if (!tarball) {
-  console.error('用法：npm run verify:pack -- <tarball 路径>（npm pack 产物）');
+  console.error('用法：pnpm run verify:pack <tarball 路径>（pnpm pack 产物）');
   process.exit(1);
 }
 if (!fs.existsSync(tarball)) {
@@ -122,6 +126,18 @@ if (missingPlugins.length > 0 || extraPlugins.length > 0) {
   if (extraPlugins.length > 0) {
     console.error(`  多出（包内有、仓库无）：${extraPlugins.join('、')}`);
   }
+}
+
+// 查 1.5：包内禁 node_modules（RQ2 报告异常流 A #3 / 问④ f）。与查 1 正交：清单可能
+// 完全对得上（插件一个不多不少）而包内仍混着 install 后被白名单卷入的成员依赖目录——
+// 逐条列出即拒绝，不给「装出去才知道」留通道。
+const nestedNodeModules = list.stdout.split('\n').filter((entry) => entry.includes('node_modules/'));
+if (nestedNodeModules.length > 0) {
+  console.error('✗ 包内混入 node_modules 条目，拒绝发布（成员内嵌 node_modules 被 pack 卷入 = 结构性坏包）：');
+  for (const entry of nestedNodeModules) {
+    console.error(`  ${entry}`);
+  }
+  process.exit(1);
 }
 
 // 查 2：每个仓库插件目录过 bundle 清单校验（缺陷消息已点名哪个插件缺哪个要素）
