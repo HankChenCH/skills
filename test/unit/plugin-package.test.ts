@@ -24,15 +24,28 @@ test('demo 包名与版本：@hankchen/dsh-demo 0.1.1（0.1.0 已发布且含坏
   assert.equal(pkg.version, '0.1.1');
 });
 
-test('demo 包四要素齐备：type module、main 直指模块、files 含清单与模块、dsh.bundle.patch', async () => {
+test('demo 包四要素齐备：type module、main 直指 .ts 模块、files 含 .ts 与清单、dsh.bundle.patch', async () => {
   const pkg = await readPluginJson('package.json');
   assert.equal(pkg.type, 'module', '插件模块按 ESM 加载（plugin-assets §1.2）');
-  assert.equal(pkg.main, 'index.js', 'main 直指插件模块（plugin-assets §1.2）');
+  // .ts 形态契约（spec 20261115-f650 demo 插件 .ts 化，票 20261115-e692）：main 直指 .ts 模块
+  assert.equal(pkg.main, 'index.ts', 'main 直指 .ts 插件模块（plugin-assets §1.2 的 .ts 形态）');
   assert.ok(
-    pkg.files.includes('cordis.patch.yml') && pkg.files.includes('index.js'),
-    `files 须含 cordis.patch.yml 与模块文件，实际：${JSON.stringify(pkg.files)}`,
+    pkg.files.includes('cordis.patch.yml') && pkg.files.includes('index.ts'),
+    `files 须含 cordis.patch.yml 与 .ts 模块文件，实际：${JSON.stringify(pkg.files)}`,
   );
   assert.deepEqual(pkg.dsh, { bundle: { patch: './cordis.patch.yml' } }, 'dsh 识别插件的凭据（plugin-assets §1.2）');
+});
+
+test('demo 包发布形态零构建：无 build/prepack/prepare 脚本（spec 20261115-f650 .ts 化契约）', async () => {
+  const pkg = await readPluginJson('package.json');
+  const buildScripts = Object.keys(pkg.scripts ?? {}).filter((key) =>
+    /^(build|prepack|prepare|postpack)$/.test(key),
+  );
+  assert.deepEqual(
+    buildScripts,
+    [],
+    `插件包须保持零构建形态（打包即源码直发），实际带编译类脚本：${JSON.stringify(buildScripts)}`,
+  );
 });
 
 test('demo 包 engines：node 基线 >=24.9.0，dsh 兼容范围覆盖官方当前运行时 0.2.2-rc.1', async () => {
@@ -70,7 +83,7 @@ test('cordis.patch.yml 为官方顶层数组形态且以包名引用自己（tic
 });
 
 test('插件模块真实可加载：导出 name=包名 与 apply(ctx)，apply 打含插件名的加载日志', async () => {
-  const mod = await import(new URL('index.js', PLUGIN_DIR).href);
+  const mod = await import(new URL('index.ts', PLUGIN_DIR).href);
   assert.equal(mod.name, PLUGIN_NAME, 'name 取包名字符串（plugin-assets §1.3）');
   assert.equal(typeof mod.apply, 'function');
   const logs: unknown[] = [];
