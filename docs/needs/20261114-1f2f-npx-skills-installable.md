@@ -1,8 +1,9 @@
 ---
 id: 20261114-1f2f
-status: confirmed
+status: fulfilled
 created: 2026-11-14
 confirmed: 2026-11-15
+fulfilled: 2026-11-15
 ---
 # @hankghchen/infra：一条命令把套件资产安装进目标项目（技能为第一类资产）
 
