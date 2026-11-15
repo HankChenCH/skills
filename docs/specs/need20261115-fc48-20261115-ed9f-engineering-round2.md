@@ -1,10 +1,11 @@
 ---
 id: 20261115-ed9f
-status: approved
+status: done
 need: 20261115-fc48
 round: 2
 created: 2026-11-15
 approved: 2026-11-15
+done: 2026-11-16
 ---
 # 仓库工程化升级 round 2：agents/ 迁移落地 + pnpm workspace + commander 15 + 插件包预编译回退
 
@@ -64,7 +65,7 @@ round 1（spec 20261115-f650，done）把全部不确定性消掉了，留下四
 - [FR-5 | 工单级] Given 全部主线合回后，When 跑全量测试与全部 e2e，Then 全绿（150+ 例）且对外安装行为断言（菜单条目、安装落盘、插件转发、版本拦截）与迁移前一致。
 - [FR-7 | 工单级] Given 插件包预编译改造，When 本地 `pnpm pack` 出 tarball，Then tarball 载 .js 形态（main 指 .js、files 含编译产物与 cordis.patch.yml、无 .ts 源码）；仓库源码态保持 .ts 且编译产物不入库。
 - [FR-7 | 工单级] Given bundle 校验器，When 分别校验源码态与发布态 fixture，Then 双态口径各自通过/拒绝行为正确（缺要素两态均拒并列缺陷）。
-- [FR-7 | 集成级 | 承载票 NNNN] Given node ≥24、registry 可达、临时 DSH_HOME，When 预编译形态插件包经官方命令装进测试 profile 且真实启动，Then 插件 apply 日志可见（FR-7 证伪闭环：回退方案落地后宿主可加载）。
+- [FR-7 | 集成级 | 承载票 20261115-cf39] Given node ≥24、registry 可达、临时 DSH_HOME，When 预编译形态插件包经官方命令装进测试 profile 且真实启动，Then 插件 apply 日志可见（FR-7 证伪闭环：回退方案落地后宿主可加载）。
 - [FR-5 | 工单级]（残余 #5）Given plugin-install.test.ts:151 断言债，When 修复后跑该测试，Then 断言匹配插件落盘版本（构造版本不一致场景断言变红、一致场景变绿）。〔独立小票〕
 - [FR-4 | 工单级]（残余 #1）Given pnpm 形态，When 发布流程演练（pack + verify:pack + dry-run），Then pnpm-lock.yaml 在 git 中无变更（pack 换载回写不弄脏 lockfile，或缓解措施生效并留痕）。
 - [FR-3 | 工单级]（round 1 交付维持）Given 本轮全部主线合回后，When 检视仓库，Then 全仓 .ts 形态无回归（无 .js 源残留、`tsc --noEmit` 零错误、erasable 约束保持）——迁移与 commander 改造不引入形态回退。

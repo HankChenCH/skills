@@ -11,6 +11,7 @@
 - [bash-multibyte-bracing.md](docs/standards/bash-multibyte-bracing.md) —— bash 3.2 变量展开紧邻多字节字符必须 `${VAR}` 花括号；日志禁 `head -c` 截 UTF-8。
 - [stub-fidelity-integration.md](docs/standards/stub-fidelity-integration.md) —— 替身保真缺口与集成级拦截纪律：被真实协作者校验/解析/发布的交付物不得只靠注入替身测试背书；替身测试钉替身契约、真实链路断言钉工件级语义。
 - [node-test-skip-gate.md](docs/standards/node-test-skip-gate.md) —— node:test 前置门跳过纪律：t.skip 只标注不截断，环境门须返回 boolean + 测试体内联 return，禁把 skip 封在不截断的 helper 里。
+- [falsified-form-gate.md](docs/standards/falsified-form-gate.md) —— 证伪形态常驻门：被真实协作者证伪的发布形态固化为发布门常驻拒绝 fixture（skip 是本轮不跑、门是永不放行）；双态资产校验判定单点。
 
 ## 兜底基线
 
