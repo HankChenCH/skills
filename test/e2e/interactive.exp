@@ -1,0 +1,32 @@
+#!/usr/bin/expect -f
+# 交互端到端 runner：在真实 PTY 中 spawn CLI，按 KEYS 参数逐键注入（每键 0.4s 渲染间隔）。
+# 用法：expect interactive.exp <node 绝对路径> <bin 绝对路径> <项目目录> <KEYS>
+# KEYS 形如 "DOWN,SPACE,DOWN,SPACE,ENTER"；超时 60s 杀进程并以 124 退出，正常透传 CLI 退出码。
+# spawn 后须给 PTY 设窗口尺寸：缺省 0 行 0 列会让 clack 把菜单折行成单字一行。
+
+set timeout 60
+set node_bin [lindex $argv 0]
+set bin [lindex $argv 1]
+set cwd [lindex $argv 2]
+set keys [lindex $argv 3]
+
+cd $cwd
+spawn $node_bin $bin
+exec stty rows 40 cols 120 < $spawn_out(slave,name)
+
+foreach k [split $keys ","] {
+    sleep 0.4
+    switch -- $k {
+        DOWN  { send "\x1b\[B" }
+        SPACE { send " " }
+        ENTER { send "\r" }
+        default { puts stderr "unknown key token: $k"; exit 125 }
+    }
+}
+
+expect {
+    eof {}
+    timeout { exec kill -9 [exp_pid]; exit 124 }
+}
+foreach {pid spawnid os_error_flag code} [wait] break
+exit $code

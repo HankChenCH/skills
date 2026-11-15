@@ -20,6 +20,13 @@ import { LOCKFILE_NAME } from '../src/lockfile.js';
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageVersion = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;
 
+// 提前进入 raw 模式：clack 只认裸 \r 的 return 键名；若终端仍处规范模式（如 PTY 合成按键、
+// 部分远端终端），\r 会被 ICRNL 翻成 \n（键名 enter）而永远无法提交。TTY 上先开 raw 保证
+// 回车语义一致；clack 自身的 raw 开关在非 tty.ReadStream 的 stdin 上会静默跳过。
+if (process.stdin.isTTY) {
+  process.stdin.setRawMode(true);
+}
+
 async function interactiveSelect() {
   clack.intro(`@hankghchen/infra v${packageVersion} · 套件资产初始化`);
 
