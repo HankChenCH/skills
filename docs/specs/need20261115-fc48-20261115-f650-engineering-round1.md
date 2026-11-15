@@ -1,10 +1,11 @@
 ---
 id: 20261115-f650
-status: approved
+status: done
 need: 20261115-fc48
 round: 1
 created: 2026-11-15
 approved: 2026-11-15
+done: 2026-11-15
 ---
 # 仓库工程化升级 round 1：三条调研 + 全仓 TypeScript（无构建直跑）+ 最小 CI + 布局规范定稿
 

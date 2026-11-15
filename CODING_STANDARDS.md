@@ -10,6 +10,7 @@
 - [skill-reference-mounting.md](docs/standards/skill-reference-mounting.md) —— 参考技能挂载双落点纪律：description 发现面 + 正文装载行执行面，蓝图 §7.2 矩阵同批登记。
 - [bash-multibyte-bracing.md](docs/standards/bash-multibyte-bracing.md) —— bash 3.2 变量展开紧邻多字节字符必须 `${VAR}` 花括号；日志禁 `head -c` 截 UTF-8。
 - [stub-fidelity-integration.md](docs/standards/stub-fidelity-integration.md) —— 替身保真缺口与集成级拦截纪律：被真实协作者校验/解析/发布的交付物不得只靠注入替身测试背书；替身测试钉替身契约、真实链路断言钉工件级语义。
+- [node-test-skip-gate.md](docs/standards/node-test-skip-gate.md) —— node:test 前置门跳过纪律：t.skip 只标注不截断，环境门须返回 boolean + 测试体内联 return，禁把 skip 封在不截断的 helper 里。
 
 ## 兜底基线
 

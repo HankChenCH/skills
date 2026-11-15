@@ -62,10 +62,22 @@ confirmed: 2026-11-15
 
 ## 假设与风险
 
-- **A1（风险）dsh 宿主端到端加载 .ts 插件**：读码证据=插件加载链走原生 ESM（@deepseek-ai/cordis-plugin-loader 1.1.0，createRequire + internal esm loader + import.meta.resolve，2026-11-15 内联查证），node ≥24.9 下 import .ts 即走默认类型剥离（本机局部实测通过）；但端到端（真启动加载）未实测。处置：拍板升格为本轮实测义务（FR-7、D7），残余仅证伪后回退成本（发布前编译，机械）。不确定度：低。
-- **A2（风险）pnpm workspace × npx 双包发布交互**：pnpm pack 对 files 白名单的遵循有先验（与 npm pack 高度一致），但 workspace 根打包、`workspace:*` 协议、lockfile 迁移、verify:pack 适配是真未知。代价：发布纪律改版走样则双包顺序对账失效。不确定度：中 → 交 RQ2 系统调研（FR-6），不靠猜。
-- **A3（假设）GitHub Actions runner 的 node 24 可用性**：官方 runner images 持续跟进主流 node 大版本。过滤闸判定：5 分钟可查证但属 CI 实操细节，查证收益不抵 spec 期直接实测兜底，故留假设。不确定度：低。
-- **A4（风险）CLI 库引入的 npx 冷启动增重**：安装器经 `npx @hankchen/infra` 裸跑，新依赖的体积直接进使用者冷启动体感（现状仅 @clack/prompts 一个依赖）。代价：选重了则每个使用者每次 npx 都变慢。处置：RQ3 把包体积列为硬维度（异常流 D 一票否决线）。不确定度：低（机械可测）。
+- **A1（风险）dsh 宿主端到端加载 .ts 插件**：读码证据=插件加载链走原生 ESM（@deepseek-ai/cordis-plugin-loader 1.1.0，createRequire + internal esm loader + import.meta.resolve，2026-11-15 内联查证），node ≥24.9 下 import .ts 即走默认类型剥离（本机局部实测通过）；但端到端（真启动加载）未实测。处置：拍板升格为本轮实测义务（FR-7、D7），残余仅证伪后回退成本（发布前编译，机械）。- **20261115-f650 round 1 验证结果：证伪（按预案合规处置）**——FR-7 端到端实测宿主拒载 node_modules 下 .ts（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING，失败点定位 node:internal stripTypeScriptModuleTypes 按物理路径拒载；dsh 加载链只改 resolve 路由不涉转译）；控制组 .js 预编译包同链真跑加载成功（回退方案预验证通过）。证伪报告 docs/research/dsh-ts-loading/fr7-dsh-ts-loading-falsification.md。残余：插件包当前仍零构建形态（main 直指 index.ts），回退落位（发布前 tsc 预编译）是 round 2 决策项。原不确定度：低。
+- **A2（风险）pnpm workspace × npx 双包发布交互**：pnpm pack 对 files 白名单的遵循有先验（与 npm pack 高度一致），但 workspace 根打包、`workspace:*` 协议、lockfile 迁移、verify:pack 适配是真未知。代价：发布纪律改版走样则双包顺序对账失效。- **20261115-f650 round 1 验证结果：验证通过（round 1 口径）**——RQ2 报告四问全答 + 落地方案四件 + 陷阱 12 条逐条缓解（docs/research/pnpm-workspace/，pnpm 12.15.0 内联实测 E1–E4）；本轮未实际迁移，实际迁移的残余不确定度折 round 2 执行票。原不确定度：中 → 交 RQ2 系统调研（FR-6），不靠猜。
+- **A3（假设）GitHub Actions runner 的 node 24 可用性**：官方 runner images 持续跟进主流 node 大版本。过滤闸判定：5 分钟可查证但属 CI 实操细节，查证收益不抵 spec 期直接实测兜底，故留假设。不确定度：低。**20261115-f650 round 1 验证结果：本轮未触发**——workflow 已落（node-version-file 读 .nvmrc=24.22.1，取版不可用则 setup 步骤原生显式失败）；真实 runner 观测留维护者在 Actions 页执行（FR-2 集成级人工段）。
+- **A4（风险）CLI 库引入的 npx 冷启动增重**：安装器经 `npx @hankchen/infra` 裸跑，新依赖的体积直接进使用者冷启动体感（现状仅 @clack/prompts 一个依赖）。代价：选重了则每个使用者每次 npx 都变慢。处置：RQ3 把包体积列为硬维度（异常流 D 一票否决线）。- **20261115-f650 round 1 验证结果：验证通过（round 1 口径）**——RQ3 实测五维对比：commander 676 KB（否决线 56%）冷启动中位 2.30 s 低于现行包 3.60 s；yargs 三重超线显式否决（docs/research/cli-lib/，evidence/ 16 案例等价探针矩阵逐字节一致）；本轮未引入依赖，引入动作折 round 2。原不确定度：低（机械可测）。
+
+### 20261115-f650 round 1 折回（验收 20261115-1457 passed 后蒸馏）
+
+残余风险（逐条）：
+1. package-lock.json 提交态 bin 字段为发布换载形态（bin/infra.js）与 package.json 仓库形态（bin/infra.ts）不同步——npm install 自动同步不碍使用；round 2 pnpm 迁移票核对同构问题（pack 换载回写是否弄脏 pnpm-lock.yaml）。
+2. agents-layout.md §4.4「本分支尚无 .github/ 目录」被后合入的 CI 票时序过期——round 2 迁移票顺手修正。
+3. 工票 20261115-7784 验收 checkbox 未勾登记（落库链完整，形式不一致）——可补登记。
+4. FR-2 集成级人工段（Actions 页观测）待维护者合并后执行。
+5. 基线既有测试债：test/e2e/plugin-install.test.ts:151 断言实匹配根包版本而非插件落盘版本（保护意图可静默失效）——独立小票修复，未进 round 1。
+6. FR-7 回退未落位：插件包仍零构建形态，宿主实测拒载 node_modules 下 .ts——round 2 决策落位（证伪报告与回退方案已成文）。
+
+下一轮建议（默认建议：开 round 2，范围 = 分轮拍板既定主线 + 上述残余折回项）：布局规范落地迁移（agents/ 建立 + 引用面迁移 + §4.4 修正）+ pnpm 迁移（RQ2 方案为准）+ CLI 库引入（RQ3 方案为准）+ FR-7 回退落位（插件包预编译）；无公开扩展机制文档宿主（Codemaker/Jazz/Terramind/Tinycloud）接入前单独补调研。
 
 ## 范围与非目标
 

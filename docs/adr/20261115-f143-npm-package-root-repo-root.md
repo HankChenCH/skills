@@ -10,7 +10,7 @@ spec 20261115-8975 实现票 20261115-975c 的架构决策蒸馏。npm 包 `@han
 ## 裁决
 
 1. **package.json 置于仓库根**（包根 = 仓库根）：`files: ["bin", "src", "skills"]` 直接引用仓库现状目录，零拷贝零双份——`npm pack` 产物中的技能即 `skills/` 原文件，发布对账（`scripts/verify-pack.mjs`：包内技能清单 = 仓库 skills/ 清单，不等即退出码 1）结构性成立，非靠流程纪律维持。
-2. **零构建直跑**：无编译步骤，`bin` 直指 `bin/infra.js`；Node ≥ 20.12.0（与依赖链 @clack/prompts 1.9.0 engines 对齐——评审 20261115-438f 阻断修正确立，声明须与依赖链事实一致）。
+2. **零构建直跑**：无编译步骤，`bin` 直指 `bin/infra.js`；Node ≥ 20.12.0（与依赖链 @clack/prompts 1.9.0 engines 对齐——评审 20261115-438f 阻断修正确立，声明须与依赖链事实一致）。〔20261115-f650 修订：本裁决的**发布面语义**收窄——node 拒剥 node_modules 下 .ts（结构性约束，实测），仓库内直跑 .ts 保持、打包清单 bin 经 prepack 显式换载指向编译产物，见 docs/adr/20261115-f650-ts-repo-zero-build-publish-precompile.md；本册裁决 1/3 不受影响、整册不被取代。〕
 3. **发布纪律**：升版本号 → `npm pack` → `verify:pack` 对账 → `npm publish --access public` → annotated tag `v<版本>`（dev-release 衔接）；semver 判据 = patch 内容修订 / minor 新增技能 / major 移除更名技能或安装目标软链规则变更（票 20261115-975c Progress 定稿）。
 
 ## 后果
