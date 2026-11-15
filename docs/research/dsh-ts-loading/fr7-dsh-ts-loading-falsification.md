@@ -27,7 +27,7 @@ ticket: 20261115-13c4
 
 **启动段（拒载，stderr 原文）**：
 
-```
+```text
 dsh: warning: 1 entry did not activate
 dsh-demo-load-log (@hankchen/dsh-demo): failed to import: Error [ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING]: Stripping types is currently unsupported for files under node_modules, for "file:///private/tmp/.../profiles/<测试profile>/node_modules/@hankchen/dsh-demo/index.ts"
     at stripTypeScriptModuleTypes (node:internal/modules/typescript:189:11)
@@ -69,4 +69,4 @@ dsh-demo-load-log (@hankchen/dsh-demo): failed to import: Error [ERR_UNSUPPORTED
 
 ## 对测试的影响（两态互斥的测试编码）
 
-承载测试 `test/e2e/dsh-ts-loading.test.ts` 将本报告结论编码为两态互斥：真跑段观察到 `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` 签名 → **显式跳过并报因**（注明证伪态、引用本报告路径、附证据行——沿仓库既有纪律：环境/契约既定事实显式跳过，不假绿不弱断言）；观察到 apply 日志（仪器捕获行）→ 成功态断言通过（若未来 node/dsh 放开则测试自动转绿）。控制组测试（预编译 .js 形态全链路绿）同文件常驻——它同时是仪器有效性的回归与回退方案的常驻预验证，此测试**不**跳过，失败即真失败。
+承载测试 `test/e2e/dsh-ts-loading.test.ts` 将本报告结论编码为两态互斥：真跑段观察到 `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` 签名 → **显式跳过并报因**（注明证伪态、引用本报告路径、附证据行——沿仓库既有纪律：环境/契约既定事实显式跳过，不假绿不弱断言）；观察到 apply 日志（仪器捕获行）→ 成功态断言通过（若未来 node/dsh 放开则测试自动转绿）。控制组测试（预编译 .js 形态全链路绿）同文件常驻——它同时是仪器有效性的回归与回退方案的常驻预验证，此测试不因证伪态跳过（前置门不满足仍按纪律显式跳过），结果态失败即真失败。

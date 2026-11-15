@@ -13,7 +13,8 @@
 // warn/error），成功态的 apply 日志须经 --patch overlay 挂测试自有仪器（注册
 // ctx.logger.exporter 并转储 ctx.logger.buffer）方可观测。仪器是测试资产，随临时目录
 // 生成销毁，不触仓库源。控制组测试用预编译 .js 形态（回退预案形态）走同一官方链路，
-// 常驻不跳过——它同时验证仪器有效性与回退方案通路，失败即真失败。
+// 不因证伪态跳过（前置门不满足仍按纪律显式跳过）——它同时验证仪器有效性与回退方案通路，
+// 结果态失败即真失败。
 //
 // 前置门（沿 spec 20261115-495e 集成级先例）：node ≥24.9 / registry 可达 / pnpm 可用
 // （官方 dsh plugin 命令转发 pnpm 执行）/ 官方 dsh 版本满足插件 engines——不满足显式
@@ -172,12 +173,15 @@ function satisfiesEngineFloor(version: string, range: string): boolean {
   return comparePre(actual.pre, floor.pre) >= 0;
 }
 
-function assertGate(t: TestContext, profile: string): void {
+// 返回 false = 门未过已 t.skip（调用方须立即 return，勿再执行测试体）——node:test 的
+// t.skip 只标注最终状态不停止执行，skip 后继续跑会白耗网络/时钟并把矛盾喷进报告
+//（评审修复：前置门 skip 截断语义）。硬断言（执行体确定性/版本对账）照常抛错失败。
+function assertGate(t: TestContext, profile: string): boolean {
   try {
     assertPluginPreconditions({ nodeVersion: process.version, profile });
   } catch (err) {
     t.skip(`前置门（环境问题，非回归）：${err.message}`);
-    return;
+    return false;
   }
   assert.equal(
     commandExists('dsh', { pathEnv: integrationPath() }),
@@ -187,12 +191,12 @@ function assertGate(t: TestContext, profile: string): void {
   const registry = probeOfficialDshVersion();
   if ('skipReason' in registry) {
     t.skip(registry.skipReason);
-    return;
+    return false;
   }
   const pnpm = probePnpm();
   if (pnpm.skipReason) {
     t.skip(pnpm.skipReason);
-    return;
+    return false;
   }
   const floor = DEMO_PKG.engines?.dsh;
   assert.equal(typeof floor, 'string', '仓库插件包清单应声明 engines.dsh 下限');
@@ -200,6 +204,7 @@ function assertGate(t: TestContext, profile: string): void {
     satisfiesEngineFloor(registry.version, floor as string),
     `官方 dsh 版本（${registry.version}）低于插件 engines.dsh 下限（${floor}）——实测对象漂移，需对齐后再跑集成`,
   );
+  return true;
 }
 
 // —— apply 日志观测仪器（cordis logger 默认只进环形缓冲，不落控制台）——
@@ -274,6 +279,10 @@ function bootAndWatch(t: TestContext, { profile, dshHome, projectRoot }: { profi
   const collect = (chunk: Buffer | string) => {
     output += chunk;
   };
+  // 显式 utf8 解码：多字节签名（「插件已加载：」等）跨块截断时默认 Buffer 拼接会产生
+  // U+FFFD 烂码，签名匹配罕见假红（评审修复）
+  child.stdout?.setEncoding('utf8');
+  child.stderr?.setEncoding('utf8');
   child.stdout?.on('data', collect);
   child.stderr?.on('data', collect);
   const classify = (): BootOutcome['kind'] | undefined => {
@@ -332,7 +341,8 @@ function installViaOfficialCommand(t: TestContext, { tarball, profile, dshHome, 
   expectMain: string;
 }): void {
   const install = runNpxDsh(['plugin', '--profile', profile, 'add', tarball], { dshHome, cwd: projectRoot, timeout: INSTALL_TIMEOUT_MS });
-  assert.equal(install.code, 0, `官方命令安装应成功（${failDetail(install)}）`);
+  // failDetail 读 status 字段而 RunResult 记 code——调用处对齐，避免失败消息恒显「退出码 null」
+  assert.equal(install.code, 0, `官方命令安装应成功（${failDetail({ ...install, status: install.code })}）`);
   // 实装形态对账：装入 profile 的必须是指定的形态（.ts 直发 / .js 预编译），而非 registry 旧版
   const manifest: { main?: string } = JSON.parse(
     fs.readFileSync(path.join(dshHome, 'profiles', profile, 'node_modules', ...PKG.split('/'), 'package.json'), 'utf8'),
@@ -348,7 +358,7 @@ function installViaOfficialCommand(t: TestContext, { tarball, profile, dshHome, 
 const FALSIFICATION_REPORT = 'docs/research/dsh-ts-loading/fr7-dsh-ts-loading-falsification.md';
 
 test(`[FR-7|集成级] ${PKG} .ts 零构建形态经官方命令安装并真实启动 profile：插件 apply 日志可见（宿主加载 .ts）`, async (t) => {
-  assertGate(t, PROFILE_TS);
+  if (!assertGate(t, PROFILE_TS)) return;
   const projectRoot = makeTempDir(t, 'dsh-ts-e2e-proj-');
   const dshHome = makeTempDir(t, 'dsh-ts-e2e-home-');
   const packDir = makeTempDir(t, 'dsh-ts-e2e-pack-');
@@ -389,7 +399,7 @@ test(`[FR-7|集成级] ${PKG} .ts 零构建形态经官方命令安装并真实�
 });
 
 test(`[FR-7|控制组] ${PKG} 预编译 .js 形态（回退预案形态）经同一官方链路：插件 apply 日志可见`, async (t) => {
-  assertGate(t, PROFILE_JS);
+  if (!assertGate(t, PROFILE_JS)) return;
   const projectRoot = makeTempDir(t, 'dsh-js-e2e-proj-');
   const dshHome = makeTempDir(t, 'dsh-js-e2e-home-');
   const packDir = makeTempDir(t, 'dsh-js-e2e-pack-');
@@ -434,7 +444,8 @@ test(`[FR-7|控制组] ${PKG} 预编译 .js 形态（回退预案形态）经同
   assert.equal(pack.status, 0, `npm pack 应成功（${failDetail(pack)}）`);
   const tarball = resolvePackedTarball(packDir, pack.stdout ?? '');
 
-  // 安装 + 启动段：同一官方链路，控制组必须绿（仪器有效性 + 回退方案通路的常驻回归）——本测试不因结果跳过
+  // 安装 + 启动段：同一官方链路，控制组必须绿（仪器有效性 + 回退方案通路的常驻回归）
+  // ——本测试不因证伪态跳过（前置门不满足仍按纪律显式跳过）
   installViaOfficialCommand(t, { tarball, profile: PROFILE_JS, dshHome, projectRoot, expectMain: 'index.js' });
   const outcome = await bootAndWatch(t, { profile: PROFILE_JS, dshHome, projectRoot });
   assert.equal(outcome.kind, 'loaded', `控制组：预编译 .js 形态应加载成功且 apply 日志可见（实际 ${outcome.kind}）。输出：${outcome.output}`);
