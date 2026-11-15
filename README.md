@@ -219,17 +219,19 @@ npx @hankchen/infra --plugins @hankchen/dsh-demo --plugins <另一包> --profile
 
 ## 维护者：发布流程
 
-npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。发布三步，顺序固定：
+npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。包管理器为 pnpm（`pnpm-workspace.yaml` 声明 workspace、`packageManager` 字段钉版）。发布三步，顺序固定：
 
-1. **对账**：`npm pack` 产出 tarball 后跑对账校验——包内技能清单必须等于仓库 `skills/` 清单，不等即拒绝发布（退出码 1）：
+1. **对账**：`pnpm pack` 产出 tarball 后跑对账校验——包内技能清单必须等于仓库 `skills/` 清单、包内插件清单等于仓库 `agents/*/plugins/` 清单且禁含 `node_modules` 条目，任一不满足即拒绝发布（退出码 1）：
 
    ```bash
-   npm pack
-   npm run verify:pack -- hankchen-infra-<版本>.tgz
+   pnpm pack
+   pnpm run verify:pack hankchen-infra-<版本>.tgz
    ```
 
+   （传参不带 `--`：pnpm 12 起 `pnpm run` 原样转发 `--`，与 npm 不同。）
+
 2. **升版本号**：改 `package.json` 的 `version`。semver 判据——patch：既有技能内容修订；minor：新增技能；major：移除或更名技能、安装目标或软链规则变更（后两类会改变既有项目的落盘形态）。
-3. **发布**：`npm publish`。发布是单向门，操作以 annotated git tag（`v<版本>`）留痕；完整检查单、CHANGELOG 纪律与「tag 与推送必须问人」的边界见 `/dev-release`。
+3. **发布**：`pnpm publish --access public`。pnpm publish 自带两道 git 门——工作树不干净（`ERR_PNPM_GIT_UNCLEAN`）或不在 `master`/`main` 分支（`ERR_PNPM_GIT_NOT_CORRECT_BRANCH`）都会被拒；插件包发布同门，双包顺序与对账三查见[插件资产规范](./docs/plugin-assets.md) §1.4。发布是单向门，操作以 annotated git tag（`v<版本>`）留痕；完整检查单、CHANGELOG 纪律与「tag 与推送必须问人」的边界见 `/dev-release`。
 
 ## 文档
 

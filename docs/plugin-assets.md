@@ -36,16 +36,36 @@
 - 插件模块导出 `name`（取包名字符串）与 `apply(ctx)`；demo 的 apply 只打一条含插件名的加载日志（真实功能设计是后续轮的事，need 非目标 1）。
 - `cordis.patch.yml` 随包携带，**以包名引用自己**（patch 声明作用于 `@hankchen/dsh-demo` 自己）；具体行结构以 `agents/dsh/plugins/dsh-demo/cordis.patch.yml` 为准，本文不重抄。
 
-### 1.4 发布纪律（双包顺序）
+### 1.4 发布纪律（双包顺序，pnpm 形态）
 
-发布沿既有流程（对账 → 升版本 → publish → annotated tag，ADR 20261115-f143 与 README 维护者节），插件引入一条硬顺序与两道机械对账：
+发布沿既有流程（对账 → 升版本 → publish → annotated tag，ADR 20261115-f143 与 README 维护者节），包管理器为 pnpm（spec 20261115-ed9f FR-4 迁移，RQ2 落地方案为准），插件引入一条硬顺序与机械对账三查。
 
-**双包发布顺序 = 先插件包，后初始化器。** 初始化器的菜单条目与安装转发都以 registry 包名为准——先发初始化器、插件包未上 registry，使用者勾选即装失败。
+**pnpm publish 的两道 git 门（npm 没有的新门）**：`pnpm publish` 默认检查，任一不满足即拒绝——
 
-发布初始化器前，对账在既有技能清单核对之外扩展两查，任一不满足拒绝发布（退出码 1）：
+- **干净树**：工作树有未提交内容即拒，错误码 `ERR_PNPM_GIT_UNCLEAN`；
+- **发布分支**：当前分支须为 `master` / `main`，否则拒，错误码 `ERR_PNPM_GIT_NOT_CORRECT_BRANCH`。
+
+（两条错误码均为 RQ2 调研问①内联实测原文；确需绕过时 `--no-git-checks` 显式声明。）与 dev-release「发布前干净树」纪律同向，只是从纪律升级为机械门。
+
+**双包发布顺序 = 先插件包，后初始化器。** 初始化器的菜单条目与安装转发都以 registry 包名为准——先发初始化器、插件包未上 registry，使用者勾选即装失败。命令序列（RQ2 件 2；`--access public` 必带，scope 包默认 restricted）：
+
+```bash
+# 前提：干净树 + master/main 分支（上方两道门）
+pnpm --filter @hankchen/dsh-demo pack
+pnpm --filter @hankchen/dsh-demo publish --access public   # 先发插件包
+pnpm pack                                                  # 后发初始化器，对账先行
+pnpm run verify:pack hankchen-infra-<版本>.tgz
+pnpm publish --access public
+git tag -a v<版本> -m "v<版本>" && git push origin v<版本>
+```
+
+（`pnpm run verify:pack` 传参不带 `--`：pnpm 12 起 `pnpm run` 原样转发 `--`，与 npm 不同，本机 12.15.0 实测。）
+
+发布初始化器前，对账在既有技能清单核对之外扩展三查，任一不满足拒绝发布（退出码 1）：
 
 1. **包内 agents/*/plugins/ 清单 = 仓库 agents/*/plugins/ 清单**（与 skills 对账同法，按 `<宿主>/<插件目录名>` 复合键两侧同法构造，`scripts/verify-pack.ts` 的插件侧扩展）；
-2. **每个插件目录过 bundle 清单校验**——四要素齐备（§1.2）、`cordis.patch.yml` 引用名 = 包名、模块导出 name + apply。
+2. **包内禁 node_modules**——workspace 形态下 `pnpm install` 在成员目录生成的依赖目录若被 files 白名单卷入包，装出去即悬空链接/异机路径的结构性坏包；对账逐条列出即拒绝（RQ2 报告异常流 A #3 / 问④ f）；
+3. **每个插件目录过 bundle 清单校验**——四要素齐备（§1.2）、`cordis.patch.yml` 引用名 = 包名、模块导出 name + apply。
 
 技能侧既有对账行为不变。
 
@@ -104,5 +124,5 @@ dsh plugin --profile <名> add <包>
 
 1. `agents/<宿主>/plugins/<目录名>/` 建完整 npm 包：package.json 过 §1.2 四要素 + `engines.dsh` + `description`；
 2. 插件模块导出 `name` + `apply(ctx)`；`cordis.patch.yml` 以包名引用自己（照抄 `agents/dsh/plugins/dsh-demo/`）；
-3. **先发插件包**（`npm publish --access public`），**再发初始化器**（§1.4 双包顺序）；
-4. 初始化器发布对账两查过（§1.4）方可 publish。
+3. **先发插件包**（`pnpm publish --access public`，过 §1.4 两道 git 门），**再发初始化器**（§1.4 双包顺序）；
+4. 初始化器发布对账三查过（§1.4）方可 publish。
