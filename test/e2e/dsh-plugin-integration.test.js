@@ -39,10 +39,12 @@ function makeTempDir(t, prefix) {
   return dir;
 }
 
-// 集成 PATH 只含当前 node 的 bin 目录：npx 与 env node 均可解析，且确定无 dsh——
-// CLI 的执行体探测必落 npx 回退形态（官方语义），不受本机是否另装有 dsh 影响。
+// 集成 PATH = node bin 目录 + 标准系统目录（/usr/bin、/bin）：npx/env node 可解析，
+// 官方命令链内部经 sh 拉起包 bin（缺 /bin 时 npm exec 报 spawn sh ENOENT，见票 Progress 留痕），
+// 且三个目录均无 dsh（下方守卫断言把关）——CLI 的执行体探测必落 npx 回退形态（官方语义），
+// 不受本机是否另装有 dsh 影响。
 function integrationPath() {
-  return path.dirname(process.execPath);
+  return [path.dirname(process.execPath), '/usr/bin', '/bin'].join(path.delimiter);
 }
 
 // registry 探测：E404 = 待发布；其余失败 = registry/环境问题。两类原因都显式报因，
