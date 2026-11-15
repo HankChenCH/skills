@@ -148,7 +148,13 @@ test('[FR-3] dsh 在 PATH（注入 shim）：--plugins --profile 免交互安装
   });
   assert.equal(code, 0, `安装应成功退出：${stderr}`);
   assert.match(stdout, new RegExp(PKG.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '摘要应含插件包名');
-  assert.match(stdout, /0\.1\.0/, '摘要应记实际落盘版本');
+  assert.match(
+    stdout,
+    new RegExp(
+      `已安装插件 ${PKG.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}@${PLUGIN_VERSION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} → dsh profile dev`,
+    ),
+    '摘要应记插件落盘版本',
+  );
 
   // 执行体收到的命令形态（组装断言在进程边界）
   assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'dev', 'add', PKG]]);
