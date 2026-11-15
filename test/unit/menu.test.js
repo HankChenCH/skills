@@ -78,3 +78,60 @@ test('--help 文本列明全部旗标与示例', () => {
     assert.ok(help.includes(needle), `帮助文本应含 ${needle}`);
   }
 });
+
+// ---------- 插件旗标解析（spec 20261115-495e 实现决策「非交互旗标」） ----------
+
+test('--plugins 逗号分隔列表 = 插件安装模式，缺 --profile 时为 null', () => {
+  assert.deepEqual(parseArgs(['--plugins', '@hankchen/dsh-demo']), {
+    mode: 'plugins',
+    plugins: ['@hankchen/dsh-demo'],
+    profile: null,
+  });
+});
+
+test('--plugins 可重复出现取并集且保序去重（与 --skills 同构）', () => {
+  const parsed = parseArgs(['--plugins', '@a/one,@a/two', '--plugins', '@a/two,@a/three']);
+  assert.deepEqual(parsed.plugins, ['@a/one', '@a/two', '@a/three']);
+});
+
+test('--plugins 与 --profile 配对：profile 记录在解析结果', () => {
+  const parsed = parseArgs(['--plugins', '@hankchen/dsh-demo', '--profile', 'dev']);
+  assert.deepEqual(parsed, { mode: 'plugins', plugins: ['@hankchen/dsh-demo'], profile: 'dev' });
+});
+
+test('--profile 先于 --plugins 出现同样配对成功（顺序无关）', () => {
+  const parsed = parseArgs(['--profile', 'dev', '--plugins', '@hankchen/dsh-demo']);
+  assert.deepEqual(parsed, { mode: 'plugins', plugins: ['@hankchen/dsh-demo'], profile: 'dev' });
+});
+
+test('--plugins 空值显式报错', () => {
+  assert.throws(() => parseArgs(['--plugins', '']), /--plugins/);
+});
+
+test('--profile 空值显式报错', () => {
+  assert.throws(() => parseArgs(['--plugins', '@a/one', '--profile', '']), /--profile/);
+});
+
+test('--profile 单独出现（无 --plugins）显式报错：两旗标配对使用', () => {
+  assert.throws(() => parseArgs(['--profile', 'dev']), /配对/);
+});
+
+test('--plugins 与 --all 同用显式报错（互斥；--all 语义维持技能全部条目）', () => {
+  assert.throws(() => parseArgs(['--plugins', '@a/one', '--all']), /互斥/);
+  assert.throws(() => parseArgs(['--all', '--plugins', '@a/one']), /互斥/);
+});
+
+test('--plugins 与 --skills 同用显式报错（互斥）', () => {
+  assert.throws(() => parseArgs(['--plugins', '@a/one', '--skills', 'dev-spec']), /互斥/);
+});
+
+test('--profile 与 --all 同用显式报错（--profile 只与 --plugins 配对）', () => {
+  assert.throws(() => parseArgs(['--all', '--profile', 'dev']), /配对/);
+});
+
+test('--help 文本列 --plugins/--profile 两旗标与插件安装示例', () => {
+  const help = renderHelp();
+  for (const needle of ['--plugins', '--profile', '--plugins @hankchen/dsh-demo --profile']) {
+    assert.ok(help.includes(needle), `帮助文本应含 ${needle}`);
+  }
+});
