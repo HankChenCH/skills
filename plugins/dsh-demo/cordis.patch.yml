@@ -1,0 +1,6 @@
+# cordis 补丁清单：随包携带，以包名引用自己——patch 声明作用于 @hankchen/dsh-demo 自己（need 20261115-339e F1）。
+# insert 行 id 本包自定为 dsh-demo-load-log（spec 20261115-495e：insert 行 id 归 design 定稿）。
+packages:
+  '@hankchen/dsh-demo':
+    - insert:
+        id: dsh-demo-load-log
