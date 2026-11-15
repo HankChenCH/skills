@@ -1,6 +1,7 @@
 // demo 插件包（plugins/dsh-demo/）的外部可观察面，期望值逐条来自 spec 20261115-495e
-// 实现决策与 docs/plugin-assets.md §1.2–§1.3、need 20261115-339e F1/F3/F4：
-// 包形态四要素、engines 声明、patch 清单以包名引用自己、模块真实可加载并打加载日志。
+// 实现决策与 docs/plugin-assets.md §1.2–§1.3、need 20261115-339e F1/F3/F4、
+// fix 票 20261115-f158（patch 清单官方顶层数组形态取证 + 版本 0.1.1）：
+// 包形态四要素、engines 声明、patch 清单官方形态且以包名引用自己、模块真实可加载并打加载日志。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,10 +18,10 @@ async function readPluginJson(name) {
   return JSON.parse(await readPluginFile(name));
 }
 
-test('demo 包名与首发版本按 spec：@hankchen/dsh-demo 0.1.0', async () => {
+test('demo 包名与版本：@hankchen/dsh-demo 0.1.1（0.1.0 已发布且含坏清单，npm 同版本不可重发）', async () => {
   const pkg = await readPluginJson('package.json');
   assert.equal(pkg.name, PLUGIN_NAME);
-  assert.equal(pkg.version, '0.1.0');
+  assert.equal(pkg.version, '0.1.1');
 });
 
 test('demo 包四要素齐备：type module、main 直指模块、files 含清单与模块、dsh.bundle.patch', async () => {
@@ -55,9 +56,17 @@ test('demo 包 engines：node 基线 >=24.9.0，dsh 兼容范围覆盖官方当�
   );
 });
 
-test('cordis.patch.yml 以包名引用自己（need F1）', async () => {
+test('cordis.patch.yml 为官方顶层数组形态且以包名引用自己（ticket 20261115-f158 取证）', async () => {
+  // 官方 loader 只加载顶层数组（dsh 0.2.2-rc.1：must be a top-level YAML array of
+  // loader patch entries）；insert 元素 = EntryOptions，须 id + name，name = 包名。
   const patch = await readPluginFile('cordis.patch.yml');
-  assert.match(patch, /['"]@hankchen\/dsh-demo['"]\s*:/m, 'patch 清单须有以包名为键的行');
+  assert.match(patch, /^- insert:/m, 'patch 清单顶层须为 YAML 数组（- insert: 开头）');
+  assert.match(patch, /id:\s*dsh-demo-load-log\b/, 'insert 元素 id 沿用 design 定稿');
+  assert.match(
+    patch,
+    /name:\s*['"]@hankchen\/dsh-demo['"]\s*$/,
+    'insert 元素 name = 包名（宿主按模块说明符解析）',
+  );
 });
 
 test('插件模块真实可加载：导出 name=包名 与 apply(ctx)，apply 打含插件名的加载日志', async () => {

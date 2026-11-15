@@ -13,10 +13,16 @@ import { fileURLToPath } from 'node:url';
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.js');
 const PKG = '@hankchen/dsh-demo';
+// 插件版本唯一来源 = 仓库插件包 package.json（shim 模拟官方安装当前包的实际版本，
+// 断言与之共用；版本升位零改动，ticket 20261115-f158：0.1.0 → 0.1.1）
+const PLUGIN_VERSION = JSON.parse(
+  fs.readFileSync(path.join(packageRoot, 'plugins', 'dsh-demo', 'package.json'), 'utf8'),
+).version;
 
 // shim 模拟官方命令（docs/plugin-assets.md §2.3 两落点语义）：记录完整 argv，
 // 解析 `plugin --profile <名> add <包>` 并写 profile 的 package.json——
-// dependencies 追加依赖行、dsh.profile.bundles 追加包名。dsh 与 npx shim 共用本实现。
+// dependencies 追加依赖行（版本 = 仓库插件包当前版本，官方装的就是包的实际版本）、
+// dsh.profile.bundles 追加包名。dsh 与 npx shim 共用本实现。
 // shebang 用测试进程的绝对 node 路径：npx 形态测试的 PATH 只有 shim 目录，env node 不可用。
 const SHIM_BODY = (nodeBin) => `#!${nodeBin}
 const fs = require('node:fs');
@@ -33,7 +39,7 @@ if (idx !== -1) {
   fs.mkdirSync(dir, { recursive: true });
   const pkgFile = path.join(dir, 'package.json');
   const pkg = fs.existsSync(pkgFile) ? JSON.parse(fs.readFileSync(pkgFile, 'utf8')) : { name: profile };
-  pkg.dependencies = { ...(pkg.dependencies || {}), [pkgName]: '0.1.0' };
+  pkg.dependencies = { ...(pkg.dependencies || {}), [pkgName]: ${JSON.stringify(PLUGIN_VERSION)} };
   pkg.dsh = { ...(pkg.dsh || {}), profile: { bundles: [...((pkg.dsh?.profile?.bundles) || []), pkgName] } };
   fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2));
 }
@@ -149,12 +155,12 @@ test('[FR-3] dsh 在 PATH（注入 shim）：--plugins --profile 免交互安装
 
   // profile 两落点齐备（shim 按官方语义写入）
   const profilePkg = JSON.parse(fs.readFileSync(path.join(dshHome, 'profiles', 'dev', 'package.json'), 'utf8'));
-  assert.equal(profilePkg.dependencies[PKG], '0.1.0');
+  assert.equal(profilePkg.dependencies[PKG], PLUGIN_VERSION);
   assert.deepEqual(profilePkg.dsh.profile.bundles, [PKG]);
 
   // 锁文件插件区记账
   const lockfile = readLockfileAt(project);
-  assert.deepEqual(lockfile.plugins[PKG], { version: '0.1.0', profile: 'dev', installedAt: lockfile.plugins[PKG].installedAt });
+  assert.deepEqual(lockfile.plugins[PKG], { version: PLUGIN_VERSION, profile: 'dev', installedAt: lockfile.plugins[PKG].installedAt });
   assert.match(lockfile.plugins[PKG].installedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
@@ -221,7 +227,7 @@ test('[FR-5] 重跑刷新：锁文件插件区无重复条目、安装时间刷�
   const second = readLockfileAt(project);
   assert.deepEqual(Object.keys(second.plugins), [PKG], '重跑不应产生重复条目');
   assert.deepEqual(second.plugins[PKG].profile, 'dev');
-  assert.deepEqual(second.plugins[PKG].version, '0.1.0');
+  assert.deepEqual(second.plugins[PKG].version, PLUGIN_VERSION);
 });
 
 test('[FR-1] 交互路径三层菜单（类型→插件→profile）与旗标路径落盘一致', async (t) => {
