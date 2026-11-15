@@ -60,6 +60,14 @@ test('dsh bundle 四要素齐备的插件包通过校验（缺陷清单为空）
   assert.deepEqual(collectBundleDefects(dir), []);
 });
 
+test('缺 type: module 即拒绝，缺陷点名该要素', async (t) => {
+  const dir = await writeValidPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => delete pkg.type);
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 1, `应只报 type 一项，实际：${JSON.stringify(defects)}`);
+  assert.match(defects[0], /type/);
+});
+
 test('缺 dsh.bundle.patch 声明即拒绝，缺陷点名该声明', async (t) => {
   const dir = await writeValidPlugin(await makeTempRoot(t));
   await rewritePackageJson(dir, (pkg) => delete pkg.dsh);

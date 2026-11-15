@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// 插件包 bundle 清单校验器（spec 20261115-495e FR-2，规范文档 docs/plugin-assets.md §1.2–§1.3）。
-// 接口窄：进插件包目录，出缺陷清单（空 = 通过）。核对 dsh 官方 bundle 形态四要素——
-//   1. package.json 声明 dsh.bundle.patch（缺它装进 profile 只作普通依赖、不进插件树，need F1）；
-//   2. files 清单含 patch 文件（npm 白名单外文件不随包分发，清单缺文件 = 装出去的包坏）；
-//   3. patch 清单以包名引用自己（patch 声明作用于插件包自己）；
-//   4. 插件模块导出 name 与 apply(ctx)（静态读源码；套件约定 ESM + 内联导出，照抄 demo 即在此形态内）。
+// 插件包 bundle 清单校验器（spec 20261115-495e FR-2，规范文档 docs/plugin-assets.md §1.2/§1.4）。
+// 接口窄：进插件包目录，出缺陷清单（空 = 通过）。核对 §1.2 清单四要素与 §1.4 两项附录——
+//   1. package.json type: "module"（要素表第 1 行：插件模块按 ESM 加载，CJS 形态宿主加载即抛错）；
+//   2. package.json 声明 dsh.bundle.patch（缺它装进 profile 只作普通依赖、不进插件树，need F1）；
+//   3. files 清单含 patch 文件（npm 白名单外文件不随包分发，清单缺文件 = 装出去的包坏）；
+//   4. patch 清单以包名引用自己（§1.4 附录一：patch 声明作用于插件包自己）；
+//   5. 插件模块导出 name 与 apply(ctx)（§1.4 附录二；main 直指模块作为定位入口随查，
+//      静态读源码，套件约定 ESM + 内联导出，照抄 demo 即在此形态内）。
 // scripts/verify-pack.mjs 的插件侧复用本实现；独立调用：
 //
 //   node scripts/verify-bundle.mjs <插件包目录>...
@@ -38,7 +40,14 @@ export function collectBundleDefects(pluginDir) {
     defects.push(`${path.basename(pluginDir)}：package.json 缺 name——patch 引用名无从对账`);
   }
 
-  // 要素 1：dsh.bundle.patch 声明。声明缺失时后续两查（files 含 patch、patch 引用名）
+  // 要素 1：type 须为 module（§1.2 要素表第 1 行）
+  if (pkg.type !== 'module') {
+    defects.push(
+      `${name ?? path.basename(pluginDir)}：package.json 缺 type: "module"——插件模块按 ESM 加载，CJS 形态宿主加载即抛错（实际：${pkg.type ?? '缺'}）`,
+    );
+  }
+
+  // 要素 2：dsh.bundle.patch 声明。声明缺失时后续两查（files 含 patch、patch 引用名）
   // 无从定位 patch 文件，随要素 1 一并缺位，不再各自造一条连带缺陷。
   const patchDeclared = pkg.dsh?.bundle?.patch;
   const patchTarget =
@@ -47,7 +56,7 @@ export function collectBundleDefects(pluginDir) {
     defects.push(`${name ?? path.basename(pluginDir)}：package.json 缺 dsh.bundle.patch 声明——没有它装进 profile 只作普通依赖、不进插件树`);
   }
 
-  // 要素 2：files 清单含 patch 文件
+  // 要素 3：files 清单含 patch 文件
   if (patchTarget) {
     const files = Array.isArray(pkg.files) ? pkg.files.map(normalizeEntry) : null;
     if (!files) {
@@ -57,7 +66,7 @@ export function collectBundleDefects(pluginDir) {
     }
   }
 
-  // 要素 3：patch 清单以包名引用自己
+  // 要素 4：patch 清单以包名引用自己
   if (patchTarget && name) {
     let patchText;
     try {
@@ -70,7 +79,7 @@ export function collectBundleDefects(pluginDir) {
     }
   }
 
-  // 要素 4：插件模块导出 name 与 apply(ctx)
+  // 要素 5：插件模块导出 name 与 apply(ctx)
   const mainEntry =
     typeof pkg.main === 'string' && pkg.main !== '' ? normalizeEntry(pkg.main) : null;
   if (!mainEntry) {
