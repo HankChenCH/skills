@@ -1,0 +1,62 @@
+# 最小 CI 回归门（spec 20261115-f650 FR-2，工票 20261115-52d5）。
+# 步骤链契约：checkout → node setup → 依赖安装（npm ci）→ tsc --noEmit（npm run typecheck）
+#   → 全量测试（npm test）→ verify:pack 对账（npm pack 出 tarball 后 reconcile）。
+# 静态契约由 test/unit/ci-workflow.test.ts 守护（seam ②）：文件本身即被测面，
+# 改本文件须同步过该测试。
+#
+# 环境缺失的显式处置（FR-2 + 异常流 B，零静默假绿）：
+#   - dsh 集成测试（test/e2e/dsh-plugin-integration.test.ts）自带前置门：node ≥24.9 与
+#     registry 探测不满足时 t.skip 并输出报因（前置门：…），呈 skip 形态不伪红不假绿。
+#   - 交互 e2e（test/e2e/install.test.ts / plugin-install.test.ts）缺 expect 时红
+#     （runInteractive 对 spawn 失败 throw，无 skip 门）——runner 镜像不保证预装 expect，
+#     故下方显式 apt 安装：装了就真跑（design 定夺，留痕于此）。
+#
+# runner 取版兜底（异常流 B）：actions/setup-node 以 node-version-file 读 .nvmrc
+#   （当前 24.22.1，与 package.json engines >=24.9.0 对齐；一致性由
+#   test/unit/node-baseline.test.ts 守护）。.nvmrc 所钉版本在 runner 上不可用时，
+#   setup-node 步骤自身显式失败并报因，后续步骤不执行——失败即红，不静默回退。
+
+name: regression-gate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  regression-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # actions/checkout v4.4.0（钉完整 commit SHA：可变 tag 不是供应链信任锚；升版改此处并同步静态核验测试）
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - name: Setup node (reads .nvmrc; unavailable version fails this step loudly)
+        # actions/setup-node v4.4.0（钉完整 commit SHA，理由同上）
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install expect for interactive e2e (missing expect would fail those tests red)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends expect
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Full test suite (dsh/interactive preconditions gate themselves, see header)
+        run: npm test
+
+      - name: Verify pack manifest (npm pack then reconcile against repo inventory)
+        # shell: bash = GitHub 端以 -eo pipefail 执行：npm pack 失败立即使本步红，
+        # 不被 `| tail` 掩码成「对账缺 tarball」的次生错误（可诊断性）。
+        shell: bash
+        run: |
+          tarball="$(npm pack --silent | tail -n 1)"
+          test -f "$tarball"
+          npm run verify:pack -- "$tarball"
