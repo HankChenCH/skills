@@ -8,11 +8,11 @@ ticket: 20261115-2b49
 
 ## 调研问题与用途
 
-round 2 pnpm 迁移票（need 20261115-fc48 FR-4）的直接输入。仓库形态由 ADR 20261115-f143 锁定：**包根 = 仓库根**（`@hankchen/infra` 的 package.json 置仓库根，`files: ["bin", "src", "skills", "plugins"]`），**双包发布**（CLI 包内嵌插件资产随包分发 + 插件包 `@hankchen/dsh-demo` 独立发布），**verify:pack 机械对账**（`scripts/verify-pack.mjs`：包内技能清单 = 仓库 skills/ 清单、包内插件清单 = 仓库 plugins/ 清单，不等即退出码 1）。本文回答四问：
+round 2 pnpm 迁移票（need 20261115-fc48 FR-4）的直接输入。仓库形态由 ADR 20261115-f143 锁定：**包根 = 仓库根**（`@hankchen/infra` 的 `package.json` 置仓库根，`files: ["bin", "src", "skills", "plugins"]`），**双包发布**（CLI 包内嵌插件资产随包分发 + 插件包 `@hankchen/dsh-demo` 独立发布），**verify:pack 机械对账**（`scripts/verify-pack.mjs`：包内技能清单 = 仓库 `skills/` 清单、包内插件清单 = 仓库 `plugins/` 清单，不等即退出码 1）。本文回答四问：
 
 1. pnpm publish 与 npm publish 的行为差异清单；
 2. workspace 根打包形态：根包非 `private` 时能否 publish、成员目录是否被误打入、`workspace:*` 协议影响；
-3. package-lock.json → pnpm-lock.yaml 迁移步骤与已知陷阱；
+3. `package-lock.json` → `pnpm-lock.yaml` 迁移步骤与已知陷阱；
 4. verify:pack 对账在 pnpm 打包产物上的适配点。
 
 检索日期 2026-11-15；本机实测环境 pnpm 12.15.0 + node 24.22.1（macOS arm64），全部实验在 `/tmp` 下新建空目录完成，**仓库目录内未跑任何打包/安装实验**；发布路径实验一律指向死端口 registry（`http://127.0.0.1:1/`），绝无真实发布。实测结论标注**内联实测**并附命令与原始输出摘录（§内联实测记录）。
@@ -28,7 +28,7 @@ round 2 pnpm 迁移票（need 20261115-fc48 FR-4）的直接输入。仓库形�
 | 唯一新增风险 | 成员内嵌 `node_modules`（install 后生成）会被白名单卷入——npm/pnpm 同病，pnpm 下以符号链接为主（相对链接以链接条目入包、绝对链接被跳过、真实文件被卷入） | 内联实测 |
 | `workspace:*` 协议 | pnpm pack/publish 自动改写为实际版本号；npm 会原样打进 tarball（坏包）。本仓根包无 `workspace:` 依赖，此差异暂不触达 | 内联实测 + [workspaces 文档](https://pnpm.io/workspaces) |
 | lockfile 迁移 | `pnpm import` 单命令完成（workspace importers 覆盖根 + 成员）；本仓依赖树实测零版本漂移、零幽灵依赖暴露 | 内联实测 + [import 文档](https://pnpm.io/cli/import) |
-| verify:pack | **零必需改动**：pnpm pack 产物 tar 根前缀仍为 `package/`，现行脚本实测全绿退出码 0；仅需命令面文案 npm → pnpm，另建议加一条「包内禁 node_modules」对账 | 内联实测 |
+| verify:pack | **零必需改动**：pnpm pack 产物 tar 根前缀仍为 `package/`，现行脚本实测全绿退出码 0；仅需命令面文案 npm → pnpm，另建议加一条「包内禁 `node_modules`」对账 | 内联实测 |
 | 发布纪律 | ADR f143 升版本 → pack → verify:pack → publish 序列原样保留，仅 npm 换 pnpm；新增两道 pnpm 特有门：干净树 + 发布分支（`master`/`main`） | 内联实测 + [publish 文档](https://pnpm.io/cli/publish) |
 
 ---
@@ -37,10 +37,10 @@ round 2 pnpm 迁移票（need 20261115-fc48 FR-4）的直接输入。仓库形�
 
 | # | 行为 | pnpm publish | npm publish | 来源 |
 |---|---|---|---|---|
-| 1 | `private: true` 拒绝 | 网络前显式拒绝，错误码 `ERR_PNPM_PRIVATE_PACKAGE`（「This package has been marked as private」） | 也拒绝（官方文档：「npm will refuse to publish it」），但实测检查次序在 auth 之后 | 内联实测 + [pnpm publish](https://pnpm.io/cli/publish) + [npm package.json](https://docs.npmjs.com/cli/v11/configuring-npm/package-json) |
+| 1 | `private: true` 拒绝 | 网络前显式拒绝，错误码 `ERR_PNPM_PRIVATE_PACKAGE`（「This package has been marked as private」） | 也拒绝（官方文档：「npm will refuse to publish it」），但实测检查次序在 auth 之后 | 内联实测 + [pnpm publish](https://pnpm.io/cli/publish) + [npm `package.json`](https://docs.npmjs.com/cli/v11/configuring-npm/package-json) |
 | 2 | git 检查 | **默认三道**：干净树 / 当前分支 = 发布分支（默认 `master`\|`main`，`publishBranch` 可覆盖）/ 与远端同步。实测错误码 `ERR_PNPM_GIT_UNCLEAN`、`ERR_PNPM_GIT_NOT_CORRECT_BRANCH`；`--no-git-checks` 跳过 | 无任何 git 检查 | 内联实测 + [pnpm publish](https://pnpm.io/cli/publish) |
 | 3 | `workspace:` 协议 | pack/publish 时把 `workspace:*` / `workspace:~` / `workspace:^` 改写为对应实际版本（`workspace:*` → `1.5.0` 形态） | 原样保留 `workspace:*` 进 tarball——使用者装到无法解析的范围串，是坏包 | 内联实测 + [workspaces 文档](https://pnpm.io/workspaces) |
-| 4 | workspace 内 LICENSE | workspace 内发包时自动把根 LICENSE 打进包（包无自带 LICENSE 时） | 无此行为 | [pnpm publish](https://pnpm.io/cli/publish) |
+| 4 | workspace 内 `LICENSE` | workspace 内发包时自动把根 `LICENSE` 打进包（包无自带 `LICENSE` 时） | 无此行为 | [pnpm publish](https://pnpm.io/cli/publish) |
 | 5 | 递归发布 | `-r publish` 发全部 workspace 包且**跳过版本已在 registry 的包**（`--force` 强发）；根包默认不在递归范围（`includeWorkspaceRoot` 默认 false） | 无 -r；`npm publish -w <dir>` 逐包，重发直接报 403 | [pnpm publish](https://pnpm.io/cli/publish) + [workspaces 文档](https://pnpm.io/workspaces) |
 | 6 | provenance | 受信发布（trusted publishing）下**自动附加**，`--no-provenance` 关闭 | 需显式 `--provenance` | [pnpm publish](https://pnpm.io/cli/publish) |
 | 7 | 发布后校验 | 12.7+ `--publish-wait-timeout`：等版本出现在 install 元数据并验证 tarball URL 返回 200 才算成功 | 发出即返回，无后续校验 | [pnpm publish](https://pnpm.io/cli/publish) |
@@ -58,7 +58,7 @@ round 2 pnpm 迁移票（need 20261115-fc48 FR-4）的直接输入。仓库形�
 
 - `pnpm pack` 产物逐条 = `npm pack` 产物逐条（`bin`/`src`/`skills` 全量 + `plugins/dsh-demo/{package.json,index.js,cordis.patch.yml}`），tar 根前缀同为 `package/`，tarball 命名同法（`rq2test-infra-0.1.0.tgz`，scope 去驼峰连字）；
 - 根 `node_modules`、`pnpm-lock.yaml`、`pnpm-workspace.yaml` 一律不入包（实测计数 0）；
-- 边界：**无 files 白名单时 `pnpm-workspace.yaml` 会入包**（实测）——本仓有白名单，不受影响，列此为异常流 A #10 陷阱。
+- 边界：**无 `files` 白名单时 `pnpm-workspace.yaml` 会入包**（实测）——本仓有白名单，不受影响，列此为异常流 A #10 陷阱。
 
 成员内嵌 `node_modules` 是唯一实测到的卷入通道（npm/pnpm 同病，根级排除规则只看根目录）：成员有依赖时 `pnpm install` 在成员目录生成 `node_modules/`（内联实测：无依赖成员不生成；有依赖成员生成且内容为指向根 `node_modules/.pnpm/...` 的符号链接）。此时若成员目录在根 `files` 白名单内：**真实文件被卷入**（npm 与 pnpm 同实测复现）；**包内相对路径符号链接以链接条目入包**（装出来的包里是悬空链接）；**绝对路径符号链接被 pnpm 跳过**。缓解见异常流 A #3（成员零运行时依赖 + 问④ f 第三查）。
 
@@ -68,9 +68,9 @@ round 2 pnpm 迁移票（need 20261115-fc48 FR-4）的直接输入。仓库形�
 - 若未来根包依赖成员：`pnpm pack` 实测把 `"@rq2test/dsh-demo": "workspace:*"` 改写为 `"0.1.1"` 后再打 tarball（npm 对照组原样保留 `workspace:*`，打出坏包）——pnpm 形态下 `workspace:` 依赖可安全使用。
 - 日常注意：workspace 内 `pnpm add` 保存依赖时按 `saveWorkspaceProtocol`（默认 `rolling`）可能写入 `workspace:` 前缀（[workspaces 文档](https://pnpm.io/workspaces)）——发布时会被改写、无功能风险，但 code review diff 时要知道这行是什么。
 
-另有一条打包差异对本仓无感：workspace 内发包自动补根 LICENSE（问①第 4 条）——本仓根目录无 `LICENSE` 文件（2026-11-15 检视），不触发。
+另有一条打包差异对本仓无感：workspace 内发包自动补根 `LICENSE`（问①第 4 条）——本仓根目录无 `LICENSE` 文件（2026-11-15 检视），不触发。
 
-## 问③ package-lock → pnpm-lock 迁移步骤与已知陷阱
+## 问③ `package-lock.json` → `pnpm-lock.yaml` 迁移步骤与已知陷阱
 
 ### 步骤（可复制，round 2 按此执行）
 
@@ -99,7 +99,7 @@ git rm package-lock.json && git add pnpm-lock.yaml pnpm-workspace.yaml
 pnpm test && pnpm pack && pnpm run verify:pack -- hankchen-infra-<版本>.tgz
 ```
 
-实测锚点：`pnpm import` 在单包场景无需 pnpm-workspace.yaml 即可运行；workspace 场景生成的 pnpm-lock.yaml `importers:` 同时覆盖 `.`（根）与 `plugins/dsh-demo`（成员）；pnpm 12.15.0 写出 `lockfileVersion: '9.0'`（均内联实测）。
+实测锚点：`pnpm import` 在单包场景无需 `pnpm-workspace.yaml` 即可运行；workspace 场景生成的 `pnpm-lock.yaml` `importers:` 同时覆盖 `.`（根）与 `plugins/dsh-demo`（成员）；pnpm 12.15.0 写出 `lockfileVersion: '9.0'`（均内联实测）。
 
 ### 已知陷阱
 
@@ -112,7 +112,7 @@ pnpm test && pnpm pack && pnpm run verify:pack -- hankchen-infra-<版本>.tgz
 
 ## 问④ verify:pack 对账在 pnpm 打包产物上的适配点
 
-对账输入（读 `scripts/verify-pack.mjs`）：脚本只依赖三样——`tar -tzf` 读清单、`package/skills/<名>/SKILL.md` 与 `package/plugins/<名>/package.json` 两条前缀正则、`collectBundleDefects`（只读仓库目录的 bundle 校验，[verify-bundle.mjs](../../../scripts/verify-bundle.mjs)）。
+对账输入（读 `scripts/verify-pack.mjs`）：脚本只依赖三样——`tar -tzf` 读清单、`package/skills/<名>/SKILL.md` 与 `package/plugins/<名>/package.json` 两条前缀正则、`collectBundleDefects`（只读仓库目录的 bundle 校验，[`verify-bundle.mjs`](../../../scripts/verify-bundle.mjs)）。
 
 **适配点逐项判定：**
 
@@ -121,7 +121,7 @@ pnpm test && pnpm pack && pnpm run verify:pack -- hankchen-infra-<版本>.tgz
 - c. **bundle 校验**：只读仓库 `plugins/` 目录，与包管理器无关——零改动。
 - d. **命令面文案**：脚本头部注释与用法的 `npm pack` / `npm run verify:pack` 表述随 round 2 文档改版换成 pnpm（非脚本逻辑）；`pnpm run verify:pack -- <tgz>` 传参与 npm 同法；tarball 文件名同法（问②实测）连示例都不用改。
 - e. **实测背书**：现行脚本对 `pnpm pack` 产物原样运行全绿退出码 0（内联实测，见§内联实测记录 E1）。
-- f. **建议增强（非必需，round 2 可选）**：加第三查「包内禁 node_modules」，封死异常流 A #3 陷阱的通道——在两查之间插入：
+- f. **建议增强（非必需，round 2 可选）**：加第三查「包内禁 `node_modules`」，封死异常流 A #3 陷阱的通道——在两查之间插入：
 
 ```js
 // 查 1.5：workspace 形态下成员内嵌 node_modules 不得入包（RQ2 报告异常流 A #3）
@@ -187,7 +187,7 @@ git tag -a v<版本> -m "v<版本>" && git push origin v<版本>   # annotated t
 ### 件 4：verify:pack 改造方案
 
 - **零必需改动**（问④ a–e：正则前缀、两查、bundle 校验全部原样成立，实测全绿）。
-- **可选增强**：问④ f 的「包内禁 node_modules」第三查，五行插入，封死成员 node_modules 卷入通道；round 2 迁移票可随票带上（或按 diff 最小化原则另立小票）。
+- **可选增强**：问④ f 的「包内禁 `node_modules`」第三查，五行插入，封死成员 `node_modules` 卷入通道；round 2 迁移票可随票带上（或按 diff 最小化原则另立小票）。
 - 命令面文案（脚本头注释 `npm pack` → `pnpm pack`）随 round 2 文档改版一并处理，非本调研范围。
 
 ---
@@ -307,7 +307,7 @@ $ 版本对照：npm 锁 @clack/core 1.6.0 / prompts 1.9.0 / sisteransi 2.0.0 / 
   = pnpm-lock 解析结果逐一同（零漂移）
 ```
 
-### E4 workspace 迁移 + 成员 node_modules 形态
+### E4 workspace 迁移 + 成员 `node_modules` 形态
 
 ```text
 $ （根 + plugins/dsh-demo[deps: sisteransi] 双包 fixture）npm install → lockfileVersion 3
@@ -322,8 +322,8 @@ $ 成员白名单内符号链接行为：相对链接入包（lrwxrwxrwx 条目�
 
 ## 引文（一手来源，检索日期均为 2026-11-15）
 
-- pnpm publish 命令文档（-r 递归、LICENSE 补包、git 检查、publishBranch、provenance、publish-wait-timeout、生命周期脚本链、64 MiB 上限）：https://pnpm.io/cli/publish
-- pnpm pack 命令文档（files 白名单、--pack-destination/--out、--recursive、--json/SRI、gzip level）：https://pnpm.io/cli/pack
+- pnpm publish 命令文档（-r 递归、`LICENSE` 补包、git 检查、publishBranch、provenance、publish-wait-timeout、生命周期脚本链、64 MiB 上限）：https://pnpm.io/cli/publish
+- pnpm pack 命令文档（`files` 白名单、--pack-destination/--out、--recursive、--json/SRI、gzip level）：https://pnpm.io/cli/pack
 - pnpm Workspaces（`pnpm-workspace.yaml`、npm workspaces 自动生成、linkWorkspacePackages、saveWorkspaceProtocol、includeWorkspaceRoot、`workspace:` 协议与发布改写规则）：https://pnpm.io/workspaces
 - pnpm import 命令文档（源 lockfile 顺序、非一一转换声明、workspace 先声明要求）：https://pnpm.io/cli/import
 - pnpm package_json（packageManager、publishConfig.*、不再读 pnpm 字段的声明）：https://pnpm.io/package_json
