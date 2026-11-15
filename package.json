@@ -12,12 +12,12 @@
     "skills"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=20.12.0"
   },
   "scripts": {
-    "test": "node --test 'test/unit/**/*.test.js' 'test/e2e/**/*.test.js'",
-    "test:unit": "node --test 'test/unit/**/*.test.js'",
-    "test:e2e": "node --test 'test/e2e/**/*.test.js'",
+    "test": "node --test test/unit test/e2e",
+    "test:unit": "node --test test/unit",
+    "test:e2e": "node --test test/e2e",
     "verify:pack": "node scripts/verify-pack.mjs"
   },
   "dependencies": {
