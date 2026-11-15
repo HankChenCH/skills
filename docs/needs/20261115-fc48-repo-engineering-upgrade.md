@@ -1,8 +1,9 @@
 ---
 id: 20261115-fc48
-status: confirmed
+status: fulfilled
 created: 2026-11-15
 confirmed: 2026-11-15
+fulfilled: 2026-11-15
 ---
 # 仓库工程化升级：agents 分层目录 + 全仓 TypeScript（无构建直跑）+ pnpm + 最小 CI
 
@@ -73,7 +74,7 @@ confirmed: 2026-11-15
 1. package-lock.json 提交态 bin 字段为发布换载形态（bin/infra.js）与 package.json 仓库形态（bin/infra.ts）不同步——npm install 自动同步不碍使用；round 2 pnpm 迁移票核对同构问题（pack 换载回写是否弄脏 pnpm-lock.yaml）。
 2. agents-layout.md §4.4「本分支尚无 .github/ 目录」被后合入的 CI 票时序过期——round 2 迁移票顺手修正。
 3. 工票 20261115-7784 验收 checkbox 未勾登记（落库链完整，形式不一致）——可补登记。
-4. FR-2 集成级人工段（Actions 页观测）待维护者合并后执行。
+4. FR-2 集成级人工段——**已核销（2026-11-15）**：fix 20261115-1a89（CI runner 缺 pnpm 致 FR-5 集成测试红，PR #242）合并后 Actions run 43724564151 全绿——FR-5 真跑 pass、FR-7 pnpm 就绪后真跑（.ts 形态证伪态 skip 报因、控制组 pass）、全量 151/150/0/1。
 5. 基线既有测试债：test/e2e/plugin-install.test.ts:151 断言实匹配根包版本而非插件落盘版本（保护意图可静默失效）——独立小票修复，未进 round 1。
 6. FR-7 回退未落位：插件包仍零构建形态，宿主实测拒载 node_modules 下 .ts——round 2 决策落位（证伪报告与回退方案已成文）。
 
