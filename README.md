@@ -45,7 +45,7 @@ AI 协作开发的三种常见失控：
 
 ## 快速上手
 
-依赖：git 与 bash；安装技能另需 Node.js ≥ 20.12.0。tracker 投影可选 GitHub（`gh`）/ GitLab（`glab`）/ 云效 Codeup（个人访问令牌），都不配则走本地文件模式，不影响任何门禁。
+依赖：git 与 bash；安装资产另需 Node.js ≥ 24.9.0（升级指引见下方「安装插件」节）。tracker 投影可选 GitHub（`gh`）/ GitLab（`glab`）/ 云效 Codeup（个人访问令牌），都不配则走本地文件模式，不影响任何门禁。
 
 接入按两步走，顺序固定：**先安装技能，后 `/setup-workspace` 接门禁**。只装了技能、没接门禁就点名流程技能（`/dev-spec`、`/dev-implement` 等）会在入口被校验拒绝——技能停下来提示「本仓库未接入开发流程，先运行 /setup-workspace」。两步都完成才能开工。
 
@@ -57,7 +57,7 @@ AI 协作开发的三种常见失控：
 npx @hankchen/infra
 ```
 
-第一层选资产类型（本轮「技能」可安装；「规范」等类型为占位，显示但不可安装），第二层空格勾选要装的技能、回车确认。安装器做完三件事：
+第一层选资产类型（「技能」与「插件」可安装，插件见下方「安装插件」节；「规范」为占位，显示但不可安装），第二层空格勾选要装的条目、回车确认。安装器做完三件事：
 
 - 所选技能实体拷入项目 `.agents/skills/<技能名>/`，内容随包原样分发（与仓库 [skills/](./skills/) 清单一致）；
 - 对项目内已存在的 agent 目录（`.claude`、`.zcode` 等）建相对软链；不存在的跳过并列入完成摘要，不报错；
@@ -88,6 +88,38 @@ npm config set https-proxy http://127.0.0.1:7890
 ```
 
 恢复默认：`npm config delete registry`、`npm config delete proxy`、`npm config delete https-proxy`。
+
+### 安装插件（首个宿主：DeepSeek Harness）
+
+插件是套件第二类资产：面向 agent 宿主的扩展包，以宿主官方格式分发。首个宿主为 DeepSeek Harness（dsh），套件随包提供 demo 插件 `@hankchen/dsh-demo`（内容与维护者照抄指南见[插件资产规范](./docs/plugin-assets.md)）。插件安装不落项目文件——它把 npm 包经官方命令装进本机 dsh profile。
+
+前置：**Node.js ≥ 24.9.0**（官方 dsh CLI 的 engines 要求），版本不足时安装器直接拒装并报当前版本。升级：
+
+```bash
+fnm install 24 && fnm use 24    # 或 nvm install 24 && nvm use 24
+```
+
+两层菜单安装：
+
+```bash
+npx @hankchen/infra
+```
+
+第一层选「插件」，第二层空格勾选要装的插件（条目正名为 npm 包名），回车后选定目标 profile——菜单列出 `~/.dsh/profiles/` 既有项（`DSH_HOME` 可覆盖根目录），无既有项时可输入新名。安装器把勾选包逐条转发官方命令 `dsh plugin --profile <名> add <包>`（`dsh` 不在 PATH 时自动改经 `npx @deepseek-ai/dsh` 运行）；完成摘要给出对账结果——profile 的 package.json 依赖行 + `dsh.profile.bundles` 行两处落点——并记入 `.infra-lock.json`。
+
+脚本与 CI 里免交互安装，落盘结果与菜单路径一致：
+
+```bash
+npx @hankchen/infra --plugins @hankchen/dsh-demo --profile default
+npx @hankchen/infra --plugins @hankchen/dsh-demo --plugins <另一包> --profile work   # 可重复出现，取并集
+```
+
+`--profile` 必填：插件安装缺它即报错并列出既有 profile。全部旗标与示例见 `npx @hankchen/infra --help`。
+
+两个例外：
+
+- **`desktop` profile 装不了**：`desktop` 是官方保留 profile 名，官方 CLI 拒绝对其做插件管理；安装器在执行官方命令前同样拒装并说明。
+- **registry 访问受限**：插件安装链路比技能多三处 registry 访问（npx 拉 `@deepseek-ai/dsh`、装插件包、profile 依赖经 pnpm 安装）。内网、公司代理环境先按上方「npm 访问受限」配镜像或代理再跑。
 
 ### 第 2 步：接入仓库
 
@@ -206,6 +238,7 @@ npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。�
 | [docs/METHOD.md](./docs/METHOD.md) | **流程规范**：原则、门禁、工作区规范、产物状态机、check.sh 与 config.sh 参考 |
 | [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md) | **设计蓝图**（唯一设计真相源）：设计原则、流程拓扑、全部技能规格（§11）、进度台账（§10.2）；治理规则「先改文档再改技能」 |
 | [docs/concepts.md](./docs/concepts.md) | **概念定位档案**：全部概念的定义、来源（外部出处/方法自创）与落点 |
+| [docs/plugin-assets.md](./docs/plugin-assets.md) | **插件资产规范**：套件插件的生产约定（仓库布局、清单四要素、双包发布顺序、新宿主接入）与 dsh 官方格式逐字段运行时形态 |
 | [docs/sessions/](./docs/sessions/) | 设计会话纪要：方法论定稿过程的决策记录 |
 | [GLOSSARY.md](./GLOSSARY.md) | 术语表：流程术语与状态定义 |
 

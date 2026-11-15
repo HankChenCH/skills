@@ -178,7 +178,8 @@ test('[FR-2] .claude 存在、.zcode 不存在：存在者得相对软链、不�
 
 test('[FR-6] 第一层选占位类型（规范）：确认后零动作退出', async (t) => {
   const project = makeTargetProject(t);
-  const { code } = await runInteractive(project, ['\x1b[B', '\r']);
+  // 第一层序 = 技能、插件、规范：下移两次到占位行（规范退第三行，spec 20261115-495e）
+  const { code } = await runInteractive(project, ['\x1b[B', '\x1b[B', '\r']);
   assert.equal(code, 0, '占位类型确认应正常退出');
   assert.equal(fs.existsSync(path.join(project, '.agents')), false, '占位类型不应产生安装动作');
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '占位类型不应写锁文件');

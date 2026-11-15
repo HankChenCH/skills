@@ -1,7 +1,10 @@
 #!/usr/bin/expect -f
-# 交互端到端 runner：在真实 PTY 中 spawn CLI，按 KEYS 参数逐键注入（每键 0.4s 渲染间隔）。
-# 用法：expect interactive.exp <node 绝对路径> <bin 绝对路径> <项目目录> <KEYS>
-# KEYS 形如 "DOWN,SPACE,DOWN,SPACE,ENTER"；超时 60s 杀进程并以 124 退出，正常透传 CLI 退出码。
+# 交互端到端 runner：在真实 PTY 中 spawn CLI，按键前可等目标提示渲染（模式同步）。
+# 用法：expect interactive.exp <node 绝对路径> <bin 绝对路径> <项目目录> <KEYS> [PATTERNS]
+# KEYS 形如 "DOWN,SPACE,DOWN,SPACE,ENTER"；PATTERNS 为与 KEYS 等长的提示文本列表（逗号分隔，
+# 空串 = 不等待直接按旧盲发节奏发键）。发键前等待对应提示文本出现在 PTY——盲发节奏会让
+# 三层连发菜单的按键在 prompt 切换窗口成组排队、被下一个 prompt 一口吞掉（实测），
+# 多于两个 prompt 的交互必须同步发键。正常透传 CLI 退出码；超时 126/124 退出。
 # spawn 后须给 PTY 设窗口尺寸：缺省 0 行 0 列会让 clack 把菜单折行成单字一行。
 
 set timeout 60
@@ -9,12 +12,23 @@ set node_bin [lindex $argv 0]
 set bin [lindex $argv 1]
 set cwd [lindex $argv 2]
 set keys [lindex $argv 3]
+set patterns ""
+if {[llength $argv] >= 5} { set patterns [lindex $argv 4] }
 
 cd $cwd
 spawn $node_bin $bin
 exec stty rows 40 cols 120 < $spawn_out(slave,name)
 
+set plist [split $patterns ","]
+set idx 0
 foreach k [split $keys ","] {
+    set p [lindex $plist $idx]
+    if {$p ne ""} {
+        expect {
+            -re $p {}
+            timeout { exec kill -9 [exp_pid]; exit 126 }
+        }
+    }
     sleep 0.4
     switch -- $k {
         DOWN  { send "\x1b\[B" }
@@ -22,6 +36,7 @@ foreach k [split $keys ","] {
         ENTER { send "\r" }
         default { puts stderr "unknown key token: $k"; exit 125 }
     }
+    incr idx
 }
 
 expect {

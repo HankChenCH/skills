@@ -1,0 +1,20 @@
+{
+  "name": "@hankchen/dsh-demo",
+  "version": "0.1.1",
+  "description": "dsh 插件资产活样例：官方「Your first plugin」最小 bundle 形态，加载时打一条日志",
+  "type": "module",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "cordis.patch.yml"
+  ],
+  "engines": {
+    "node": ">=24.9.0",
+    "dsh": ">=0.2.2-rc.1"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
