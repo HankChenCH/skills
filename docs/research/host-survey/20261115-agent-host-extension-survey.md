@@ -39,7 +39,7 @@ spec: 20261115-f650
 | `.codemaker` · Codemaker | S（仅生态） | `.codemaker/skills/`【生态】 | `~/.codemaker/skills/`【生态】 | 目录拷贝 | **无公开扩展机制文档** |
 | `.codestudio` · Syncfusion Code Studio | O·S | `.codestudio/prompts/`【厂商博客】 | — | 目录拷贝 | 厂商博客 + 生态 |
 | `.commandcode` · Command Code | S·H·M·P | `.commandcode/`【官方】 | `~/.commandcode/`【官方】 | 目录拷贝 | 官方 |
-| `.continue` · Continue | S·C·R·M·P | `.continue/{rules,skills…}`【生态】 | `~/.continue/{…}`【生态】 | Hub 市场 + 目录拷贝 | 官方 + 生态 |
+| `.continue` · Continue | S·C·R·M·P | `.continue/rules/`【官方】；`.continue/skills/`【生态】 | `~/.continue/{…}`【生态】 | Hub 市场 + 目录拷贝 | 官方 + 生态 |
 | `.cortex` · Snowflake Cortex Code | S·M | `.cortex/skills/`【生态】 | `~/.snowflake/cortex/`【官方】 | 内置捆绑 + 目录拷贝 | 官方 + 生态 |
 | `.crush` · Crush | S·R·M | `.crush/skills/`【官方仓库】 | `~/.config/crush/skills/`【生态】 | 目录拷贝 | 官方仓库 |
 | `.deepagents/agent` · Deep Agents | S·A·O | `.agents/skills/`【生态】 | `~/.deepagents/agent/skills/`【生态】 | 目录拷贝 / 框架内建 | 二手/待复核 |
@@ -68,7 +68,7 @@ spec: 20261115-f650
 | `.qoder` · Qoder（CN 同规范） | S·R·M | `.qoder/rules/`【官方】；`.qoder/skills/`【生态】 | `~/.qoder/skills/`【生态】 | 目录拷贝 | 官方 + 生态 |
 | `.qwen` · Qwen Code | S·C·P·M | `.qwen/{commands,skills,extensions…}`【官方】 | `~/.qwen/{…}`【官方】 | 扩展安装 + 目录拷贝 | 官方 |
 | `.reasonix` · Reasonix | S | `.reasonix/skills/`【生态】 | `~/.reasonix/skills/`【生态】 | 目录拷贝 | 官方仓库 |
-| `.roo` · Roo Code | S·R·A·M | `.roo/{rules,rules-<mode>,skills…}`【官方】 | `~/.roo/{rules,skills…}`【官方】 | 目录拷贝 | 官方 |
+| `.roo` · Roo Code | S·R·A·M | `.roo/rules/`【官方】；`.roo/skills/`【生态】 | `~/.roo/{rules,skills…}`【官方】 | 目录拷贝 | 官方 |
 | `.rovodev` · Rovo Dev | S·R·C·H·O | `.rovodev/skills/`【生态】 | `~/.rovodev/`【官方】 | 目录拷贝 | 官方 + 生态 |
 | `.tabnine/agent` · Tabnine | S·R·A·M | `.tabnine/agent/agents/`【官方】 | `~/.tabnine/agent/`【生态】 | 目录拷贝 | 官方 + 生态 |
 | `.terramind` · Terramind | S（仅生态） | `.terramind/skills/`【生态】 | `~/.terramind/skills/`【生态】 | 目录拷贝 | **无公开扩展机制文档** |
@@ -233,6 +233,7 @@ spec: 20261115-f650
 - 机制：
   - S：内置捆绑 skills + 社区 SKILL.md skills；skills 配置 `~/.snowflake/cortex/skills.json` 由 Desktop 与 CLI 共享。
   - M：MCP 集成。
+  - hooks：生态兼容表标 No。
 - 目录：本机级 `~/.snowflake/cortex/`【官方】；项目级 `.cortex/skills/`【生态】。
 - 分发：内置捆绑 + 目录拷贝。
 - 来源（检索 2026-11-15）：
@@ -649,7 +650,7 @@ spec: 20261115-f650
 - 机制：
   - S：skills 于 Zenflow 与 IDE Agents 可用（按任务上下文自动选择 + 手动选择）。
   - O：Zenflow 并行 agent 隔离环境、可编排外部 agent。
-  - hooks / commands / rules / 子代理目录：无官方文档页。
+  - hooks：生态兼容表标 No；commands / rules / 子代理目录：无官方文档页。
 - 目录：项目级 `.zencoder/skills/`、本机级 `~/.zencoder/skills/`【生态】（官方 docs 未逐字给出）。
 - 分发：目录拷贝。
 - 来源：【官方】<https://docs.zencoder.ai/welcome>；目录【生态】vercel-labs/skills 表。检索 2026-11-15。
@@ -661,9 +662,10 @@ spec: 20261115-f650
 ### T1 skills（SKILL.md 目录型）——普世主干
 
 - 覆盖面（口径与矩阵一致）：**49 宿主全部有 skills 目录条目**，绝大多数遵循 agentskills.io 开放规范（`<name>/SKILL.md` 目录 + YAML frontmatter）。
-  - 官方文档 / 官方仓库载明 skills 机制：37 个。
-  - skills 仅【生态】行：12 个——宿主另有其他官方机制 7 个（Code Studio / ForgeCode / Lingma / Mux / Neovate / Rovo Dev / Tabnine）。
+  - 官方文档 / 官方仓库载明 skills 机制：35 个。
+  - skills 仅【生态】行：8 个——宿主另有其他官方机制（Code Studio / ForgeCode / Lingma / Mux / Neovate / Rovo Dev / Tabnine / Augment，各见对应小节）。
   - 宿主完全无官方机制文档：5 个（Codemaker / MCPJam / Jazz / Terramind / Tinycloud，即矩阵「S（仅生态）」行）。
+  - Deep Agents：来源【二手/待复核】（§14），单列不计入上三桶。35 + 8 + 5 + 1 = 49 闭合。
 - 布局模式：`agents/<宿主>/skills/<技能名>/SKILL.md`（+ 附属文件）。这是唯一可以一次设计全、跨宿主复用的机制类型。
 - 形态分叉（布局规范需逐宿主映射，不能只写一条规则）：
   - 标准型：`.claude`、`.adal`、`.trae`、`.vibe`、`.windsurf`、`.grok`、`.kode`、`.roo`、`.kilo`、`.qwen` 等——`.<host>/skills/`。
