@@ -1,0 +1,18 @@
+##### argv: [--all --skills dev-spec --foo]
+--- ref (真实 cli-args.js):
+✗ --all 与 --skills 互斥：全装与按条目指定只能选一
+  运行 npx @hankchen/infra --help 查看全部旗标与示例。
+--exit: 1
+--- commander 探针:
+✗ --all 与 --skills 互斥：全装与按条目指定只能选一
+  运行 npx @hankchen/infra --help 查看全部旗标与示例。
+--exit: 1
+##### argv: [--foo --all --skills dev-spec]
+--- ref (真实 cli-args.js):
+✗ 未知旗标 --foo；可用旗标：--all、--skills <名[,名...]> [-a, -b, ...]、--plugins <名[,名...]> --profile <名> [-a, -b, ...]、-h, --help（--help 查看示例）
+  运行 npx @hankchen/infra --help 查看全部旗标与示例。
+--exit: 1
+--- commander 探针:
+✗ 未知旗标 --foo；可用旗标：--all、--skills <名[,名...]> [-a, -b, ...]、--plugins <名[,名...]> --profile <名> [-a, -b, ...]、-h, --help（--help 查看示例）
+  运行 npx @hankchen/infra --help 查看全部旗标与示例。
+--exit: 1
