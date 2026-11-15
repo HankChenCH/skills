@@ -6,7 +6,7 @@ round: 1
 created: 2026-11-15
 approved: 2026-11-15
 ---
-# @hankghchen/infra：套件资产初始化 CLI（round 1 全 FR MVP）
+# @hankchen/infra：套件资产初始化 CLI（round 1 全 FR MVP）
 
 ## 问题陈述
 
@@ -14,7 +14,7 @@ approved: 2026-11-15
 
 ## 方案
 
-新建单 npm 包 `@hankghchen/infra`（个人基建初始化器，need D1/D3 拍板）：使用者在目标项目根目录裸跑 `npx @hankghchen/infra` 进入两层交互菜单（第一层选资产类型，第二层勾选条目），选毕把所选套件技能安装进项目 `.agents/skills/`，对检测到的 agent 目录建软链，锁文件记账；支持非交互旗标；包经 npm registry 分发、semver 可锁版本；资产模型走「资产类型 → 安装目标」映射表扩展点，本轮仅实现技能一行（need FR-1～FR-6）。README 把一条命令安装写成官方方式并写明「先安装、后 /setup-workspace」两步顺序与 registry 受限缓解路径（need 异常流 A/B）。
+新建单 npm 包 `@hankchen/infra`（个人基建初始化器，need D1/D3 拍板）：使用者在目标项目根目录裸跑 `npx @hankchen/infra` 进入两层交互菜单（第一层选资产类型，第二层勾选条目），选毕把所选套件技能安装进项目 `.agents/skills/`，对检测到的 agent 目录建软链，锁文件记账；支持非交互旗标；包经 npm registry 分发、semver 可锁版本；资产模型走「资产类型 → 安装目标」映射表扩展点，本轮仅实现技能一行（need FR-1～FR-6）。README 把一条命令安装写成官方方式并写明「先安装、后 /setup-workspace」两步顺序与 registry 受限缓解路径（need 异常流 A/B）。
 
 本轮 round 1 = 全 FR 最小闭环（CLI + 安装 + 菜单 + 锁文件 + README + 发布流程文档），分轮拍板 2026-11-15；update/remove/list 专项子命令与技能之外的资产类型实现留后续轮次（need 非目标 + 预想②「第二轮起」拍板）。
 
@@ -31,13 +31,13 @@ approved: 2026-11-15
 
 ## 实现决策
 
-- **单 npm 包、零构建直跑**：包名 `@hankghchen/infra`，Node.js（≥18）ESM 实现，`bin` 入口裸跑即进安装流（need D5 裸跑拍板）；交互提示用成熟 prompt 库（具体选型归 design；交互视觉参照 vercel-labs/skills 实测形态——单选/多选列表 + 进度提示 + 完成摘要）。不发「技能集 npm 包」供生态 sync（need 非目标 2）。
+- **单 npm 包、零构建直跑**：包名 `@hankchen/infra`，Node.js（≥18）ESM 实现，`bin` 入口裸跑即进安装流（need D5 裸跑拍板）；交互提示用成熟 prompt 库（具体选型归 design；交互视觉参照 vercel-labs/skills 实测形态——单选/多选列表 + 进度提示 + 完成摘要）。不发「技能集 npm 包」供生态 sync（need 非目标 2）。
 - **资产随包分发**：npm 包打包清单含 skills/ 全量（31 技能，每技能 SKILL.md 与 references/ 齐备）；发布前机械对账——包内技能清单 = 仓库 `skills/` 目录清单，不等即拒绝发布（need A3 风险的机制化）。
 - **映射表驱动安装（need FR-4）**：包内「资产类型 → 安装目标」映射为独立数据结构，每行四字段——类型名、来源目录（包内）、安装目标（项目内路径）、agent 目录软链规则；本轮仅「技能」一行（来源 skills/ → 目标 `.agents/skills/`）；安装流程由表驱动，新增资产类型 = 映射表加行 + 菜单自动出现该类型，不改安装流程代码。规范等未来类型本轮在映射表中以「占位行（不可选）」呈现，菜单显示但拒绝安装（need FR-4 拍板）。
 - **安装行为（参照 vercel-labs/skills 实测形态，need FR-1/FR-2）**：所选技能目录实体拷贝进目标项目 `.agents/skills/<技能名>/`；安装器持 agent 目录清单（具体清单归 design 定稿，参照生态 CLI 支持的 20+ agent），检测目标项目内存在的 agent 目录，对存在者建相对软链指向 `.agents/skills/` 下对应技能，不存在者跳过并在完成摘要中列出，不报错。
 - **锁文件记账（need FR-1/FR-5）**：安装完成后在目标项目根落 `.infra-lock.json`，记录包版本 + 逐技能条目（技能名、内容指纹、安装时间）；重跑安装幂等——按当前包内容覆盖刷新已装技能并更新锁文件，不重复堆积（round 1 的升级 MVP 形态，对账语义与生态 CLI 的 update/check 同构）。
 - **非交互旗标（need FR-6）**：全装与按类型/条目指定两种跳过交互形态（具体旗标名归 design），`--help` 列明全部旗标与示例；旗标与交互路径产生一致落盘结果。
-- **版本锁定（need FR-5）**：`npx @hankghchen/infra@<semver>` 走 npm 原生版本解析，锁文件记录实际安装的包版本；包 semver 与套件版本对齐发布（技能内容变更按 semver 判据升版本，判据细则归 design）。
+- **版本锁定（need FR-5）**：`npx @hankchen/infra@<semver>` 走 npm 原生版本解析，锁文件记录实际安装的包版本；包 semver 与套件版本对齐发布（技能内容变更按 semver 判据升版本，判据细则归 design）。
 - **发布流程（need FR-3/FR-5）**：README 维护者段写发布步骤（对账校验 → 版本号 → `npm publish`）；发布动作属单向门，操作留痕于 git tag（与 dev-release 的 annotated tag 机制衔接，发布流程文档指路 dev-release）。
 - **README 官方安装故事（need FR-3）**：安装节改写为裸跑命令 + 旗标 + 重跑升级语义 + registry 受限缓解路径（镜像/代理，带可执行命令）+「先安装技能、后 /setup-workspace 接门禁」两步顺序，并说明只装技能未接门禁时流程技能会被入口校验拒绝并指路 /setup-workspace（need 异常流 A/B）；替换现有「拷贝或软链」指引。
 - **测试 seam**：核心函数四 seam——映射表结构与驱动、安装器（拷贝 + 软链 + 幂等）、锁文件读写、菜单构造与旗标解析；单测覆盖四 seam；端到端在临时目录对真实 CLI 进程跑（本地包引用，`npm pack` 产物或本地路径均可）；测试框架选型归 design。
@@ -50,18 +50,18 @@ approved: 2026-11-15
 
 ## 验收场景
 
-- [FR-1 | 工单级] Given 全新 git 项目根目录，When 裸跑 `npx @hankghchen/infra` 并在两层菜单选「技能」勾选部分技能后确认，Then 所选技能落盘 `.agents/skills/<技能名>/`（每技能 SKILL.md 与 references/ 齐备），未勾选技能不落盘。
+- [FR-1 | 工单级] Given 全新 git 项目根目录，When 裸跑 `npx @hankchen/infra` 并在两层菜单选「技能」勾选部分技能后确认，Then 所选技能落盘 `.agents/skills/<技能名>/`（每技能 SKILL.md 与 references/ 齐备），未勾选技能不落盘。
 - [FR-6 | 工单级] Given 两层菜单第一层，When 选「规范」等占位类型，Then 该类型显示占位不可选、确认后无任何安装动作。
 - [FR-6 | 工单级] When 带非交互旗标跑（全装与按条目指定各一），Then 免交互完成安装，落盘结果与交互路径一致；`--help` 列明全部旗标与示例。
 - [FR-2 | 工单级] Given 项目内存在部分 agent 目录（如 `.claude/` 存在、`.zcode/` 不存在），When 安装完成，Then 存在的 agent 目录内出现指向 `.agents/skills/` 对应技能的软链，不存在的跳过并在完成摘要中列出，进程不报错。
 - [FR-1 | 工单级] When 安装完成，Then 项目根出现 `.infra-lock.json`（包版本 + 逐技能名/指纹/安装时间）；重跑安装后已装技能按当前包内容刷新、锁文件更新、无重复条目。
-- [FR-5 | 工单级] When 以 `npx @hankghchen/infra@<历史版本>` 安装，Then 安装的是该版本内容且锁文件记录该版本号。
+- [FR-5 | 工单级] When 以 `npx @hankchen/infra@<历史版本>` 安装，Then 安装的是该版本内容且锁文件记录该版本号。
 - [FR-4 | 工单级] When 检视映射表数据结构与其在安装流程中的使用，Then 映射表为独立结构（类型名/来源目录/安装目标/软链规则四字段），本轮仅技能一行 + 占位行，安装流程由表驱动；单测断言表驱动分发行为（增行不改流程代码以结构断言验证）。
 - [FR-3 | 工单级] Given README，When 检索安装指引，Then 安装节为裸跑命令 + 旗标 + 重跑升级语义 + 维护者发布步骤，原「拷贝或软链」指引不再出现。
 - [FR-3 | 工单级] Given README（异常流 A），When 检索缓解路径，Then 存在 registry 受限时镜像/代理的可执行配置指引（含命令）。
 - [FR-3 | 工单级] Given README（异常流 B），When 检索安装与门禁关系，Then 按「先安装技能、后 /setup-workspace 接门禁」两步顺序写明，且说明只装未接门禁时流程技能被入口校验拒绝并指路 /setup-workspace。
 - [FR-2 | 集成级 | 人工：智能体触发需真实会话环境，无脚本化承载] Given 安装完成的项目，When 在 ZCode / Claude Code 新会话点名已装技能，Then 技能被智能体发现并进入执行（留验收阶段人工执行）。
-- [FR-5 | 集成级 | 人工：需包已发布至 npm registry 方可执行，发布属单向门在验收时点完成] Given 指定版本已发布，When 在全新项目裸跑 `npx @hankghchen/infra@<版本>`，Then 安装成功且锁文件记录该版本（留验收阶段人工执行）。
+- [FR-5 | 集成级 | 人工：需包已发布至 npm registry 方可执行，发布属单向门在验收时点完成] Given 指定版本已发布，When 在全新项目裸跑 `npx @hankchen/infra@<版本>`，Then 安装成功且锁文件记录该版本（留验收阶段人工执行）。
 
 ## 非目标
 
@@ -77,3 +77,4 @@ approved: 2026-11-15
 - 溯源：need 20261114-1f2f（confirmed 2026-11-15，issue #209）；D1-D7 拍板记录见 need 开放问题节。
 - 分轮拍板：round 1 全 FR MVP（2026-11-15 用户显式确认；理由——门禁要求全 FR 场景覆盖、need 已把可延迟项拍进非目标、A3 风险不可后置）。
 - 实现细节选型（prompt 库、agent 目录清单、旗标名、semver 判据、测试框架）归 design 阶段定稿，本 spec 只锁契约。
+- round 1 内修订（2026-11-15 用户拍板）：包名 `@hankghchen/infra` → `@hankchen/infra`。理由——npm scope `hankghchen` 不存在，`npm publish` 返回 `Scope not found`（PUT 404 实证）；need 阶段「npm 实测可用」验证的是名字未被占用，不等于 scope 可发布性。全字面落点随 fix 票 spec20261115-8975-20261115-b1b8 改名落地；`@hankchen` 为发起人 npm 登录用户 scope（whoami=hankchen）。spec 已合并入 main（PR #214），本修订为合并后验收补验段的前置。
