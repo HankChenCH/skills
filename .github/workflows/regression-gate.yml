@@ -1,8 +1,17 @@
-# 最小 CI 回归门（spec 20261115-f650 FR-2，工票 20261115-52d5）。
-# 步骤链契约：checkout → node setup → 依赖安装（npm ci）→ tsc --noEmit（npm run typecheck）
-#   → 全量测试（npm test）→ verify:pack 对账（npm pack 出 tarball 后 reconcile）。
+# 最小 CI 回归门（spec 20261115-f650 FR-2，工票 20261115-52d5；依赖安装步 pnpm 化随
+# spec 20261115-ed9f FR-4，工票 20261115-d5f4）。
+# 步骤链契约：checkout → pnpm 安装（全局，钉主版本 12，先于 setup-node 供 cache: pnpm
+#   取版）→ node setup（node-version-file 读 .nvmrc；cache: pnpm 随 pnpm-lock.yaml）
+#   → 依赖安装（pnpm install --frozen-lockfile）→ tsc --noEmit（pnpm run typecheck）
+#   → 全量测试（pnpm test）→ verify:pack 对账（pnpm pack 出 tarball 后 reconcile）。
 # 静态契约由 test/unit/ci-workflow.test.ts 守护（seam ②）：文件本身即被测面，
 # 改本文件须同步过该测试。
+#
+# pnpm 契约（RQ2 方案，RQ2 异常流 A #6）：pnpm 版本两处钉——本文件全局安装步钉主版本 12
+#   （兼容 dsh 集成测试转发），package.json packageManager 字段钉精确版 12.15.0（pnpm
+#   据此经 lockfile packageManagerDependencies 自管理，frozen 安装强制版本对齐）；
+#   frozen-lockfile 显式传参留痕——CI 本就自动 frozen，incompatible lockfile 或
+#   pnpm-lock.yaml 漏提交直接红，这是防漂移的正确行为，不静默回退。
 #
 # 环境缺失的显式处置（FR-2 + 异常流 B，零静默假绿）：
 #   - dsh 集成测试（test/e2e/dsh-plugin-integration.test.ts）自带前置门：node ≥24.9 与
@@ -33,36 +42,40 @@ jobs:
         # actions/checkout v4.4.0（钉完整 commit SHA：可变 tag 不是供应链信任锚；升版改此处并同步静态核验测试）
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
+      - name: Install pnpm (official dsh plugin command forwards to pnpm; setup-node cache: pnpm needs it on PATH)
+        # fix 20261115-1a89：ubuntu runner 不预装 pnpm，官方 dsh plugin 命令转发 pnpm 执行，
+        # 缺装时 spawn ENOENT 使 FR-5 集成测试红（Actions run 43722887029）。装了就真跑
+        # （与 expect 同款定夺：给测试补前置门跳过会让集成覆盖永久缺失）。钉主版本 12。
+        # pnpm 迁移后本步身兼两职：dsh 集成前置 + 下方 setup-node cache: pnpm 的取版前置
+        # （spec 20261115-ed9f FR-4；精确版由 packageManager 字段经 frozen 安装强制对齐）。
+        run: npm install -g pnpm@12
+
       - name: Setup node (reads .nvmrc; unavailable version fails this step loudly)
         # actions/setup-node v4.4.0（钉完整 commit SHA，理由同上）
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
-          cache: npm
+          cache: pnpm
 
       - name: Install expect for interactive e2e (missing expect would fail those tests red)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends expect
 
-      - name: Install pnpm for dsh integration tests (official dsh plugin command forwards to pnpm)
-        # fix 20261115-1a89：ubuntu runner 不预装 pnpm，官方 dsh plugin 命令转发 pnpm 执行，
-        # 缺装时 spawn ENOENT 使 FR-5 集成测试红（Actions run 43722887029）。装了就真跑
-        # （与 expect 同款定夺：给测试补前置门跳过会让集成覆盖永久缺失）。钉主版本 12。
-        run: npm install -g pnpm@12
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (frozen; incompatible lockfile fails red by design)
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck (tsc --noEmit)
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Full test suite (dsh/interactive preconditions gate themselves, see header)
-        run: npm test
+        run: pnpm test
 
-      - name: Verify pack manifest (npm pack then reconcile against repo inventory)
-        # shell: bash = GitHub 端以 -eo pipefail 执行：npm pack 失败立即使本步红，
+      - name: Verify pack manifest (pnpm pack then reconcile against repo inventory)
+        # shell: bash = GitHub 端以 -eo pipefail 执行：pnpm pack 失败立即使本步红，
         # 不被 `| tail` 掩码成「对账缺 tarball」的次生错误（可诊断性）。
+        # 不加 --silent：pnpm pack --silent 整个静默（连 tarball 文件名都不打印，实测
+        # 12.15.0），非 npm 的「只留文件名」语义——取报告 stdout 末行（即 tarball 名）。
         shell: bash
         run: |
-          tarball="$(npm pack --silent | tail -n 1)"
+          tarball="$(pnpm pack | tail -n 1)"
           test -f "$tarball"
-          npm run verify:pack -- "$tarball"
+          pnpm run verify:pack "$tarball"
