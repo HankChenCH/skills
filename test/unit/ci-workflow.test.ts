@@ -342,6 +342,26 @@ test('交互 e2e 的 expect 前置由安装步骤真实供应（装了就真跑�
   );
 });
 
+test('dsh 集成段的 pnpm 前置由安装步骤真实供应（官方 dsh plugin 命令转发 pnpm 执行）', () => {
+  // 缺陷钉住（fix 票 20261115-1a89）：Actions 首跑红——既有 FR-5 集成测试真跑段经官方
+  // dsh plugin add 转发 pnpm，runner PATH 无 pnpm 时 spawn ENOENT 使安装中止（exit 127），
+  // 断言红（run 43722887029）。pnpm 安装步骤必须先于 npm test，装了就真跑（与 expect
+  // 同款定夺：补前置门跳过会让集成覆盖永久缺失）。
+  const steps = readWorkflowSteps(readWorkflowDoc());
+  const pnpmIdx = steps.findIndex(
+    (s) => typeof s.run === 'string' && /npm\s+install\s+-g\s+pnpm@/.test(s.run)
+  );
+  assert.ok(
+    pnpmIdx >= 0,
+    '缺 pnpm 安装步骤（npm install -g pnpm@<主版本>）——runner 镜像不预装 pnpm，缺装时官方 dsh plugin 命令转发 pnpm 执行即 ENOENT，FR-5 集成测试红'
+  );
+  const testIdx = steps.findIndex((s) => s.run === 'npm test');
+  assert.ok(
+    pnpmIdx < testIdx,
+    'pnpm 安装步骤必须先于 npm test——否则 dsh 集成测试跑时 pnpm 仍未就绪'
+  );
+});
+
 test('全文件无 secrets：结构无 secrets 键、原文无 secrets 表达式', () => {
   const raw = fs.readFileSync(WORKFLOW_PATH, 'utf8');
   const doc = readWorkflowDoc();
