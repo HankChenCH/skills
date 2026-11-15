@@ -1,11 +1,12 @@
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { installAssets } from '../../src/installer.js';
-import { readLockfile, lockfilePath, LOCKFILE_NAME } from '../../src/lockfile.js';
+import { installAssets } from '../../src/installer.ts';
+import type { InstallRow } from '../../src/installer.ts';
+import { readLockfile, lockfilePath, LOCKFILE_NAME } from '../../src/lockfile.ts';
 
 // 测试用映射行：与 ASSET_MAP 技能行同构（表驱动分发用合成行复验，见末测试）
 const SKILL_ROW = {
@@ -15,7 +16,7 @@ const SKILL_ROW = {
   symlinkRule: '<agentDir>/skills/<skillName>',
 };
 
-function makePackage(t, skills) {
+function makePackage(t: TestContext, skills: Record<string, Record<string, string>>) {
   const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-pkg-'));
   t.after(() => fs.rmSync(packageRoot, { recursive: true, force: true }));
   for (const [name, files] of Object.entries(skills)) {
@@ -28,7 +29,7 @@ function makePackage(t, skills) {
   return packageRoot;
 }
 
-function makeProject(t, existingDirs = []) {
+function makeProject(t: TestContext, existingDirs: string[] = []) {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-proj-'));
   t.after(() => fs.rmSync(projectRoot, { recursive: true, force: true }));
   for (const dir of existingDirs) {
@@ -37,7 +38,13 @@ function makeProject(t, existingDirs = []) {
   return projectRoot;
 }
 
-function install(t, { selected, agentDirs, packageRoot, projectRoot, row = SKILL_ROW }) {
+function install(t: TestContext, { selected, agentDirs, packageRoot, projectRoot, row = SKILL_ROW }: {
+  selected: string[];
+  agentDirs: string[];
+  packageRoot: string;
+  projectRoot: string;
+  row?: InstallRow;
+}) {
   return installAssets({
     row,
     packageRoot,
@@ -98,7 +105,7 @@ test('选中不存在的技能名显式报错并列出可选清单', (t) => {
   const projectRoot = makeProject(t);
   assert.throws(
     () => install(t, { selected: ['ghost'], agentDirs: [], packageRoot, projectRoot }),
-    (err) => err.message.includes('alpha'),
+    (err) => (err as Error).message.includes('alpha'),
   );
 });
 
@@ -118,7 +125,7 @@ test('重跑幂等：内容刷新（源变则装后变）、过期文件被清�
   assert.equal(fs.readFileSync(path.join(installed, 'SKILL.md'), 'utf8'), 'v2', '重跑后应刷新为当前包内容');
   assert.equal(fs.existsSync(path.join(installed, 'extra.md')), false, '源里已删的文件重跑后不应残留');
 
-  const lockfile = readLockfile(projectRoot);
+  const lockfile = readLockfile(projectRoot)!;
   assert.deepEqual(Object.keys(lockfile.skills), ['alpha'], '重跑不应产生重复条目');
 });
 
@@ -161,7 +168,7 @@ test('锁文件记录包版本 + 逐技能指纹/安装时间；先前安装的�
   install(t, { selected: ['alpha'], agentDirs: [], packageRoot, projectRoot });
   install(t, { selected: ['beta'], agentDirs: [], packageRoot, projectRoot });
 
-  const lockfile = readLockfile(projectRoot);
+  const lockfile = readLockfile(projectRoot)!;
   assert.deepEqual(Object.keys(lockfile.skills).sort(), ['alpha', 'beta']);
   assert.equal(lockfile.package, '@hankchen/infra');
   assert.equal(lockfile.packageVersion, '0.1.0');

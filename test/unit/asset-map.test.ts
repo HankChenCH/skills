@@ -9,7 +9,7 @@ import {
   isCommandRow,
   findRow,
   expandSymlinkRule,
-} from '../../src/asset-map.js';
+} from '../../src/asset-map.ts';
 
 // 行模型（spec 20261115-495e 实现决策「映射表行模型扩展」）：
 //   copy 类行    = type + mechanism:'copy' + sourceDir + installTarget + symlinkRule（技能，行为不变）

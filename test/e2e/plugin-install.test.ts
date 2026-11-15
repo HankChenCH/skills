@@ -2,7 +2,7 @@
 // 官方执行体在 OS 边界注入：PATH 里放 shim 可执行文件（记录 argv 并按官方语义写 profile
 // 两落点），CLI 真实走 PATH 探测 → spawnSync → 对账 → 锁文件全链，绝不实跑官方 dsh/npx。
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const BIN = path.join(packageRoot, 'bin', 'infra.js');
+const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 const PKG = '@hankchen/dsh-demo';
 // 插件版本唯一来源 = 仓库插件包 package.json（shim 模拟官方安装当前包的实际版本，
 // 断言与之共用；版本升位零改动，ticket 20261115-f158：0.1.0 → 0.1.1）
@@ -24,7 +24,7 @@ const PLUGIN_VERSION = JSON.parse(
 // dependencies 追加依赖行（版本 = 仓库插件包当前版本，官方装的就是包的实际版本）、
 // dsh.profile.bundles 追加包名。dsh 与 npx shim 共用本实现。
 // shebang 用测试进程的绝对 node 路径：npx 形态测试的 PATH 只有 shim 目录，env node 不可用。
-const SHIM_BODY = (nodeBin) => `#!${nodeBin}
+const SHIM_BODY = (nodeBin: string) => `#!${nodeBin}
 const fs = require('node:fs');
 const path = require('node:path');
 const argv = process.argv.slice(2);
@@ -46,13 +46,13 @@ if (idx !== -1) {
 process.exit(0);
 `;
 
-function makeProject(t) {
+function makeProject(t: TestContext) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-pluginse2e-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return root;
 }
 
-function makeDshHome(t, profiles = []) {
+function makeDshHome(t: TestContext, profiles: string[] = []) {
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-dshhome-'));
   t.after(() => fs.rmSync(home, { recursive: true, force: true }));
   for (const name of profiles) {
@@ -61,7 +61,7 @@ function makeDshHome(t, profiles = []) {
   return home;
 }
 
-function makeShimDir(t, names) {
+function makeShimDir(t: TestContext, names: string[]) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-shim-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   for (const name of names) {
@@ -70,13 +70,13 @@ function makeShimDir(t, names) {
   return dir;
 }
 
-function makeShimLog(t) {
+function makeShimLog(t: TestContext) {
   const log = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'infra-shimlog-')), 'calls.log');
   t.after(() => fs.rmSync(path.dirname(log), { recursive: true, force: true }));
   return log;
 }
 
-function runCliIn(projectRoot, args, env) {
+function runCliIn(projectRoot: string, args: string[], env: Record<string, string>) {
   const result = spawnSync(process.execPath, [BIN, ...args], {
     cwd: projectRoot,
     encoding: 'utf8',
@@ -85,7 +85,7 @@ function runCliIn(projectRoot, args, env) {
   return { code: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
 
-function readShimCalls(log) {
+function readShimCalls(log: string) {
   return fs
     .readFileSync(log, 'utf8')
     .split('\n')
@@ -93,21 +93,21 @@ function readShimCalls(log) {
     .map((line) => JSON.parse(line));
 }
 
-function readLockfileAt(projectRoot) {
+function readLockfileAt(projectRoot: string) {
   return JSON.parse(fs.readFileSync(path.join(projectRoot, '.infra-lock.json'), 'utf8'));
 }
 
 // PTY 原始输出含 ANSI 控制序列与折行；断言渲染文本前剥控制序列、压掉空白
 const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
 
-function plainText(output) {
+function plainText(output: string): string {
   return output.replace(ANSI_RE, '').replace(/\s+/g, '');
 }
 
 // 经 expect(1) 在真实 PTY 中跑交互式 CLI（三层菜单：类型 → 插件勾选 → profile 选择）。
 // PATTERNS 与 KEYS 等长：发键前等对应提示文本渲染（盲发节奏会让三层连发菜单的
 // 按键在 prompt 切换窗口被吞，见 interactive.exp 头注）。
-function runInteractiveIn(projectRoot, keys, env, patterns = []) {
+function runInteractiveIn(projectRoot: string, keys: string[], env: Record<string, string>, patterns: string[] = []) {
   const keyTokens = keys
     .map((key) => {
       if (key === '\x1b[B') return 'DOWN';
@@ -231,7 +231,7 @@ test('[FR-5] 重跑刷新：锁文件插件区无重复条目、安装时间刷�
 });
 
 test('[FR-1] 交互路径三层菜单（类型→插件→profile）与旗标路径落盘一致', async (t) => {
-  const envOf = (dshHome, shimLog) => ({
+  const envOf = (dshHome: string, shimLog: string) => ({
     DSH_HOME: dshHome,
     DSH_SHIM_LOG: shimLog,
     PATH: `${makeShimDir(t, ['dsh'])}${path.delimiter}${process.env.PATH}`,

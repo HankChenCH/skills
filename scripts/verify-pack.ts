@@ -3,7 +3,7 @@
 // 技能侧（spec 20261115-8975）：包内技能清单 = 仓库 skills/ 清单。
 // 插件侧两查（spec 20261115-495e FR-2，docs/plugin-assets.md §1.4）：
 //   查 1 包内 plugins/ 清单 = 仓库 plugins/ 清单；
-//   查 2 每个仓库插件目录过 bundle 清单校验（复用 scripts/verify-bundle.mjs；
+//   查 2 每个仓库插件目录过 bundle 清单校验（复用 scripts/verify-bundle.ts；
 //       查 1 成立时包内内容 = 仓库内容，校验仓库目录即校验发出去的内容）。
 // 发布流程属单向门，本入口供 dev-release / 维护者在 `npm pack` 之后、`npm publish` 之前调用：
 //
@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { collectBundleDefects } from './verify-bundle.mjs';
+import { collectBundleDefects } from './verify-bundle.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS_DIR = path.join(packageRoot, 'skills');
@@ -36,7 +36,7 @@ if (list.status !== 0) {
 }
 
 // tarball 内技能 = 含 package/skills/<名>/SKILL.md 的目录名
-const packed = new Set();
+const packed = new Set<string>();
 for (const entry of list.stdout.split('\n')) {
   const match = entry.match(/^package\/skills\/([^/]+)\/SKILL\.md$/);
   if (match) {
@@ -44,7 +44,7 @@ for (const entry of list.stdout.split('\n')) {
   }
 }
 
-const repo = new Set(
+const repo = new Set<string>(
   fs
     .readdirSync(SKILLS_DIR, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -74,7 +74,7 @@ if (!fs.existsSync(PLUGINS_DIR)) {
 }
 
 // 查 1：tarball 内插件 = 含 package/plugins/<名>/package.json 的目录名
-const packedPlugins = new Set();
+const packedPlugins = new Set<string>();
 for (const entry of list.stdout.split('\n')) {
   const match = entry.match(/^package\/plugins\/([^/]+)\/package\.json$/);
   if (match) {

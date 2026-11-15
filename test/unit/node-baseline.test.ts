@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
@@ -8,13 +8,13 @@ import { readFile } from 'node:fs/promises';
 
 const OFFICIAL_DSH_NODE_FLOOR = [24, 9, 0];
 
-function versionFloorOf(range) {
+function versionFloorOf(range: string): number[] {
   const match = range.match(/^>=\s*(\d+)\.(\d+)\.(\d+)$/);
   assert.ok(match, `声明须是 ">=主.次.补" 形态，实际：${range}`);
   return [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
-function noLowerThan(version, floor) {
+function noLowerThan(version: number[], floor: number[]): boolean {
   const [major, minor, patch] = version;
   const [floorMajor, floorMinor, floorPatch] = floor;
   if (major !== floorMajor) return major > floorMajor;

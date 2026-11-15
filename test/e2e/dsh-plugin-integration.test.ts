@@ -7,7 +7,7 @@
 // 结构三段：前置门 → 执行段（真实安装 + profile 两落点 + 锁文件四元组 + 对账摘要）
 //          → 幂等段（重复安装：以官方幂等语义为准，无异常退出、锁文件无重复条目）。
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -15,10 +15,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assertPluginPreconditions, commandExists } from '../../src/dsh-command.js';
+import { assertPluginPreconditions, commandExists } from '../../src/dsh-command.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const BIN = path.join(packageRoot, 'bin', 'infra.js');
+const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 // 期望值独立来源：包名/版本运行时读仓库内包清单（发布后与 registry 最新版对账），不写死字面量
 const DEMO_PKG = JSON.parse(fs.readFileSync(path.join(packageRoot, 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
 const PKG = DEMO_PKG.name;
@@ -31,9 +31,9 @@ const PROBE_TIMEOUT_MS = 60 * 1000;
 // clack spinner/outro 输出含 ANSI 控制序列与折行；断言渲染文本前剥控制序列、压掉空白
 //（同 plugin-install.test.js 的 plainText 口径）
 const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
-const plainText = (output) => output.replace(ANSI_RE, '').replace(/\s+/g, '');
+const plainText = (output: string): string => output.replace(ANSI_RE, '').replace(/\s+/g, '');
 
-function makeTempDir(t, prefix) {
+function makeTempDir(t: TestContext, prefix: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
@@ -62,12 +62,12 @@ function probeRegistryVersion() {
     };
   }
   const reason = probe.error
-    ? `npm 不可用（${probe.error.code ?? probe.error.message}）`
+    ? `npm 不可用（${(probe.error as NodeJS.ErrnoException).code ?? probe.error.message}）`
     : output.trim().split('\n').slice(-3).join('；') || `退出码 ${probe.status}`;
   return { published: false, skipReason: `前置门：registry 探测失败（环境问题，非回归）——${reason}` };
 }
 
-function runInstallCli(projectRoot, dshHome) {
+function runInstallCli(projectRoot: string, dshHome: string) {
   const result = spawnSync(
     process.execPath,
     [BIN, '--plugins', PKG, '--profile', PROFILE],
@@ -88,18 +88,18 @@ function runInstallCli(projectRoot, dshHome) {
   };
 }
 
-function readProfilePkg(dshHome) {
+function readProfilePkg(dshHome: string) {
   return JSON.parse(fs.readFileSync(path.join(dshHome, 'profiles', PROFILE, 'package.json'), 'utf8'));
 }
 
 // profile node_modules 下实装包的清单：scoped 包名 → 目录路径的截段只在此处定义
 //（parse-normalization 规则 1），执行段与幂等段共用同一读取口径。
-function readInstalledManifest(dshHome) {
+function readInstalledManifest(dshHome: string) {
   const manifestPath = path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...PKG.split('/'), 'package.json');
   return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 }
 
-function readLockfile(projectRoot) {
+function readLockfile(projectRoot: string) {
   return JSON.parse(fs.readFileSync(path.join(projectRoot, '.infra-lock.json'), 'utf8'));
 }
 

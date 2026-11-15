@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AGENT_DIRS } from '../../src/agent-dirs.js';
+import { AGENT_DIRS } from '../../src/agent-dirs.ts';
 
 test('agent 目录清单为 20+ 量级', () => {
   assert.ok(AGENT_DIRS.length >= 20, `清单应 ≥20 项，实际 ${AGENT_DIRS.length}`);

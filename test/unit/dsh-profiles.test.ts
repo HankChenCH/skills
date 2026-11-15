@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { profilesRoot, listProfiles } from '../../src/dsh-profiles.js';
+import { profilesRoot, listProfiles } from '../../src/dsh-profiles.ts';
 
 // profile 解析（spec 20261115-495e 实现决策「profile 解析」Q2 拍板）：
 // profile 根 = $DSH_HOME/profiles/（缺省 ~/.dsh/profiles/）；列举既有 profile 按目录名排序。

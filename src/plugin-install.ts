@@ -6,11 +6,30 @@
 
 import { spawnSync } from 'node:child_process';
 
-import { buildPluginCommand, resolveExecutor, assertPluginPreconditions } from './dsh-command.js';
-import { reconcilePluginInstall } from './reconcile.js';
-import { PACKAGE_NAME, readLockfile, writeLockfile } from './lockfile.js';
+import { buildPluginCommand, resolveExecutor, assertPluginPreconditions } from './dsh-command.ts';
+import { reconcilePluginInstall } from './reconcile.ts';
+import { PACKAGE_NAME, readLockfile, writeLockfile } from './lockfile.ts';
+import type { InfraLockfile } from './lockfile.ts';
 
-export function runCommand({ command, args }) {
+export interface CommandRunResult {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+}
+
+export type CommandRunner = (invocation: { command: string; args: string[] }) => CommandRunResult;
+
+export interface InstalledPlugin {
+  name: string;
+  version: string;
+}
+
+export interface InstallPluginsResult {
+  profile: string;
+  installed: InstalledPlugin[];
+}
+
+export function runCommand({ command, args }: { command: string; args: string[] }): CommandRunResult {
   const result = spawnSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   return { status: result.status, stdout: result.stdout ?? '', stderr: result.stderr ?? '' };
 }
@@ -25,13 +44,23 @@ export function installPlugins({
   now,
   nodeVersion = process.version,
   run = runCommand,
-}) {
+}: {
+  profile: string;
+  plugins: string[];
+  profilePath: string;
+  dshInPath: boolean;
+  projectRoot: string;
+  packageVersion: string;
+  now: string;
+  nodeVersion?: string;
+  run?: CommandRunner;
+}): InstallPluginsResult {
   if (!Array.isArray(plugins) || plugins.length === 0) {
     throw new Error('未选择任何插件：plugins 为空，拒绝安装');
   }
   assertPluginPreconditions({ nodeVersion, profile });
   const executor = resolveExecutor(dshInPath);
-  const lockfile = readLockfile(projectRoot) ?? {
+  const lockfile: InfraLockfile = readLockfile(projectRoot) ?? {
     package: PACKAGE_NAME,
     packageVersion,
     skills: {},
@@ -41,7 +70,7 @@ export function installPlugins({
   lockfile.packageVersion = packageVersion;
   lockfile.plugins = { ...(lockfile.plugins ?? {}) };
 
-  const installed = [];
+  const installed: InstalledPlugin[] = [];
   for (const [index, name] of plugins.entries()) {
     try {
       const { command, args } = buildPluginCommand(executor, profile, name);

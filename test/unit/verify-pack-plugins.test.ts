@@ -4,7 +4,7 @@
 //   任一不满足退出码 1；既有 skills 对账行为不变。
 // fixture：临时目录真实 staging + 真实 tar 打包，不 mock 文件系统；对账脚本以子进程真实运行。
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, rm, cp, readdir, readFile } from 'node:fs/promises';
@@ -13,9 +13,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const VERIFY_PACK = path.join(packageRoot, 'scripts', 'verify-pack.mjs');
+const VERIFY_PACK = path.join(packageRoot, 'scripts', 'verify-pack.ts');
 
-async function makeTempRoot(t) {
+async function makeTempRoot(t: TestContext) {
   const root = await mkdtemp(path.join(tmpdir(), 'verify-pack-plugins-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
@@ -23,7 +23,7 @@ async function makeTempRoot(t) {
 
 // staging 一个满足「包内清单 = 仓库清单」的 tarball：skills 按 SKILL.md 标记、plugins 整目录拷贝。
 // options：omitPlugin（从包内抽走某插件使其缺席）、addExtraPlugin（塞进仓库没有的幽灵插件）。
-async function stageTarball(root, { omitPlugin = null, addExtraPlugin = false } = {}) {
+async function stageTarball(root: string, { omitPlugin = null, addExtraPlugin = false }: { omitPlugin?: string | null; addExtraPlugin?: boolean } = {}) {
   const stage = path.join(root, 'stage', 'package');
   await mkdir(path.join(stage, 'skills'), { recursive: true });
   await mkdir(path.join(stage, 'plugins'), { recursive: true });
@@ -48,7 +48,7 @@ async function stageTarball(root, { omitPlugin = null, addExtraPlugin = false } 
   return tarball;
 }
 
-function runVerifyPack(tarball) {
+function runVerifyPack(tarball: string) {
   return spawnSync(process.execPath, [VERIFY_PACK, tarball], { encoding: 'utf8' });
 }
 

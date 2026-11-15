@@ -3,18 +3,18 @@
 // fix 票 20261115-f158（patch 清单官方顶层数组形态取证 + 版本 0.1.1）：
 // 包形态四要素、engines 声明、patch 清单官方形态且以包名引用自己、模块真实可加载并打加载日志。
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const PLUGIN_NAME = '@hankchen/dsh-demo';
 const PLUGIN_DIR = new URL('../../plugins/dsh-demo/', import.meta.url);
 
-async function readPluginFile(name) {
+async function readPluginFile(name: string) {
   return readFile(new URL(name, PLUGIN_DIR), 'utf8');
 }
 
-async function readPluginJson(name) {
+async function readPluginJson(name: string) {
   return JSON.parse(await readPluginFile(name));
 }
 
@@ -44,7 +44,7 @@ test('demo 包 engines：node 基线 >=24.9.0，dsh 兼容范围覆盖官方当�
   assert.ok(match, `engines.dsh 须是 ">=主.次.补" 形态的范围声明，实际：${pkg.engines.dsh}`);
   const floor = match.slice(1, 4).map(Number);
   const OFFICIAL_DSH_RUNTIME = [0, 2, 2];
-  const atLeast = (version, base) =>
+  const atLeast = (version: number[], base: number[]) =>
     version[0] !== base[0]
       ? version[0] > base[0]
       : version[1] !== base[1]
@@ -73,14 +73,14 @@ test('插件模块真实可加载：导出 name=包名 与 apply(ctx)，apply �
   const mod = await import(new URL('index.js', PLUGIN_DIR).href);
   assert.equal(mod.name, PLUGIN_NAME, 'name 取包名字符串（plugin-assets §1.3）');
   assert.equal(typeof mod.apply, 'function');
-  const logs = [];
-  mod.apply({ logger: { info: (message) => logs.push(message) } });
+  const logs: unknown[] = [];
+  mod.apply({ logger: { info: (message: unknown) => logs.push(message) } });
   assert.equal(logs.length, 1, 'apply 应恰好打一条加载日志');
-  assert.match(logs[0], new RegExp(PLUGIN_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '日志须含插件名');
+  assert.match(logs[0] as string, new RegExp(PLUGIN_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '日志须含插件名');
 });
 
 test('demo 包通过 bundle 校验器（四要素齐备）', async () => {
-  const { collectBundleDefects } = await import('../../scripts/verify-bundle.mjs');
+  const { collectBundleDefects } = await import('../../scripts/verify-bundle.ts');
   const { fileURLToPath } = await import('node:url');
   assert.deepEqual(collectBundleDefects(fileURLToPath(PLUGIN_DIR)), []);
 });

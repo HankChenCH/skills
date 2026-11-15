@@ -7,27 +7,35 @@
 // @deepseek-ai/cordis-plugin-loader EntryOptions：insert 元素须 id + name）；
 // fixture 在临时目录真实读写，不 mock 文件系统。
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { collectBundleDefects } from '../../scripts/verify-bundle.mjs';
+import { collectBundleDefects } from '../../scripts/verify-bundle.ts';
 
 const PLUGIN_NAME = '@hankchen/dsh-demo';
+
+// fixture 插件包 package.json 的可变异切片（四要素相关字段；破坏测试逐字段删改）
+interface FixturePluginPackage {
+  name?: string;
+  type?: string;
+  files?: string[];
+  dsh?: { bundle?: { patch?: string } };
+}
 
 // 官方形态的 patch 清单（ticket 20261115-f158 取证）：顶层 YAML 数组，元素 = PatchOptions；
 // insert 元素 = EntryOptions，须 id + name（name = 包名，宿主按模块说明符解析）。
 const OFFICIAL_PATCH = `- insert:\n    - id: dsh-demo-load-log\n      name: '${PLUGIN_NAME}'\n`;
 
-async function makeTempRoot(t) {
+async function makeTempRoot(t: TestContext) {
   const root = await mkdtemp(path.join(tmpdir(), 'verify-bundle-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }
 
 // 按 spec FR-2 四要素手工构造的合格插件包（独立 fixture，不引用仓库插件源码）
-async function writeValidPlugin(root) {
+async function writeValidPlugin(root: string) {
   const dir = path.join(root, 'dsh-demo');
   await mkdir(dir, { recursive: true });
   await writeFile(
@@ -53,9 +61,9 @@ async function writeValidPlugin(root) {
   return dir;
 }
 
-async function rewritePackageJson(dir, mutate) {
+async function rewritePackageJson(dir: string, mutate: (pkg: FixturePluginPackage) => void) {
   const pkgPath = path.join(dir, 'package.json');
-  const pkg = JSON.parse(await readFile(pkgPath, 'utf8'));
+  const pkg: FixturePluginPackage = JSON.parse(await readFile(pkgPath, 'utf8'));
   mutate(pkg);
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2));
 }

@@ -1,0 +1,29 @@
+{
+  // TS 迁移类型检查（票 20261115-d437，本运行无独立 design 阶段、票即权威）：
+  // - module/moduleResolution nodenext：ESM + 显式扩展名导入的真实形态（仓内 .ts specifier
+  //   直跑、发布面 prepack emit 同形），allowImportingTsExtensions 使 .ts specifier 可检。
+  // - strict 全开，唯一例外 useUnknownInCatchVariables=false：迁移零行为变化优先——strict
+  //   默认的 unknown catch 会逼出 12 处 instanceof 分支的运行面改动；本库错误均为构造的
+  //   Error，关闭该子旗标让 catch 体保持原样。
+  // - erasableSyntaxOnly：拍板 D8 语法约束（无 enum/namespace/参数属性），tsc 独立承担检查。
+  // - include 覆盖 test/：测试代码同受类型检查（期望值拼装错误在合入前被拦）；测试 helper
+  //   的类型标注属 AC2 允许的「新增类型标注」。
+  // - noEmit：类型检查独立于运行（AC3）；发布面 emit 由 scripts/prepack.ts 经 compiler API
+  //   承载（含已知配置码 5096 的显式处理），不走本配置。
+  // - target/lib es2023：node ≥24.9 运行面的保守子集；skipLibCheck + types:["node"]（仅
+  //   @types/node 全局类型，@clack/prompts 走包内 exports 类型）。
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "useUnknownInCatchVariables": false,
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src", "bin", "scripts", "test"]
+}
