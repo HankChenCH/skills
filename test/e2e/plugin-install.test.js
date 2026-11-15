@@ -91,6 +91,13 @@ function readLockfileAt(projectRoot) {
   return JSON.parse(fs.readFileSync(path.join(projectRoot, '.infra-lock.json'), 'utf8'));
 }
 
+// PTY 原始输出含 ANSI 控制序列与折行；断言渲染文本前剥控制序列、压掉空白
+const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
+
+function plainText(output) {
+  return output.replace(ANSI_RE, '').replace(/\s+/g, '');
+}
+
 // 经 expect(1) 在真实 PTY 中跑交互式 CLI（三层菜单：类型 → 插件勾选 → profile 选择）。
 // PATTERNS 与 KEYS 等长：发键前等对应提示文本渲染（盲发节奏会让三层连发菜单的
 // 按键在 prompt 切换窗口被吞，见 interactive.exp 头注）。
@@ -251,4 +258,51 @@ test('[FR-1] 交互路径三层菜单（类型→插件→profile）与旗标路
   for (const name of Object.keys(la)) {
     assert.deepEqual({ version: la[name].version, profile: la[name].profile }, { version: lb[name].version, profile: lb[name].profile });
   }
+});
+
+test('[FR-1] 交互第二层条目以正名呈现、提示为包 description，完成摘要逐条列对账结果', async (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+  // 期望字面独立来源：plugins/dsh-demo/package.json（正名 = name、提示 = description、版本随包）
+  const demoPkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
+
+  // 第一层 DOWN 到插件 → ENTER；第二层 SPACE 勾选 → ENTER；第三层回车选 dev
+  const picked = await runInteractiveIn(
+    project,
+    ['\x1b[B', '\r', ' ', '\r', '\r'],
+    { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['选择要安装的资产类型', '', '选择要安装的插件', '', '选择目标 dsh profile'],
+  );
+  assert.equal(picked.code, 0, '交互插件安装应成功退出');
+
+  const plain = plainText(picked.output);
+  assert.ok(plain.includes(demoPkg.name), `第二层应以正名呈现条目：${demoPkg.name}`);
+  assert.ok(plain.includes(demoPkg.description.replace(/\s+/g, '')), `第二层提示应为包 description：${demoPkg.description}`);
+  assert.ok(
+    plain.includes(`已安装插件${demoPkg.name}@${demoPkg.version}→dshprofiledev（对账：依赖行+bundles行齐备）`),
+    '完成摘要应逐条列插件名/版本与对账状态',
+  );
+});
+
+test('[FR-3|异常流B] 交互三层选 desktop：拒装并说明官方保留名，不执行官方命令、不写锁文件', async (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['desktop', 'dev']); // 按名排序 desktop 居首，回车即选中它
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+
+  // 同款三层按键：类型→插件→profile；第三层回车选排序首项 desktop
+  const picked = await runInteractiveIn(
+    project,
+    ['\x1b[B', '\r', ' ', '\r', '\r'],
+    { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['选择要安装的资产类型', '', '选择要安装的插件', '', '选择目标 dsh profile'],
+  );
+  const output = picked.output.replace(ANSI_RE, '');
+  assert.equal(picked.code, 1, '交互选 desktop 应拒装（退出码 1）');
+  assert.match(output, /desktop/);
+  assert.match(output, /保留/, '应说明官方保留名行为');
+  assert.equal(fs.existsSync(shimLog), false, '拒装不得执行任何官方命令');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '拒装不得写锁文件');
 });
