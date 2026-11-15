@@ -150,7 +150,7 @@ test('[FR-1] 交互安装后锁文件记账：包版本 + 逐技能指纹/安装
   const project = makeTargetProject(t);
   await runInteractive(project, ['\r', ...pickKeys(PICK_INDICES)]);
   const lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
-  assert.equal(lockfile.package, '@hankghchen/infra');
+  assert.equal(lockfile.package, '@hankchen/infra');
   assert.equal(lockfile.packageVersion, '0.1.0');
   assert.deepEqual(Object.keys(lockfile.skills).sort(), [...PICK_NAMES].sort());
   for (const entry of Object.values(lockfile.skills)) {
@@ -227,7 +227,7 @@ test('[FR-6] --help 列明全部旗标与示例、退出码 0', (t) => {
   const project = makeTargetProject(t);
   const { code, stdout } = runCli(project, ['--help']);
   assert.equal(code, 0);
-  for (const needle of ['--all', '--skills', '--help', 'npx @hankghchen/infra']) {
+  for (const needle of ['--all', '--skills', '--help', 'npx @hankchen/infra']) {
     assert.ok(stdout.includes(needle), `--help 输出应含 ${needle}`);
   }
 });
@@ -257,9 +257,9 @@ test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文�
   const tarballB = pack(pkgDir);
 
   const project = makeTargetProject(t);
-  const binIn = (root) => path.join(root, 'node_modules', '@hankghchen/infra', 'bin', 'infra.js');
+  const binIn = (root) => path.join(root, 'node_modules', '@hankchen/infra', 'bin', 'infra.js');
 
-  // 安装版本 A（模拟 npx @hankghchen/infra@0.1.0）
+  // 安装版本 A（模拟 npx @hankchen/infra@0.1.0）
   let r = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballA], {
     cwd: project,
     encoding: 'utf8',
@@ -272,7 +272,7 @@ test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文�
   const contentA = fs.readFileSync(path.join(project, '.agents/skills', PICK_NAMES[0], 'SKILL.md'), 'utf8');
   assert.ok(!contentA.includes('v0.2.0 标记'), '版本 A 落盘不应含版本 B 标记');
 
-  // 升级到版本 B 并重跑（模拟 npx @hankghchen/infra@0.2.0 + 幂等刷新）
+  // 升级到版本 B 并重跑（模拟 npx @hankchen/infra@0.2.0 + 幂等刷新）
   r = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballB], {
     cwd: project,
     encoding: 'utf8',

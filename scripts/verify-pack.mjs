@@ -3,7 +3,7 @@
 // 必须 = 仓库 skills/ 清单，不等即拒绝（退出码 1）。发布流程属单向门，本入口供
 // dev-release / 维护者在 `npm pack` 之后、`npm publish` 之前调用：
 //
-//   npm run verify:pack -- <tarball 路径>       # 例：hankghchen-infra-0.1.0.tgz
+//   npm run verify:pack -- <tarball 路径>       # 例：hankchen-infra-0.1.0.tgz
 //
 // 维护者段（README 发布步骤与 registry 缓解路径）由安装故事票补写。
 

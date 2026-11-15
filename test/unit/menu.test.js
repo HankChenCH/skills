@@ -74,7 +74,7 @@ test('-h 与 --help 等价，进入帮助模式', () => {
 
 test('--help 文本列明全部旗标与示例', () => {
   const help = renderHelp();
-  for (const needle of ['--all', '--skills', '--help', 'npx @hankghchen/infra']) {
+  for (const needle of ['--all', '--skills', '--help', 'npx @hankchen/infra']) {
     assert.ok(help.includes(needle), `帮助文本应含 ${needle}`);
   }
 });

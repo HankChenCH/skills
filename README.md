@@ -54,7 +54,7 @@ AI 协作开发的三种常见失控：
 在目标 git 项目根目录裸跑一条命令，进入两层菜单：
 
 ```bash
-npx @hankghchen/infra
+npx @hankchen/infra
 ```
 
 第一层选资产类型（本轮「技能」可安装；「规范」等类型为占位，显示但不可安装），第二层空格勾选要装的技能、回车确认。安装器做完三件事：
@@ -66,15 +66,15 @@ npx @hankghchen/infra
 脚本与 CI 里免交互安装，落盘结果与菜单路径一致：
 
 ```bash
-npx @hankghchen/infra --all                        # 安装全部 31 项技能
-npx @hankghchen/infra --skills dev-spec,dev-plan   # 只装指定技能（逗号分隔）
-npx @hankghchen/infra --skills dev-spec --skills ref-testing   # 可重复出现，取并集
+npx @hankchen/infra --all                        # 安装全部 31 项技能
+npx @hankchen/infra --skills dev-spec,dev-plan   # 只装指定技能（逗号分隔）
+npx @hankchen/infra --skills dev-spec --skills ref-testing   # 可重复出现，取并集
 ```
 
-全部旗标与示例见 `npx @hankghchen/infra --help`。
+全部旗标与示例见 `npx @hankchen/infra --help`。
 
 - **重跑即升级**：再跑一次同一条命令，已装技能按当前包内容覆盖刷新、锁文件同步更新，不重复堆积。
-- **锁版本**：`npx @hankghchen/infra@<版本>` 安装指定版本（如 `npx @hankghchen/infra@0.1.0`），锁文件记录实际安装的版本号，团队以此对齐同一版本。
+- **锁版本**：`npx @hankchen/infra@<版本>` 安装指定版本（如 `npx @hankchen/infra@0.1.0`），锁文件记录实际安装的版本号，团队以此对齐同一版本。
 
 npm 访问受限（内网、公司代理）时，先配镜像或代理再跑安装：
 
@@ -187,13 +187,13 @@ npm config set https-proxy http://127.0.0.1:7890
 
 ## 维护者：发布流程
 
-npm 包 `@hankghchen/infra` 的包根即仓库根，skills/ 全量随包分发。发布三步，顺序固定：
+npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。发布三步，顺序固定：
 
 1. **对账**：`npm pack` 产出 tarball 后跑对账校验——包内技能清单必须等于仓库 `skills/` 清单，不等即拒绝发布（退出码 1）：
 
    ```bash
    npm pack
-   npm run verify:pack -- hankghchen-infra-<版本>.tgz
+   npm run verify:pack -- hankchen-infra-<版本>.tgz
    ```
 
 2. **升版本号**：改 `package.json` 的 `version`。semver 判据——patch：既有技能内容修订；minor：新增技能；major：移除或更名技能、安装目标或软链规则变更（后两类会改变既有项目的落盘形态）。

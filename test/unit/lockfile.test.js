@@ -65,7 +65,7 @@ test('写入后读回一致（包版本 + 逐技能名/指纹/安装时间）', 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-proj-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const lockfile = {
-    package: '@hankghchen/infra',
+    package: '@hankchen/infra',
     packageVersion: '0.1.0',
     skills: {
       'dev-spec': { fingerprint: 'f'.repeat(64), installedAt: '2026-11-15T00:00:00Z' },
@@ -79,12 +79,12 @@ test('重写同名技能条目为覆盖、不产生重复条目', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-proj-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   writeLockfile(root, {
-    package: '@hankghchen/infra',
+    package: '@hankchen/infra',
     packageVersion: '0.1.0',
     skills: { a: { fingerprint: '1', installedAt: 't1' } },
   });
   writeLockfile(root, {
-    package: '@hankghchen/infra',
+    package: '@hankchen/infra',
     packageVersion: '0.1.0',
     skills: { a: { fingerprint: '2', installedAt: 't2' } },
   });
