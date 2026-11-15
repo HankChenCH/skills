@@ -11,7 +11,7 @@
 
 ### 1.1 仓库布局
 
-- 插件源码放 `agents/<宿主>/<机制段>/plugins/<插件目录名>/`（agents/ 布局规范 docs/standards/agents-layout.md，宿主段 = 宿主标识如 `dsh`、机制段 `plugins`），**每个插件目录各自是完整的 npm 包**（有自己的 package.json，语义化版本独立演进）。
+- 插件源码放 `agents/<宿主>/<机制段>/<插件目录名>/`（agents/ 布局规范 docs/standards/agents-layout.md，宿主段 = 宿主标识如 `dsh`，机制段当前为 `plugins`），**每个插件目录各自是完整的 npm 包**（有自己的 package.json，语义化版本独立演进）。
 - 包根 = 仓库根（ADR 20261115-f143）：初始化器包 `@hankchen/infra` 的 `files` 清单加入 `agents`（与 skills 同法），`agents/` 两级布局下的新增宿主与插件目录自动随包分发，无需改安装器代码。
 - **条目正名是包名，不是目录名**：菜单条目、安装转发、锁文件记账一律取插件包 package.json 的 `name`（registry 名，如 `@hankchen/dsh-demo`）；`description` 取为菜单提示语。
 
