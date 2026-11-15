@@ -15,9 +15,9 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test test/unit/ test/e2e/",
-    "test:unit": "node --test test/unit/",
-    "test:e2e": "node --test test/e2e/",
+    "test": "node --test 'test/unit/**/*.test.js' 'test/e2e/**/*.test.js'",
+    "test:unit": "node --test 'test/unit/**/*.test.js'",
+    "test:e2e": "node --test 'test/e2e/**/*.test.js'",
     "verify:pack": "node scripts/verify-pack.mjs"
   },
   "dependencies": {
