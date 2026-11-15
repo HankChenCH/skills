@@ -7,8 +7,10 @@
 //   4. patch 清单为官方 loader 可解析的 PatchOptions[]（要素表第 4 行「以包名引用自己」的官方
 //      形态，ticket 20261115-f158 取证：顶层须 YAML 数组、元素须映射、insert 元素须 id + name、
 //      引用名 = 包名）；
-//   5. 插件模块导出 name 与 apply(ctx)（§1.4 附录二；main 直指模块作为定位入口随查，
-//      静态读源码，套件约定 ESM + 内联导出，照抄 demo 即在此形态内）。
+//   5. 插件模块导出 name 与 apply(ctx)（§1.4 附录二；main 直指模块作为定位入口随查，main 允许
+//      .ts 形态——spec 20261115-f650 demo 插件 .ts 化契约；静态读源码，套件约定 ESM + 内联导出，
+//      照抄 demo 即在此形态内。导出识别在剥注释后的文本上做：.ts 文档注释天然引用导出名、
+//      type 声明形似导出，裸正则会误放行幽灵导出）。
 // scripts/verify-pack.ts 的插件侧复用本实现；独立调用：
 //
 //   node scripts/verify-bundle.ts <插件包目录>...
@@ -273,6 +275,75 @@ function collectPatchDefects(name: string, patchTarget: string, patchText: strin
   return defects;
 }
 
+// 剥注释（字符串感知，票 20261115-e692 .ts 形态适配）：导出识别前先把行注释与块注释逐字符
+// 换成空格（保留换行与字符位，防 token 粘连）。机制取舍：AST 解析需 typescript 依赖，而本
+// 校验器被 verify-pack（发布对账）与测试直跑复用、scripts/ 零运行时依赖纪律（ADR
+// 20261115-f143 零构建直跑）不可假设它——.ts 形态引入的真实噪声 = 文档注释天然引用导出名
+// 与 type 声明形似导出，剥注释 + 既有词法锚定（export const/let/var/function）即可覆盖；
+// 套件约定 ESM + 内联导出（见要素 5 头注），在此约定内正则匹配足够。
+// 字符串感知：'…'、"…"、`…` 内的 // 与 /* 不开注释（插件模块日志串含 URL 属常态）；转义对
+// （\\、\' 等）不终结字符串。已知边界：模板串按到闭反引号为止、不展开 ${} 内嵌引号——超出
+// 套件插件模块形态（照抄 demo 即在此形态内）。误判两方向均有界：漏认方向 = 校验器误报未导出
+// （fail-loud 有界）；漏剥方向 = 静默放行，由宿主真实加载链兜底（集成承载票 20261115-13c4）。
+function stripComments(source: string): string {
+  type State = 'code' | 'single' | 'double' | 'template' | 'line' | 'block';
+  let state: State = 'code';
+  let out = '';
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i]!;
+    const next = source[i + 1] ?? '';
+    if (state === 'code') {
+      if (ch === '/' && next === '/') {
+        state = 'line';
+        out += '  ';
+        i++;
+        continue;
+      }
+      if (ch === '/' && next === '*') {
+        state = 'block';
+        out += '  ';
+        i++;
+        continue;
+      }
+      if (ch === "'" || ch === '"' || ch === '`') state = ch === "'" ? 'single' : ch === '"' ? 'double' : 'template';
+      out += ch;
+      continue;
+    }
+    if (state === 'single' || state === 'double' || state === 'template') {
+      out += ch;
+      if (ch === '\\') {
+        out += next;
+        i++;
+        continue;
+      }
+      if ((state === 'single' && ch === "'") || (state === 'double' && ch === '"') || (state === 'template' && ch === '`')) {
+        state = 'code';
+      }
+      continue;
+    }
+    if (state === 'line') {
+      if (ch === '\n') {
+        state = 'code';
+        out += ch;
+      } else {
+        out += ' ';
+      }
+      continue;
+    }
+    // block：*/ 收口，其余逐字符空格化（换行保留）
+    if (ch === '*' && next === '/') {
+      state = 'code';
+      out += '  ';
+      i++;
+    } else {
+      out += ch === '\n' ? '\n' : ' ';
+    }
+  }
+  return out;
+}
+
+export { stripComments };
+
 export function collectBundleDefects(pluginDir: string): string[] {
   let pkg: PluginPackageJson;
   try {
@@ -339,10 +410,12 @@ export function collectBundleDefects(pluginDir: string): string[] {
       defects.push(`${name ?? path.basename(pluginDir)}：插件模块文件读不到（${mainEntry}，${error.message}）`);
     }
     if (source !== undefined) {
-      if (!/\bexport\s+(?:const|let|var)\s+name\b/.test(source)) {
+      // 导出识别在剥注释后的文本上做（.ts 形态适配，票 20261115-e692）：注释字样不算导出
+      const stripped = stripComments(source);
+      if (!/\bexport\s+(?:const|let|var)\s+name\b/.test(stripped)) {
         defects.push(`${name ?? path.basename(pluginDir)}：插件模块（${mainEntry}）未导出 name`);
       }
-      if (!/\bexport\s+(?:(?:async\s+)?function|(?:const|let|var))\s+apply\b/.test(source)) {
+      if (!/\bexport\s+(?:(?:async\s+)?function|(?:const|let|var))\s+apply\b/.test(stripped)) {
         defects.push(`${name ?? path.basename(pluginDir)}：插件模块（${mainEntry}）未导出 apply(ctx)`);
       }
     }

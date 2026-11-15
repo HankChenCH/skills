@@ -22,7 +22,7 @@
 | 要素 | 值 | 作用 |
 |---|---|---|
 | `type` | `"module"` | 插件模块按 ESM 加载 |
-| `main` | 直指插件模块（如 `"index.js"`） | 宿主加载插件的入口 |
+| `main` | 直指插件模块（.ts 形态零构建直发，如 `"index.ts"`——spec 20261115-f650 demo 插件 .ts 化契约） | 宿主加载插件的入口 |
 | `files` | 含 `cordis.patch.yml` 与模块文件 | npm 白名单外文件不随包分发，清单缺文件 = 装出去的包坏 |
 | `dsh` | `{"bundle": {"patch": "./cordis.patch.yml"}}` | dsh 识别插件的凭据；缺它见 §2.2 警告 |
 

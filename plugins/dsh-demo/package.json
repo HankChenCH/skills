@@ -3,9 +3,9 @@
   "version": "0.1.1",
   "description": "dsh 插件资产活样例：官方「Your first plugin」最小 bundle 形态，加载时打一条日志",
   "type": "module",
-  "main": "index.js",
+  "main": "index.ts",
   "files": [
-    "index.js",
+    "index.ts",
     "cordis.patch.yml"
   ],
   "engines": {

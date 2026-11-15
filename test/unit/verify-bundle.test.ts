@@ -163,6 +163,72 @@ test('patch 文件为顶层数组但 insert 元素缺 id 即拒绝，缺陷点�
   assert.match(defects[0], /\bid\b/);
 });
 
+// .ts 形态插件包（spec 20261115-f650 demo 插件 .ts 化契约：main 直指 .ts 模块）。
+// fixture 独立于仓库插件源码，模块带类型标注与文档注释——.ts 文档注释天然引用导出名，
+// type 声明形似导出，是 .js 形态没有的解析噪声面（票 20261115-e692 校验器适配点）。
+async function writeValidPluginTs(root: string) {
+  const dir = path.join(root, 'dsh-demo-ts');
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, 'package.json'),
+    JSON.stringify(
+      {
+        name: PLUGIN_NAME,
+        version: '0.1.1',
+        type: 'module',
+        main: 'index.ts',
+        files: ['index.ts', 'cordis.patch.yml'],
+        dsh: { bundle: { patch: './cordis.patch.yml' } },
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(dir, 'index.ts'),
+    `/** 插件文档注释：提及 export const name 与 export function apply 属正常文档噪声。 */\n` +
+      `export const name: string = '${PLUGIN_NAME}';\n\n` +
+      `const homepage = 'https://dsh.example//guide';\n\n` +
+      `export function apply(ctx: { logger: { info(message: string): void } }): void {\n` +
+      `  ctx.logger.info(\`插件已加载：\${name}（\${homepage}）\`);\n}\n`,
+  );
+  await writeFile(path.join(dir, 'cordis.patch.yml'), OFFICIAL_PATCH);
+  return dir;
+}
+
+test('.ts 形态合法插件包通过校验：类型标注内联导出 + 注释噪声 + 字符串含 //', async (t) => {
+  const dir = await writeValidPluginTs(await makeTempRoot(t));
+  const defects = collectBundleDefects(dir);
+  assert.deepEqual(
+    defects,
+    [],
+    `合法 .ts 形态不应报缺陷（注释噪声与字符串内 // 不得干扰导出识别），实际：${JSON.stringify(defects)}`,
+  );
+});
+
+test('.ts 模块导出名仅存在于注释与 type 声明（幽灵导出）即拒绝，缺陷逐一点名', async (t) => {
+  const dir = await writeValidPluginTs(await makeTempRoot(t));
+  // 真实导出为零：name/apply 只出现在行注释、块注释与 export type 别名里——
+  // 朴素正则会把注释与类型层的字样当成运行时导出（.ts 形态误放行的结构性风险）。
+  await writeFile(
+    path.join(dir, 'index.ts'),
+    `// 历史残留：export const name = '${PLUGIN_NAME}';\n` +
+      `/*\n * 旧实现：export function apply(ctx) { ctx.logger.info(name); }\n */\n` +
+      `export type name = string;\n` +
+      `const internal = '未导出的内部常量';\n`,
+  );
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 2, `应报 name 与 apply 两项幽灵导出，实际：${JSON.stringify(defects)}`);
+  assert.ok(
+    defects.some((d) => /未导出 name/.test(d)),
+    `缺陷应点名未导出 name：${JSON.stringify(defects)}`,
+  );
+  assert.ok(
+    defects.some((d) => /未导出 apply/.test(d)),
+    `缺陷应点名未导出 apply：${JSON.stringify(defects)}`,
+  );
+});
+
 test('裸 dash 后缩进键的合法块状形态放行且引用检查通过（官方 loader 可解析）', async (t) => {
   const dir = await writeValidPlugin(await makeTempRoot(t));
   // 破折号单独一行、元素键在后续缩进行：标准块状 YAML，官方 loadOverlayPatches 正常解析
