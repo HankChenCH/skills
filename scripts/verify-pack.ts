@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // 发布前机械对账：npm pack 产物里的资产清单必须 = 仓库清单，不等即拒绝（退出码 1）。
 // 技能侧（spec 20261115-8975）：包内技能清单 = 仓库 skills/ 清单。
-// 插件侧两查（spec 20261115-495e FR-2，docs/plugin-assets.md §1.4）：
-//   查 1 包内 plugins/ 清单 = 仓库 plugins/ 清单；
+// 插件侧两查（spec 20261115-495e FR-2，docs/plugin-assets.md §1.4；agents/ 两级布局随
+// spec 20261115-ed9f 迁移，agents-layout.md §3.2——对账键为 <宿主>/<插件目录名> 复合键，
+// 两侧同法构造，报错消息点名宿主段）：
+//   查 1 包内 agents/*/plugins/ 清单 = 仓库 agents/*/plugins/ 清单；
 //   查 2 每个仓库插件目录过 bundle 清单校验（复用 scripts/verify-bundle.ts；
 //       查 1 成立时包内内容 = 仓库内容，校验仓库目录即校验发出去的内容）。
 // 发布流程属单向门，本入口供 dev-release / 维护者在 `npm pack` 之后、`npm publish` 之前调用：
@@ -17,7 +19,7 @@ import { collectBundleDefects } from './verify-bundle.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS_DIR = path.join(packageRoot, 'skills');
-const PLUGINS_DIR = path.join(packageRoot, 'plugins');
+const AGENTS_DIR = path.join(packageRoot, 'agents');
 
 const tarball = process.argv[2];
 if (!tarball) {
@@ -67,33 +69,53 @@ if (missing.length > 0 || extra.length > 0) {
 
 console.log(`✓ 对账通过：包内技能清单 = 仓库 skills/ 清单（${repo.size} 项）`);
 
-// ---------- 插件两查 ----------
-if (!fs.existsSync(PLUGINS_DIR)) {
-  console.error('✗ 仓库缺 plugins/ 目录——插件资产无从对账，拒绝发布');
+// ---------- 插件两查（agents/<宿主>/plugins/ 两级布局） ----------
+if (!fs.existsSync(AGENTS_DIR)) {
+  console.error('✗ 仓库缺 agents/ 目录——插件资产无从对账，拒绝发布');
   process.exit(1);
 }
 
-// 查 1：tarball 内插件 = 含 package/plugins/<名>/package.json 的目录名
-const packedPlugins = new Set<string>();
-for (const entry of list.stdout.split('\n')) {
-  const match = entry.match(/^package\/plugins\/([^/]+)\/package\.json$/);
-  if (match) {
-    packedPlugins.add(match[1]);
+// 仓库侧两级枚举：<宿主>/<插件目录名> 复合键（不同宿主可同名插件目录，单键会误合并）
+interface RepoPlugin {
+  key: string; // <宿主>/<插件目录名>
+  dir: string; // 仓库内绝对路径
+}
+const repoPlugins: RepoPlugin[] = [];
+for (const host of fs
+  .readdirSync(AGENTS_DIR, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => entry.name)
+  .sort()) {
+  const pluginsDir = path.join(AGENTS_DIR, host, 'plugins');
+  if (!fs.existsSync(pluginsDir)) {
+    continue; // 按需建目录：宿主可只载明其他机制（agents-layout.md §1.3）
+  }
+  for (const name of fs
+    .readdirSync(pluginsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort()) {
+    repoPlugins.push({ key: `${host}/${name}`, dir: path.join(pluginsDir, name) });
   }
 }
 
-const repoPlugins = fs
-  .readdirSync(PLUGINS_DIR, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory())
-  .map((entry) => entry.name);
+// 查 1：tarball 内插件 = 含 package/agents/<宿主>/plugins/<名>/package.json 的复合键
+const packedPlugins = new Set<string>();
+for (const entry of list.stdout.split('\n')) {
+  const match = entry.match(/^package\/agents\/([^/]+)\/plugins\/([^/]+)\/package\.json$/);
+  if (match) {
+    packedPlugins.add(`${match[1]}/${match[2]}`);
+  }
+}
 
-const missingPlugins = repoPlugins.filter((name) => !packedPlugins.has(name)).sort();
-const extraPlugins = [...packedPlugins].filter((name) => !repoPlugins.includes(name)).sort();
+const repoKeys = repoPlugins.map((plugin) => plugin.key);
+const missingPlugins = repoKeys.filter((key) => !packedPlugins.has(key)).sort();
+const extraPlugins = [...packedPlugins].filter((key) => !repoKeys.includes(key)).sort();
 
 let pluginFailed = false;
 if (missingPlugins.length > 0 || extraPlugins.length > 0) {
   pluginFailed = true;
-  console.error('✗ 包内插件清单与仓库 plugins/ 清单不一致，拒绝发布：');
+  console.error('✗ 包内插件清单与仓库 agents/*/plugins/ 清单不一致，拒绝发布：');
   if (missingPlugins.length > 0) {
     console.error(`  缺失（仓库有、包内无）：${missingPlugins.join('、')}`);
   }
@@ -103,7 +125,7 @@ if (missingPlugins.length > 0 || extraPlugins.length > 0) {
 }
 
 // 查 2：每个仓库插件目录过 bundle 清单校验（缺陷消息已点名哪个插件缺哪个要素）
-const bundleDefects = repoPlugins.flatMap((name) => collectBundleDefects(path.join(PLUGINS_DIR, name)));
+const bundleDefects = repoPlugins.flatMap((plugin) => collectBundleDefects(plugin.dir));
 if (bundleDefects.length > 0) {
   pluginFailed = true;
   console.error('✗ 仓库插件未过 bundle 清单校验，拒绝发布：');
@@ -116,5 +138,5 @@ if (pluginFailed) {
   process.exit(1);
 }
 console.log(
-  `✓ 对账通过：包内插件清单 = 仓库 plugins/ 清单，且每插件过 bundle 校验（${repoPlugins.length} 项）`,
+  `✓ 对账通过：包内插件清单 = 仓库 agents/*/plugins/ 清单，且每插件过 bundle 校验（${repoPlugins.length} 项）`,
 );
