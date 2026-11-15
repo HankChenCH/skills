@@ -45,15 +45,60 @@ AI 协作开发的三种常见失控：
 
 ## 快速上手
 
-依赖：git 与 bash。tracker 投影可选 GitHub（`gh`）/ GitLab（`glab`）/ 云效 Codeup（个人访问令牌），都不配则走本地文件模式，不影响任何门禁。
+依赖：git 与 bash；安装技能另需 Node.js ≥ 20.12.0。tracker 投影可选 GitHub（`gh`）/ GitLab（`glab`）/ 云效 Codeup（个人访问令牌），都不配则走本地文件模式，不影响任何门禁。
 
-1. **安装技能**：把 [skills/](./skills/) 下各子目录拷贝或软链到智能体的技能目录（ZCode 为 `~/.zcode/skills/`）。内置 ZCode 与 Claude Code 的接入参考，其他智能体走通用流程。
-2. **接入仓库**：在目标 git 仓库的会话里运行 `/setup-workspace`。它会扫描仓库、问你三件事（产物与 issue 出口、执行环境、编码标准来源），然后生成门禁脚本、配置与 tracker 适配器，并装好 git hooks。幂等可重跑，永不触碰源码。
-3. **开工**：
-   - `/sdlc` —— 随时盘点：走到哪个阶段、可开工哪些工票、被哪个门禁挡住。
-   - `/dev-clarify` —— 从一个模糊想法开始；需求已清晰可直接 `/dev-spec`。
-   - 脊柱上的技能出口**默认自动串联**下一个，只在决策点停下问你；也可以 `/sdlc next` 让总控自动推进到下一个决策点。
-   - 点名一张 approved spec 交给 `/dev-execute`，整 spec 编排：worktree 并行实现、逐票评审、一次合并收口，全程人只决策两次（开工、合并）。
+接入按两步走，顺序固定：**先安装技能，后 `/setup-workspace` 接门禁**。只装了技能、没接门禁就点名流程技能（`/dev-spec`、`/dev-implement` 等）会在入口被校验拒绝——技能停下来提示「本仓库未接入开发流程，先运行 /setup-workspace」。两步都完成才能开工。
+
+### 第 1 步：安装技能
+
+在目标 git 项目根目录裸跑一条命令，进入两层菜单：
+
+```bash
+npx @hankghchen/infra
+```
+
+第一层选资产类型（本轮「技能」可安装；「规范」等类型为占位，显示但不可安装），第二层空格勾选要装的技能、回车确认。安装器做完三件事：
+
+- 所选技能实体拷入项目 `.agents/skills/<技能名>/`，内容随包原样分发（与仓库 [skills/](./skills/) 清单一致）；
+- 对项目内已存在的 agent 目录（`.claude`、`.zcode` 等）建相对软链；不存在的跳过并列入完成摘要，不报错；
+- 在项目根写 `.infra-lock.json` 记账：包版本 + 逐技能指纹/安装时间。
+
+脚本与 CI 里免交互安装，落盘结果与菜单路径一致：
+
+```bash
+npx @hankghchen/infra --all                        # 安装全部 31 项技能
+npx @hankghchen/infra --skills dev-spec,dev-plan   # 只装指定技能（逗号分隔）
+npx @hankghchen/infra --skills dev-spec --skills ref-testing   # 可重复出现，取并集
+```
+
+全部旗标与示例见 `npx @hankghchen/infra --help`。
+
+- **重跑即升级**：再跑一次同一条命令，已装技能按当前包内容覆盖刷新、锁文件同步更新，不重复堆积。
+- **锁版本**：`npx @hankghchen/infra@<版本>` 安装指定版本（如 `npx @hankghchen/infra@0.1.0`），锁文件记录实际安装的版本号，团队以此对齐同一版本。
+
+npm 访问受限（内网、公司代理）时，先配镜像或代理再跑安装：
+
+```bash
+# 走公共镜像源
+npm config set registry https://registry.npmmirror.com
+
+# 或走 HTTP 代理
+npm config set proxy http://127.0.0.1:7890
+npm config set https-proxy http://127.0.0.1:7890
+```
+
+恢复默认：`npm config delete registry`、`npm config delete proxy`、`npm config delete https-proxy`。
+
+### 第 2 步：接入仓库
+
+在目标 git 仓库的会话里运行 `/setup-workspace`。它会扫描仓库、问你三件事（产物与 issue 出口、执行环境、编码标准来源），然后生成门禁脚本、配置与 tracker 适配器，并装好 git hooks。幂等可重跑，永不触碰源码。
+
+### 第 3 步：开工
+
+- `/sdlc` —— 随时盘点：走到哪个阶段、可开工哪些工票、被哪个门禁挡住。
+- `/dev-clarify` —— 从一个模糊想法开始；需求已清晰可直接 `/dev-spec`。
+- 脊柱上的技能出口**默认自动串联**下一个，只在决策点停下问你；也可以 `/sdlc next` 让总控自动推进到下一个决策点。
+- 点名一张 approved spec 交给 `/dev-execute`，整 spec 编排：worktree 并行实现、逐票评审、一次合并收口，全程人只决策两次（开工、合并）。
 
 一轮最小闭环：
 
@@ -139,6 +184,20 @@ AI 协作开发的三种常见失控：
 
 - **九类产物各有固定状态机**（如 spec：draft → approved → done），frontmatter 是 check.sh 的解析依据；知识档进版本库，过程档（工票 / 评审 / 验收 / 总览）被 .gitignore 排除、验收后蒸馏清扫——审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用。状态机详见 [docs/METHOD.md](./docs/METHOD.md) §5。
 - **check.sh 常用子命令**：`phase` 全库状态总览；`frontier` 可开工的工票；`validate <file>` 产物模板与 FR 追溯校验；`publish <file>` 投影到 tracker；`all` 全量 lint/typecheck/test。提交走轻门禁（message 带 `[#NNNN]` 或 `[trivial]`），push 前走重门禁（implemented 工票必须有 approved 评审覆盖）。
+
+## 维护者：发布流程
+
+npm 包 `@hankghchen/infra` 的包根即仓库根，skills/ 全量随包分发。发布三步，顺序固定：
+
+1. **对账**：`npm pack` 产出 tarball 后跑对账校验——包内技能清单必须等于仓库 `skills/` 清单，不等即拒绝发布（退出码 1）：
+
+   ```bash
+   npm pack
+   npm run verify:pack -- hankghchen-infra-<版本>.tgz
+   ```
+
+2. **升版本号**：改 `package.json` 的 `version`。semver 判据——patch：既有技能内容修订；minor：新增技能；major：移除或更名技能、安装目标或软链规则变更（后两类会改变既有项目的落盘形态）。
+3. **发布**：`npm publish`。发布是单向门，操作以 annotated git tag（`v<版本>`）留痕；完整检查单、CHANGELOG 纪律与「tag 与推送必须问人」的边界见 `/dev-release`。
 
 ## 文档
 
