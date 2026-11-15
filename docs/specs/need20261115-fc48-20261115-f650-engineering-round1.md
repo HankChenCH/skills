@@ -21,7 +21,7 @@ round 1 = 「调研先行、规范定稿、类型落地」三线（need FR-1～F
    - **RQ3 CLI 库选型**：候选（commander / yargs / cac / citty / clipanion 等）按硬维度对比——ESM/TS 原生、**npx 冷启动体积（实测数据）**、子命令模型扩展性、help 生成、维护活跃度——产出选型结论与迁移方案。
    - **RQ4 agent 宿主扩展机制普查**：输入 = AGENT_DIRS 已有 20+ 宿主清单（src/agent-dirs.js，取自 vercel-labs/skills 支持面）；产出 = 各宿主扩展机制类型（插件 / hooks / 命令 / 规则 / 子代理等）与官方目录约定，作为 `agents/<宿主>/<机制>/` 布局规范的输入。
 2. **agents/ 布局规范定稿**（need FR-1 round 1 深度）：以 RQ4 结论为输入，按「先改文档再改技能」治理规则定稿布局规范（目录模式、各机制类型的清单要素、发布纪律改造方案、demo 迁位方案）；**目录迁移落地折 round 2**（规范先行，迁移以定稿规范为准绳）。
-3. **全仓 TypeScript 无构建直跑**（need FR-3）：src/ bin/ scripts/ test/ 与 demo 插件全部 .ts 化，行为等价迁移；源码直发、运行时默认剥类型（node ≥24.9 本机实测可行）、`tsc --noEmit` 承担类型检查进 CI；bundle 校验器适配 .ts 形态。
+3. **全仓 TypeScript 无构建直跑**（need FR-3）：src/ bin/ scripts/ test/ 与 demo 插件全部 .ts 化，行为等价迁移；仓库内零构建直跑（运行时默认剥类型，node ≥24.9）、**发布面预编译**（node 拒剥 node_modules 下 .ts，见实现决策修订）、`tsc --noEmit` 承担类型检查进 CI；bundle 校验器适配 .ts 形态。
 4. **最小 CI 回归门**（need FR-2）：`.github/workflows` push/PR 触发，node 24（对齐 .nvmrc/engines）+ 类型检查 + 全量测试 + verify:pack 对账；dsh 集成测试与交互 e2e 在环境不满足时按既有前置门显式跳过并报因，不假绿。
 5. **dsh 端到端 .ts 实测**（need FR-7，集成级）：.ts 形态 demo 插件经官方命令装进临时 profile + dsh 真启动加载，apply 日志可见即证；证伪则显式证伪报告 + 回退方案（插件包发布前编译）作为 round 2 决策输入。
 
@@ -41,8 +41,8 @@ round 1 = 「调研先行、规范定稿、类型落地」三线（need FR-1～F
 - **RQ3 调研契约**：报告含候选库对比表，维度固定五项——ESM/TS 原生支持、包体积与 npx 冷启动耗时（**实测**：各候选装入后 `npm pack` 体积与冷启动 `time npx` 数据）、子命令/旗标模型扩展性、help 生成能力（等价复刻现行 --help 内容的可行性）、维护活跃度（最近发布时间、issue 响应）。结论节给出选型推荐 + 迁移方案（现行旗标语义映射表：--all/--skills/--plugins/--profile/-h 的库内表达 + 互斥校验 + 错误口径等价方案），作为 round 2 CLI 库引入票的输入。
 - **RQ4 调研契约**：报告按宿主逐个列——扩展机制类型（插件 / hooks / 斜杠命令 / 规则 / 子代理 / 其他）、官方目录约定（项目级与本机级）、分发形态（npm 包 / 目录拷贝 / 市场）。范围 = AGENT_DIRS 清单内可查证到官方扩展机制文档的宿主（查不到的显式标「无公开扩展机制文档」，不虚构）；结论节给出 `agents/<宿主>/<机制>/` 布局模式的机制类型分类学，作为布局规范定稿输入。
 - **布局规范定稿契约**（need FR-1 round 1 深度）：以 RQ4 结论为输入定稿规范文档——`agents/<宿主>/<机制>/` 目录模式定义、各机制类型的清单要素（对齐插件包四要素的思路逐机制定义）、发布纪律改造方案（双包对账路径变更方案）、demo 迁位方案（`agents/dsh/plugins/dsh-demo/`）；规范文档落点与是否升格/拆分 plugin-assets.md 归 design；目录迁移本身不在本轮落地（round 2 首批票，按定稿规范执行）。
-- **TS 迁移形态（need FR-3，拍板 D8）**：无构建直跑——源码 .ts 直发，运行时依赖 node ≥24.9 默认类型剥离（本机实测 node 24.22.1 直跑与 .ts 间显式扩展名导入均通过）；语法约束 = erasable-only（无 enum/namespace/参数属性，用 const 对象 + union 替代）；类型检查 = `tsc --noEmit` 独立于运行（CI 步骤 + 本地脚本）；tsconfig 策略（strict 程度、include 范围）归 design。行为等价迁移：不改任何对外可观察行为，既有全量测试（49 例）直跑 .ts 全绿即防线（node:test 原生支持 .ts 已实测）。
-- **demo 插件 .ts 化契约**：插件包 `main` 直指 .ts 模块、`files` 清单含 .ts 文件与 cordis.patch.yml、四要素与 bundle 校验器适配 .ts 形态（校验器解析模块导出的方式对 .ts 的适配点归 design）；发布形态保持零构建。**回退预案**（FR-7 证伪时启用）：插件包单独预编译（发布前 tsc），主 CLI 零构建不变；回退触发条件 = 端到端实测失败且读码复核确认宿主加载链不支持，回退决策材料进 round 2 输入。
+- **TS 迁移形态（need FR-3，拍板 D8；20261115-d437 运行中修订，见备注）**：仓库内零构建直跑不变——src/ bin/ scripts/ test/ 源码全部 .ts，开发与测试直跑（node ≥24.9 默认剥类型，node:test 原生支持 .ts）；语法约束 = erasable-only（无 enum/namespace/参数属性，用 const 对象 + union 替代）；类型检查 = `tsc --noEmit` 独立于运行（CI 步骤 + 本地脚本）；tsconfig 策略（strict 程度、include 范围）归 design。**发布面预编译（修订点）**：node 对 node_modules 下 .ts 一律拒绝剥类型（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`，官方有意设计、无旗标逃生，npm install / npx 消费路径全命中）——发布面比照插件包回退预案先例在打包前 tsc 编译（prepack 承载 emit），tarball 含编译 .js（bin 直指编译产物）与 .ts 源码（导航可读），skills/plugins 清单与路径不变。行为等价迁移：不改任何对外可观察行为，既有全量测试直跑 .ts 全绿即防线（node:test 原生支持 .ts 已实测）。
+- **demo 插件 .ts 化契约**：插件包 `main` 直指 .ts 模块、`files` 清单含 .ts 文件与 cordis.patch.yml、四要素与 bundle 校验器适配 .ts 形态（校验器解析模块导出的方式对 .ts 的适配点归 design）；发布形态保持零构建。**回退预案**（FR-7 证伪时启用）：插件包单独预编译（发布前 tsc）——该先例机制已由 D8 修订扩展为主 CLI 发布面形态（见上条与备注）；回退触发条件 = 端到端实测失败且读码复核确认宿主加载链不支持，回退决策材料进 round 2 输入。
 - **CI workflow 契约（need FR-2）**：触发 = push + pull_request；运行时 = 单 node 24（版本读 .nvmrc 或与 engines 一致的写法，具体归 design）；步骤链 = checkout → node setup → 依赖安装（本轮仍 npm，pnpm 折 round 2）→ tsc --noEmit → 全量测试 → verify:pack；环境缺失（dsh 集成测试的 node/registry 前置、交互 e2e 的 expect/PTY 前置）→ 既有前置门显式跳过并输出报因，不许假绿；workflow 文件不持 secrets（发布自动化是非目标）。
 - **dsh 端到端实测契约（need FR-7，集成级）**：临时 `DSH_HOME` + 测试 profile + .ts 形态 demo 插件经官方命令（npx 执行体）安装 + 真实启动该 profile 断言 apply 日志可见；测试前置门沿既有纪律（node ≥24.9 + registry 可达，不满足显式跳过报因）。
 - **行为不变防线（need FR-5 round 1 深度）**：本轮一切改动（TS 迁移、CI 落地、规范文档）不动对外行为——npx 命令形态、两层菜单、技能安装落盘、插件安装转发、`--plugins`/`--profile`/`--all`/`--skills`/`-h` 旗标语义与错误口径、--help 文本内容全部保持原样；cli-args.js 手写解析本轮不替换（FR-8 落地折 round 2）。
@@ -62,7 +62,7 @@ round 1 = 「调研先行、规范定稿、类型落地」三线（need FR-1～F
 - [FR-2 | 工单级] Given workflow 文件，When 静态核验，Then 触发含 push 与 pull_request、node 24、步骤链含 tsc --noEmit + 全量测试 + verify:pack、无 secrets；Given 环境缺 dsh/registry/expect，When 全量测试运行，Then 对应测试显式跳过并输出报因（零静默假绿）。
 - [FR-2 | 集成级 | 人工：CI 触发需推送 GitHub，验收时点由维护者在 Actions 页观测] Given workflow 已合入主干，When push/PR 发生，Then Actions 运行全绿（或前置门跳过段显式报因）。
 - [FR-3 | 工单级] When 检视仓库，Then src/ bin/ scripts/ test/ 与 demo 插件全部为 .ts（无并存 .js 源文件），`node --test` 直跑全量全绿，`tsc --noEmit` 零错误，源码无 enum/namespace/参数属性（erasable-only）。
-- [FR-3 | 工单级] Given 无构建直跑形态，When 本地 `npm pack` + `verify:pack` 对账，Then 产物含 .ts 源码、对账通过（包内 skills/plugins 清单 = 仓库清单，路径未变——目录迁移折 round 2）、bin 直指 .ts 入口可执行。
+- [FR-3 | 工单级] Given 发布面预编译形态（仓库内零构建直跑不变，D8 修订），When 本地 `npm pack` + `verify:pack` 对账，Then 产物含编译 .js（bin 直指编译产物）与 .ts 源码、对账通过（包内 skills/plugins 清单 = 仓库清单，路径未变——目录迁移折 round 2）、安装后消费链可跑（tarball 装入后 bin 真实执行）。
 - [FR-5 | 工单级] Given 迁移后 CLI，When 跑既有全部 e2e（交互 + 旗标 + 安装落盘 + 插件转发），Then 全绿且断言的输出文本/错误口径与迁移前一致（--help 文本、互斥报错、版本拦截文案逐字不变）。
 - [FR-4 | 工单级] Given RQ2 结论节，When 检视落地方案，Then workspace 结构 / 发布命令序列 / lockfile 迁移步骤 / verify:pack 改造方案四件齐备（round 2 pnpm 票的输入就绪）；pnpm 本轮不实际迁移（package-lock.json 仍在）。
 - [FR-8 | 工单级] Given RQ3 结论节，When 检视迁移方案，Then 选型结论 + 现行旗标语义映射表 + 互斥/错误口径等价方案齐备（round 2 CLI 库票的输入就绪）；cli-args.js 本轮不替换（手写解析仍在位）。
@@ -92,3 +92,4 @@ round 1 = 「调研先行、规范定稿、类型落地」三线（need FR-1～F
 - 分轮拍板（2026-11-15 用户批准）：保守两轮——round 1 = 三条调研 + CI + TS 迁移（含 FR-7 实测），round 2 = 布局规范落地迁移 + pnpm + CLI 库（以 round 1 调研结论为输入）。need FR-1～FR-8 全覆盖过孤儿门禁（spec 0015 先例），深度分级：FR-1 round 1 = 规范定稿（迁移折 round 2）、FR-4/FR-8 round 1 = 调研结论就绪（落地折 round 2）、FR-5 = 全程防线（真实验收）。
 - 实现细节选型（tsconfig 策略、bundle 校验器 .ts 适配点、workflow 具体动作写法、规范文档落点、CI 中 expect 的安装方式）归 design 阶段定稿，本 spec 只锁契约。
 - 集成级两条 FR-7 场景互斥（成功证/证伪）——恰一条通过即 FR-7 兑现，证伪路径的交付物是证伪报告与回退方案（need FR-7 回退预案）。
+- **运行中修订（2026-11-15，无人值守自主处置留痕；触发票 20261115-d437）**：拍板 D8 原文「源码 .ts 直发 + bin 直指 .ts 入口」的发布面形态被实现期前提核实证伪——node 对 node_modules 下 .ts 一律拒绝剥类型（`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`；编排会话独立复现双形态：入口直跑与依赖链解析均拒，无旗标逃生；官方设计动机 = 阻止包作者直发 .ts，nodejs/node#57215）。原查证声明「node 24.22.1 直跑通过」只覆盖仓内路径，未覆盖 npm install / npx 安装后消费面——而本 CLI 全部分发消费路径恰在 node_modules 内。候选与裁决：①**发布面预编译**（打包前 tsc emit，prepack 承载；比照插件包回退预案先例）——选定；②bin 薄 .js 入口 + 其余 .ts 直发——否决（限制命中 node_modules 下任何 .ts 的加载，含依赖链解析，单点 bin 改形无效）；③安装期编译（prepare）——否决（安装期工具链依赖破坏 npx 冷启动与离线安装）。ADR 20261115-f143「零构建直跑」的发布面语义由本修订收窄为「仓库内零构建 + 发布面预编译」，蒸馏时更新 ADR；仓库内开发/测试体验不变。FR-7 插件实测义务不变——其回退预案与本修订同机制，实测仍须真跑取证（证据随票 20261115-d437 Progress 与本备注留痕）。
