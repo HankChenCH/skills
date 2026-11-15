@@ -1,10 +1,11 @@
 ---
 id: 20261115-8975
-status: approved
+status: done
 need: 20261114-1f2f
 round: 1
 created: 2026-11-15
 approved: 2026-11-15
+done: 2026-11-15
 ---
 # @hankchen/infra：套件资产初始化 CLI（round 1 全 FR MVP）
 
