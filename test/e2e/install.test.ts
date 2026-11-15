@@ -10,6 +10,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// 期望值来源：src/cli.ts 的 renderHelp（文本字节的对账锚在 test/unit/cli.test.ts 对
+// 迁移前参照 evidence/probe-ref-matrix.txt 的逐字转录，此处只对账通道形态）。
+import { renderHelp } from '../../src/cli.ts';
+
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 const REPO_SKILLS = path.join(packageRoot, 'skills');
@@ -239,6 +243,31 @@ test('[FR-6] --help 列明全部旗标与示例、退出码 0', (t) => {
   for (const needle of ['--all', '--skills', '--help', 'npx @hankchen/infra']) {
     assert.ok(stdout.includes(needle), `--help 输出应含 ${needle}`);
   }
+});
+
+// 通道锚点（工单 20261115-eed0，RQ3 §10.3 出口通道映射）：文本字节由 test/unit/cli.test.ts
+// 对迁移前参照转录守卫；此处守卫真实入口的通道形态——stdout 载全文 + 恰一尾换行、
+// stderr 空、退出码 0（npx 裸跑入口的 --help 出口契约）。
+test('[FR-5] --help 通道逐字节：全文走 stdout、单尾换行、stderr 空', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['--help']);
+  assert.equal(code, 0);
+  assert.equal(stdout, `${renderHelp()}\n`);
+  assert.equal(stderr, '');
+});
+
+// 互斥报错三通道（RQ3 §6.3 矩阵参照 evidence/probe-ref-matrix.txt --all --skills dev-spec 行）：
+// 报错原文 + 提示行走 stderr、stdout 空、退出码 1——bin ✗ 出口契约在真实入口逐字节守护。
+test('[FR-5] 互斥报错通道逐字节：文案与提示行走 stderr、退出码 1', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['--all', '--skills', 'dev-spec']);
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(
+    stderr,
+    '✗ --all 与 --skills 互斥：全装与按条目指定只能选一\n' +
+      '  运行 npx @hankchen/infra --help 查看全部旗标与示例。\n',
+  );
 });
 
 test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文件记录该版本', (t) => {

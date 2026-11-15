@@ -24,11 +24,11 @@ test('映射表含「技能」行：来源 skills/、目标 .agents/skills/', ()
   );
 });
 
-test('映射表含「插件」command 类行：来源 plugins/、机制 command', () => {
+test('映射表含「插件」command 类行：枚举根 agents/（两级枚举 agents/<宿主>/plugins/）、机制 command', () => {
   const row = findRow(ASSET_MAP, PLUGINS_TYPE);
   assert.deepEqual(
     { type: row.type, mechanism: row.mechanism, sourceDir: row.sourceDir },
-    { type: '插件', mechanism: 'command', sourceDir: 'plugins' },
+    { type: '插件', mechanism: 'command', sourceDir: 'agents' },
   );
 });
 

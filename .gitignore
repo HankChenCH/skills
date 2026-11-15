@@ -17,7 +17,11 @@ node_modules/
 # 发布面预编译产物（spec 20261115-f650 D8 修订，票 20261115-d437：prepack emit 同路径 .js
 # 进 tarball + 打包清单 bin 换载（package.json 备份后改写），postpack 清理并还原仓库树；
 # gitignore 兜底 pack 中途失败场景，npm pack 的 files 清单不受 ignore 规则影响，编译 .js
-# 照常进包）
+# 照常进包。插件包发布面同法（spec 20261115-ed9f FR-7 回退，票 20261115-cf39：
+# agents/dsh/plugins/dsh-demo/scripts/prepack.ts emit index.js + 清单换载；备份文件由下方
+# 无斜杠 basename 模式任意深度匹配，无需另列）
 bin/*.js
 src/**/*.js
+agents/dsh/plugins/dsh-demo/index.js
 package.json.prepack-bak
+.prepack-stash/

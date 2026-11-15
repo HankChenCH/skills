@@ -8,9 +8,10 @@
   // - erasableSyntaxOnly：拍板 D8 语法约束（无 enum/namespace/参数属性），tsc 独立承担检查。
   // - include 覆盖 test/：测试代码同受类型检查（期望值拼装错误在合入前被拦）；测试 helper
   //   的类型标注属 AC2 允许的「新增类型标注」。
-  // - include 覆盖 plugins/（票 20261115-e692 定夺）：demo 插件模块是仓库正源（规范文档与
-  //   之互为印证）且校验器/测试断言其行为，测试经动态 URL import 加载——tsc 不追动态导入，
-  //   不入 include 则模块类型回归静默；零构建形态不受影响（prepack BUILD_DIRS 不含 plugins）。
+  // - include 覆盖 agents/（票 20261115-e692 定夺；agents/ 两级布局随票 20261115-30f2 迁移）：
+  //   demo 插件模块是仓库正源（规范文档与之互为印证）且校验器/测试断言其行为，测试经动态
+  //   URL import 加载——tsc 不追动态导入，不入 include 则模块类型回归静默；零构建形态不受
+  //   影响（prepack BUILD_DIRS 不含 agents）。
   // - noEmit：类型检查独立于运行（AC3）；发布面 emit 由 scripts/prepack.ts 经 compiler API
   //   承载（含已知配置码 5096 的显式处理），不走本配置。
   // - target/lib es2023：node ≥24.9 运行面的保守子集；skipLibCheck + types:["node"]（仅
@@ -28,5 +29,5 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["src", "bin", "scripts", "test", "plugins"]
+  "include": ["src", "bin", "scripts", "test", "agents"]
 }

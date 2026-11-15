@@ -1,8 +1,8 @@
 # agents/ 扩展资产布局规范
 
-本规范定稿 `agents/<宿主>/<机制>/` 目录模式（need 20261115-fc48 FR-1 round 1 深度），输入 = RQ4 宿主普查报告的分类学（`docs/research/host-survey/20261115-agent-host-extension-survey.md`，T1–T8 机制类型 + 49 宿主逐个目录约定）。治理规则「先改文档再改技能」（`docs/concepts.md` 单一真相源）：本册先行定稿，目录迁移折 round 2 按本册执行——**本册描述目标态，落定前仓库根不存在 `agents/` 目录**。
+本规范定稿 `agents/<宿主>/<机制>/` 目录模式（need 20261115-fc48 FR-1 round 1 深度），输入 = RQ4 宿主普查报告的分类学（`docs/research/host-survey/20261115-agent-host-extension-survey.md`，T1–T8 机制类型 + 49 宿主逐个目录约定）。治理规则「先改文档再改技能」（`docs/concepts.md` 单一真相源）：本册先行定稿，目录迁移折 round 2 按本册执行——**本册描述目标态；round 2 迁移票（20261115-30f2）落地后 `agents/` 已是仓库现状，本册即现态描述**。
 
-与本册并行的现行文档：`docs/plugin-assets.md` 是插件资产的生产约定与 dsh 运行时形态，描述**当前** `plugins/` 顶层布局；本册描述**目标** `agents/` 布局。两者时间态不同，迁位落地时 plugin-assets.md 按 §4.3 引用面清单回改。升格进 `CODING_STANDARDS.md` 索引属后续 design 票事，本册落定时不改索引。
+`docs/plugin-assets.md` 是插件资产的生产约定与 dsh 运行时形态，已按 §4.3 引用面清单回改至 `agents/` 布局（20261115-30f2），与本册同述现态：本册管宿主分层模式与机制枚举，plugin-assets.md 管插件包形态与发布纪律。升格进 `CODING_STANDARDS.md` 索引属后续 design 票事，本册落定时不改索引。
 
 ## 一、目录模式定义
 
@@ -98,9 +98,9 @@ agents/<宿主>/<机制>/<条目>
 
 ### 3.4 原子性与结构性成立
 
-- **原子性**：目录迁移、`files` 切换、`verify-pack` 路径切换、编目两级化、测试路径常量更新属同一条 round 2 迁移票，同一提交序列原子落地——任一项单独先行，对账或编目必红。发布命令序列本身不变（`npm pack` → `verify:pack` → `npm publish` → annotated tag）。
+- **原子性**：目录迁移、`files` 切换、`verify-pack` 路径切换、编目两级化、测试路径常量更新属同一条 round 2 迁移票，同一提交序列原子落地——任一项单独先行，对账或编目必红。发布命令序列本身不变（`pnpm pack` → `pnpm run verify:pack <tarball>` → `pnpm publish --access public` → annotated tag；pnpm 形态随 spec 20261115-ed9f FR-4 迁移更新，两道 git 门见 plugin-assets §1.4）。
 - **结构性成立**：`agents/` 在仓库根 + `files` 白名单含 `agents` → 打包产物即仓库原文件，对账是机械校验而非流程纪律（ADR 20261115-f143 同构论据）。
-- CI 步骤（spec 20261115-f650 FR-2 契约）调用 `npm run verify:pack`，命令名不变——脚本内路径变更不波及 workflow 与 README 发布节命令行。
+- CI 步骤（spec 20261115-f650 FR-2 契约）调用 verify:pack 对账，命令名不变（pnpm 形态下为 `pnpm run verify:pack`，spec 20261115-ed9f FR-4）——脚本内路径变更不波及 workflow 与 README 发布节命令行。
 
 ## 四、demo 迁位方案（`agents/dsh/plugins/dsh-demo/`）
 
@@ -117,7 +117,7 @@ agents/<宿主>/<机制>/<条目>
 4. `scripts/verify-pack.ts` 路径切换：`PLUGINS_DIR` 枚举根 + 查 1 正则 + 复合键（§3.2）。
 5. §4.3 引用面清单逐文件更新测试路径常量与 fixture。
 6. 文档回改：`docs/plugin-assets.md` §1.1 仓库布局行改述 agents/ 布局，导语活样例行与 §1.3、§三 的 `plugins/dsh-demo/` 路径提法随迁；README 插件节免改（§4.4）。
-7. 全量验证：`npm test` 全绿 → `npm pack` → `npm run verify:pack -- <tarball>` 对账绿。
+7. 全量验证：`pnpm test` 全绿 → `pnpm pack` → `pnpm run verify:pack <tarball>` 对账绿。
 8. 全部改动同一提交序列带 `[#工单号]` 提交，一步一验。
 
 ### 4.3 连带引用面清单（grep 实证，2026-11-15，运行分支）
@@ -150,7 +150,7 @@ agents/<宿主>/<机制>/<条目>
 - `--plugins` 旗标与示例文本（`README.md:113–114`、`src/cli-args.ts:37`、`bin/infra.ts:242`、`test/unit/menu.test.ts`）：旗标名是 CLI 表面，非目录路径。
 - 包名 `@hankchen/dsh-demo` 全部引用（`test/unit/plugin-install`、`dsh-command`、`reconcile`、`verify-bundle`、`menu` 等测试与包内文件）：条目正名是包名（plugin-assets §1.1），不随目录迁位变。
 - `.infra-lock.json` 记账（`src/lockfile.ts`、`src/plugin-install.ts`）：插件区按包名记账，无仓库内路径。
-- CI workflow：步骤调 `npm run verify:pack` 命令名不变；本分支尚无 `.github/` 目录，无引用面。
+- CI workflow：步骤调 verify:pack 对账命令名不变（pnpm 形态下为 `pnpm run verify:pack`，spec 20261115-ed9f FR-4）；`.github/workflows/regression-gate.yml` 已在位（spec 20261115-f650 FR-2 交付），全部步骤只调命令名（pnpm install --frozen-lockfile / pnpm run typecheck / pnpm test / pnpm pack + pnpm run verify:pack），无 `plugins/` 目录路径引用——本行清单初稿「本分支尚无 .github/ 目录」系时序过期表述，已修正（残余 #2 核销，票 20261115-30f2）。
 - 历史知识档不回改：`docs/needs/`、`docs/specs/`、`docs/research/`（rq2 报告结论节已自注「round 1 后为 agents/ 布局时改 patterns」）。
 
 ### 4.5 need FR-1 引用清单核对结论

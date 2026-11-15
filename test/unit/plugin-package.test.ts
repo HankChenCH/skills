@@ -1,14 +1,17 @@
-// demo 插件包（plugins/dsh-demo/）的外部可观察面，期望值逐条来自 spec 20261115-495e
+// demo 插件包（agents/dsh/plugins/dsh-demo/）的外部可观察面，期望值逐条来自 spec 20261115-495e
 // 实现决策与 docs/plugin-assets.md §1.2–§1.3、need 20261115-339e F1/F3/F4、
-// fix 票 20261115-f158（patch 清单官方顶层数组形态取证 + 版本 0.1.1）：
-// 包形态四要素、engines 声明、patch 清单官方形态且以包名引用自己、模块真实可加载并打加载日志。
+// fix 票 20261115-f158（patch 清单官方顶层数组形态取证 + 版本 0.1.1）、
+// spec 20261115-ed9f 插件预编译契约（FR-7 证伪回退，round 2 票 20261115-cf39）：
+// 包形态四要素、engines 声明、patch 清单官方形态且以包名引用自己、模块真实可加载并打加载日志、
+// 发布面预编译钩子（源码态 .ts 保持，打包面 prepack 换载 .js——spec 20261115-f650 的
+// .ts 零构建直发契约经 FR-7 端到端实测证伪后退役）。
 
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const PLUGIN_NAME = '@hankchen/dsh-demo';
-const PLUGIN_DIR = new URL('../../plugins/dsh-demo/', import.meta.url);
+const PLUGIN_DIR = new URL('../../agents/dsh/plugins/dsh-demo/', import.meta.url);
 
 async function readPluginFile(name: string) {
   return readFile(new URL(name, PLUGIN_DIR), 'utf8');
@@ -24,27 +27,29 @@ test('demo 包名与版本：@hankchen/dsh-demo 0.1.1（0.1.0 已发布且含坏
   assert.equal(pkg.version, '0.1.1');
 });
 
-test('demo 包四要素齐备：type module、main 直指 .ts 模块、files 含 .ts 与清单、dsh.bundle.patch', async () => {
+test('demo 包四要素齐备（源码态）：type module、main 直指 .ts 模块、files 含 .ts 与清单、dsh.bundle.patch', async () => {
   const pkg = await readPluginJson('package.json');
   assert.equal(pkg.type, 'module', '插件模块按 ESM 加载（plugin-assets §1.2）');
-  // .ts 形态契约（spec 20261115-f650 demo 插件 .ts 化，票 20261115-e692）：main 直指 .ts 模块
-  assert.equal(pkg.main, 'index.ts', 'main 直指 .ts 插件模块（plugin-assets §1.2 的 .ts 形态）');
+  // 源码态 main 直指 .ts 模块（e692 契约保留为仓库源码态形态）；发布态（tarball）由 prepack
+  // 换载为 index.js（FR-7 证伪回退）——发布面形态归 pack 产物断言（集成承载测试证 tarball 清单）。
+  assert.equal(pkg.main, 'index.ts', '源码态 main 直指 .ts 插件模块（发布态换载归 prepack）');
   assert.ok(
     pkg.files.includes('cordis.patch.yml') && pkg.files.includes('index.ts'),
-    `files 须含 cordis.patch.yml 与 .ts 模块文件，实际：${JSON.stringify(pkg.files)}`,
+    `源码态 files 须含 cordis.patch.yml 与 .ts 模块文件，实际：${JSON.stringify(pkg.files)}`,
   );
   assert.deepEqual(pkg.dsh, { bundle: { patch: './cordis.patch.yml' } }, 'dsh 识别插件的凭据（plugin-assets §1.2）');
 });
 
-test('demo 包发布形态零构建：无 build/prepack/prepare 脚本（spec 20261115-f650 .ts 化契约）', async () => {
+test('demo 包发布面预编译契约：prepack/postpack 钩子在位 + devDependencies 含 typescript（FR-7 证伪回退）', async () => {
   const pkg = await readPluginJson('package.json');
-  const buildScripts = Object.keys(pkg.scripts ?? {}).filter((key) =>
-    /^(build|prepack|prepare|postpack)$/.test(key),
-  );
-  assert.deepEqual(
-    buildScripts,
-    [],
-    `插件包须保持零构建形态（打包即源码直发），实际带编译类脚本：${JSON.stringify(buildScripts)}`,
+  // FR-7 证伪定案（docs/research/dsh-ts-loading/fr7-dsh-ts-loading-falsification.md）：node 拒载
+  // node_modules 下 .ts（无旗标逃生），发布面必须预编译。钩子选 prepack（e692 零构建契约随之
+  // 退役）：prepublishOnly 不作用于 pnpm pack，而发布契约锁「pack 产物即 .js 形态」。
+  assert.equal(pkg.scripts?.prepack, 'node scripts/prepack.ts', '打包面编译钩子应为 prepack');
+  assert.equal(pkg.scripts?.postpack, 'node scripts/postpack.ts', '打包后还原仓库树应为 postpack');
+  assert.ok(
+    typeof pkg.devDependencies?.typescript === 'string',
+    '插件包应自持 typescript 工具链（workspace 成员独立可构建，spec 预编译契约明文）',
   );
 });
 
