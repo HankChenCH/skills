@@ -1,0 +1,8 @@
+# pnpm workspace 声明（spec 20261115-ed9f FR-4，工票 20261115-d5f4，RQ2 落地方案件 1）。
+# 成员 = agents/dsh/plugins/*（agents/ 两级布局下各插件目录各自是完整 npm 包，
+# docs/plugin-assets.md §1.1）；根包 = @hankchen/infra（包根 = 仓库根，ADR 20261115-f143，
+# 不得声明 private——pnpm publish 会以 ERR_PNPM_PRIVATE_PACKAGE 拒绝）。
+# settings 取默认：不开 shamefully-hoist（幽灵依赖防线，RQ2 异常流 A #4，本仓暴露面为零）；
+# settings 类配置一律写本文件、不写 package.json 的 pnpm 字段（异常流 A #7）。
+packages:
+  - agents/dsh/plugins/*
