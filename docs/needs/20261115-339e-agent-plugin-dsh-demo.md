@@ -1,7 +1,8 @@
 ---
 id: 20261115-339e
-status: confirmed
+status: fulfilled
 created: 2026-11-15
+fulfilled: 2026-11-15
 confirmed: 2026-11-15
 ---
 # infra 第二类资产：agent 插件（首个宿主 DeepSeek Harness，demo 定规范）
