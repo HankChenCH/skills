@@ -30,10 +30,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # actions/checkout v4.4.0（钉完整 commit SHA：可变 tag 不是供应链信任锚；升版改此处并同步静态核验测试）
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup node (reads .nvmrc; unavailable version fails this step loudly)
-        uses: actions/setup-node@v4
+        # actions/setup-node v4.4.0（钉完整 commit SHA，理由同上）
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -51,6 +53,9 @@ jobs:
         run: npm test
 
       - name: Verify pack manifest (npm pack then reconcile against repo inventory)
+        # shell: bash = GitHub 端以 -eo pipefail 执行：npm pack 失败立即使本步红，
+        # 不被 `| tail` 掩码成「对账缺 tarball」的次生错误（可诊断性）。
+        shell: bash
         run: |
           tarball="$(npm pack --silent | tail -n 1)"
           test -f "$tarball"

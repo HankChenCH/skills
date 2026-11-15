@@ -11,6 +11,9 @@
 // 见 test/e2e/dsh-plugin-integration.test.ts）；交互 e2e 的 expect 缺失时红（runInteractive
 // throw，非假绿）——workflow 内显式 apt 安装 expect 使交互段真跑（design 定夺：装了就真跑，
 // runner 镜像不保证预装 expect）。
+// 评审加固项同为 seam 契约：actions 钉完整 commit SHA（可变 tag 非供应链信任锚）、
+// verify 步骤 shell: bash（-eo pipefail，npm pack 失败不被 tail 掩码）、解析器拒重复键
+// 与非法块标量缩进（坏点一律带行号显式报错）。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -85,12 +88,30 @@ function parseScalar(rawText: string, lineNo: number): YamlNode {
   return text;
 }
 
-// 字面块标量：吞掉所有缩进更深的后续行（原样保留），遇到缩进 <= 基线即止
+// 字面块标量：吞掉所有缩进更深的后续行（原样保留），遇到缩进 <= 键缩进即止。
+// 内容基线 = 首个非空内容行的缩进——合法 YAML 只要求内容深于键缩进，不固定「键 +2」；
+// 基线定后出现更浅（但仍深于键缩进）的行，相对缩进为负：显式抛带行号解析错误，
+// 不让 RangeError 裸奔，也不误伤合法的浅缩进块。
 function consumeBlockScalar(lines: Line[], idx: number, baseIndent: number): [string, number] {
   const parts: string[] = [];
+  let contentIndent = -1;
   let i = idx;
-  while (i < lines.length && (lines[i].text === '' || lines[i].indent > baseIndent)) {
-    parts.push(lines[i].text.length === 0 ? '' : ' '.repeat(lines[i].indent - baseIndent - 2) + lines[i].text);
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.text === '') {
+      parts.push('');
+      i += 1;
+      continue;
+    }
+    if (line.indent <= baseIndent) break;
+    if (contentIndent === -1) {
+      contentIndent = line.indent;
+    } else if (line.indent < contentIndent) {
+      throw new Error(
+        `YAML 解析失败（第 ${line.lineNo} 行）：块标量内容缩进浅于内容基线（${line.indent} < ${contentIndent}）但深于键缩进——缩进不一致，拒绝解析`
+      );
+    }
+    parts.push(' '.repeat(line.indent - contentIndent) + line.text);
     i += 1;
   }
   return [parts.join('\n'), i];
@@ -157,6 +178,11 @@ function parseMapping(lines: Line[], idx: number, indent: number): [YamlNode, nu
       throw new Error(`YAML 解析失败（第 ${line.lineNo} 行）：非 "key: value" 行落在映射层——${line.text.slice(0, 40)}`);
     }
     const key = match[1];
+    if (Object.prototype.hasOwnProperty.call(result, key)) {
+      throw new Error(
+        `YAML 解析失败（第 ${line.lineNo} 行）：映射出现重复键 "${key}"——重复键被静默覆盖即盲区，解析即拒`
+      );
+    }
     const rawValue = match[2] ?? '';
     if (rawValue === '|' || rawValue === '|-' || rawValue === '>') {
       const [block, next] = consumeBlockScalar(lines, idx + 1, indent);
@@ -196,6 +222,7 @@ function parseWorkflowYaml(raw: string): YamlNode {
 interface Step {
   name: string;
   uses?: string;
+  shell?: string;
   run?: string;
   with: Record<string, string>;
 }
@@ -226,6 +253,7 @@ function readWorkflowSteps(doc: YamlNode): Step[] {
     return {
       name: String(step['name'] ?? ''),
       uses: step['uses'] === undefined ? undefined : String(step['uses']),
+      shell: step['shell'] === undefined ? undefined : String(step['shell']),
       run: step['run'] === undefined ? undefined : String(step['run']),
       with: withMap,
     };
@@ -267,14 +295,24 @@ test('node 24 取版声明在位：setup-node 读 .nvmrc，且 .nvmrc 钉住 nod
 test('步骤链契约齐备且有序：checkout → node setup → npm ci → typecheck → test → verify:pack', () => {
   const steps = readWorkflowSteps(readWorkflowDoc());
   const chain: Array<{ label: string; match: (s: Step) => boolean }> = [
-    { label: 'checkout', match: (s) => typeof s.uses === 'string' && s.uses.startsWith('actions/checkout@') },
-    { label: 'node setup', match: (s) => typeof s.uses === 'string' && s.uses.startsWith('actions/setup-node@') },
+    {
+      label: 'checkout（uses 钉完整 commit SHA，可变 tag 非供应链信任锚）',
+      match: (s) => typeof s.uses === 'string' && /^actions\/checkout@[0-9a-f]{40}$/.test(s.uses),
+    },
+    {
+      label: 'node setup（uses 钉完整 commit SHA）',
+      match: (s) => typeof s.uses === 'string' && /^actions\/setup-node@[0-9a-f]{40}$/.test(s.uses),
+    },
     { label: '依赖安装 npm ci', match: (s) => s.run === 'npm ci' },
     { label: 'typecheck（tsc --noEmit 经脚本）', match: (s) => s.run === 'npm run typecheck' },
     { label: '全量测试 npm test', match: (s) => s.run === 'npm test' },
     {
-      label: 'verify:pack 对账（先 npm pack 出 tarball 再对账）',
-      match: (s) => typeof s.run === 'string' && s.run.includes('npm pack') && s.run.includes('npm run verify:pack --'),
+      label: 'verify:pack 对账（先 npm pack 出 tarball 再对账；shell: bash 带 -eo pipefail，pack 失败不被 tail 掩码）',
+      match: (s) =>
+        typeof s.run === 'string' &&
+        s.shell === 'bash' &&
+        s.run.includes('npm pack') &&
+        s.run.includes('npm run verify:pack --'),
     },
   ];
   let cursor = -1;
