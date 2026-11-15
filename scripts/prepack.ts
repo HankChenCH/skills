@@ -3,7 +3,8 @@
 // 不变，仅发布面在打包前把 src/ 与 bin/ 的 .ts 编译为同路径 .js 进 tarball——node 对
 // node_modules 下 .ts 一律拒绝剥类型（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING，官方有
 // 意设计、无旗标逃生），npm install / npx 消费路径全命中，故 tarball 必须含可直跑 .js。
-// tarball 形态：bin/infra.js（编译产物；publishConfig 使打包清单 bin 直指它）+ src/*.js +
+// tarball 形态：bin/infra.js（编译产物；打包清单 bin 由本脚本显式换载直指它——备份
+// package.json → 改写 bin: bin/infra.js，postpack 还原）+ src/*.js +
 // 全部 .ts 源码（导航可读）；skills/plugins 清单与路径不变。
 // 幂等门：tarball 解包目录重打包（install.test.js [FR-5] 双版本消费链）无 devDependencies
 // 且编译产物已随包在位 → 跳过编译；否则 typescript 编译 + 错误诊断（非零即中止打包）。

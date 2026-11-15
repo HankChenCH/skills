@@ -19,5 +19,5 @@ node_modules/
 # gitignore 兜底 pack 中途失败场景，npm pack 的 files 清单不受 ignore 规则影响，编译 .js
 # 照常进包）
 bin/*.js
-src/*.js
+src/**/*.js
 package.json.prepack-bak

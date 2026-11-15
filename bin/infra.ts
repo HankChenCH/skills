@@ -4,7 +4,8 @@
 // 旗标路径按映射表机制分发（copy 行 → 技能安装器；command 行 → 插件安装编排）——
 // 不再把旗标模式硬连技能行。交互、占位、取消、空选路径全部零落盘。
 // （TS 迁移注：仓库内本入口为 .ts 直跑〔node ≥24.9 默认剥类型〕；发布面经 prepack 编译
-//  为同路径 bin/infra.js，publishConfig 使打包清单的 bin 直指编译产物——spec D8 修订。）
+//  为同路径 bin/infra.js，并显式换载打包清单 bin 直指它〔备份 package.json → 改写 bin:
+//  bin/infra.js → postpack 还原〕——spec D8 修订。）
 
 import fs from 'node:fs';
 import path from 'node:path';
