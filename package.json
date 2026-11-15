@@ -6,11 +6,6 @@
   "bin": {
     "infra": "bin/infra.ts"
   },
-  "publishConfig": {
-    "bin": {
-      "infra": "bin/infra.js"
-    }
-  },
   "files": [
     "bin",
     "src",

@@ -124,3 +124,21 @@ if (!binJs.startsWith('#!')) {
 console.log(
   `✓ prepack：发布面编译完成（${fileNames.length} 个 .ts → 同路径 .js；specifier 改写 ${rewrittenFiles} 个文件）`,
 );
+
+// ---- manifest 换载：打包清单的 bin 直指编译产物 bin/infra.js ----
+// publishConfig.bin 不作用于 npm pack 的打包清单（实测：打包后 manifest bin 仍为源码形态），
+// 故由本脚本显式换载：备份原 package.json → 写入换载后清单；postpack 用备份还原仓库树。
+// 幂等守卫：上次 pack 中途失败残留的备份先还原，再基于还原后的原态改写，避免叠改。
+const manifestPath = path.join(packageRoot, 'package.json');
+const manifestBackupPath = `${manifestPath}.prepack-bak`;
+if (fs.existsSync(manifestBackupPath)) {
+  fs.copyFileSync(manifestBackupPath, manifestPath);
+  fs.rmSync(manifestBackupPath);
+}
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+if (manifest.bin?.infra !== 'bin/infra.js') {
+  fs.copyFileSync(manifestPath, manifestBackupPath);
+  manifest.bin = { ...(manifest.bin ?? {}), infra: 'bin/infra.js' };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  console.log('✓ prepack：打包清单 bin 已换载 → bin/infra.js（postpack 还原仓库原态）');
+}
