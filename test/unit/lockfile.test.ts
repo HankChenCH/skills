@@ -1,4 +1,4 @@
-import { test, beforeEach } from 'node:test';
+import { test, beforeEach, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -11,7 +11,7 @@ import {
   LOCKFILE_NAME,
 } from '../../src/lockfile.ts';
 
-function makeSkillDir(t, files) {
+function makeSkillDir(t: TestContext, files: Record<string, string>) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-lock-'));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   for (const [rel, content] of Object.entries(files)) {
@@ -58,7 +58,7 @@ test('损坏的锁文件显式报错且错误信息带文件路径', (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-proj-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   fs.writeFileSync(path.join(root, LOCKFILE_NAME), '{ not json');
-  assert.throws(() => readLockfile(root), (err) => err.message.includes(LOCKFILE_NAME));
+  assert.throws(() => readLockfile(root), (err) => (err as Error).message.includes(LOCKFILE_NAME));
 });
 
 test('写入后读回一致（包版本 + 逐技能名/指纹/安装时间）', (t) => {
@@ -88,7 +88,7 @@ test('重写同名技能条目为覆盖、不产生重复条目', (t) => {
     packageVersion: '0.1.0',
     skills: { a: { fingerprint: '2', installedAt: 't2' } },
   });
-  const lockfile = readLockfile(root);
+  const lockfile = readLockfile(root)!;
   assert.deepEqual(Object.keys(lockfile.skills), ['a']);
   assert.equal(lockfile.skills.a.fingerprint, '2');
 });

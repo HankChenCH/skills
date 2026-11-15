@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,7 +13,7 @@ import { ASSET_MAP, findRow } from '../../src/asset-map.ts';
 
 const PLUGIN_ROW = findRow(ASSET_MAP, '插件');
 
-function makePackage(t, plugins) {
+function makePackage(t: TestContext, plugins: Record<string, Record<string, unknown> | null>) {
   const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-plugincat-'));
   t.after(() => fs.rmSync(packageRoot, { recursive: true, force: true }));
   for (const [dirName, pkg] of Object.entries(plugins)) {

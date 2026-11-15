@@ -60,10 +60,10 @@ test('node 低于 24.9.0：拒装，报当前版本与 fnm/nvm 升级指引', ()
   assert.throws(
     () => assertPluginPreconditions({ nodeVersion: 'v22.23.4', profile: 'dev' }),
     (err) => {
-      assert.match(err.message, /22\.23\.4/, '须报当前版本');
-      assert.match(err.message, /24\.9\.0/, '须报基线');
-      assert.match(err.message, /fnm/, '须给 fnm 指引');
-      assert.match(err.message, /nvm/, '须给 nvm 指引');
+      assert.match((err as Error).message, /22\.23\.4/, '须报当前版本');
+      assert.match((err as Error).message, /24\.9\.0/, '须报基线');
+      assert.match((err as Error).message, /fnm/, '须给 fnm 指引');
+      assert.match((err as Error).message, /nvm/, '须给 nvm 指引');
       return true;
     },
   );
@@ -77,8 +77,8 @@ test('目标 profile 为 desktop：拒装并说明官方保留名行为', () => 
   assert.throws(
     () => assertPluginPreconditions({ nodeVersion: 'v24.22.1', profile: 'desktop' }),
     (err) => {
-      assert.match(err.message, /desktop/);
-      assert.match(err.message, /保留/);
+      assert.match((err as Error).message, /desktop/);
+      assert.match((err as Error).message, /保留/);
       return true;
     },
   );
@@ -87,6 +87,6 @@ test('目标 profile 为 desktop：拒装并说明官方保留名行为', () => 
 test('node 与 profile 双不满足：node 前置先行（第一时刻拦截）', () => {
   assert.throws(
     () => assertPluginPreconditions({ nodeVersion: 'v22.23.4', profile: 'desktop' }),
-    (err) => err.message.includes('22.23.4'),
+    (err) => (err as Error).message.includes('22.23.4'),
   );
 });

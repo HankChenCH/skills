@@ -14,15 +14,15 @@ test('第一层选项由映射表生成：每个类型一行', () => {
 
 test('占位类型选项带「本轮不可安装」提示，可安装类型显示来源→目标', () => {
   const options = typeOptions(ASSET_MAP);
-  const specs = options.find((o) => o.value === '规范');
+  const specs = options.find((o) => o.value === '规范')!;
   assert.match(specs.hint, /不可安装/);
-  const skills = options.find((o) => o.value === '技能');
+  const skills = options.find((o) => o.value === '技能')!;
   assert.match(skills.hint, /\.agents\/skills/);
 });
 
 test('插件类型选项提示为官方命令转发语义，不显示 undefined 安装目标', () => {
   const options = typeOptions(ASSET_MAP);
-  const plugins = options.find((o) => o.value === '插件');
+  const plugins = options.find((o) => o.value === '插件')!;
   assert.ok(!plugins.hint.includes('undefined'), `插件提示不得含 undefined：${plugins.hint}`);
   assert.match(plugins.hint, /官方命令/);
 });

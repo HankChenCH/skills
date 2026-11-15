@@ -54,10 +54,12 @@ interface PatchLine {
 type InsertEntry = Record<string, string>;
 
 // readPatchItem 的三态结果：映射（含 insert 切片或 null = 无 insert 键）/ 标量 / 读不出。
+// 标量与读不出态以 `insert?: undefined` 补齐同名字段——引用检查可对整个 items 集合统一
+// 取 insert ?? []（非映射元素无 insert = 空列表，与迁移前运行时取值一致）。
 type PatchItem =
   | { kind: 'mapping'; insert: InsertEntry[] | null }
-  | { kind: 'scalar' }
-  | { kind: 'unreadable' };
+  | { kind: 'scalar'; insert?: undefined }
+  | { kind: 'unreadable'; insert?: undefined };
 
 // readPatchOverlay 的三态结果：顶层数组（items）/ 顶层映射（官方拒绝的旧形态）/ 读不出。
 type PatchOverlay =

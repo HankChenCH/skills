@@ -20,7 +20,7 @@ import {
 import type { InfraLockfile } from './lockfile.ts';
 
 // 可安装行的结构化入参：安装流程只消费这四个字段（copy 行与合成行同构，表驱动分发）。
-interface InstallRow {
+export interface InstallRow {
   type: string;
   sourceDir: string;
   installTarget: string;

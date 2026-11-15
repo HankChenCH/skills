@@ -1,7 +1,7 @@
 // 端到端：临时目录 + 真实 CLI 进程 + 真实文件系统（不 mock）。
 // 交互路径经 script(1) 提供 PTY——clack 需要真 TTY 才收按键；旗标路径直接 spawnSync。
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -18,7 +18,7 @@ const REPO_SKILLS = path.join(packageRoot, 'skills');
 const PICK_INDICES = [1, 5];
 const PICK_NAMES = ['design-brief', 'dev-clarify'];
 
-function makeTargetProject(t, { agentDirs = ['.claude'] } = {}) {
+function makeTargetProject(t: TestContext, { agentDirs = ['.claude'] }: { agentDirs?: string[] } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-e2e-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   spawnSync('git', ['init', '-q'], { cwd: root });
@@ -28,7 +28,7 @@ function makeTargetProject(t, { agentDirs = ['.claude'] } = {}) {
   return root;
 }
 
-function runCli(projectRoot, args) {
+function runCli(projectRoot: string, args: string[]) {
   const result = spawnSync(process.execPath, [BIN, ...args], { cwd: projectRoot, encoding: 'utf8' });
   return { ...result, code: result.status, error: result.error };
 }
@@ -36,7 +36,7 @@ function runCli(projectRoot, args) {
 
 // 经 expect(1) 在真实 PTY 中跑交互式 CLI 并逐键注入（expect 于 PTY 内 spawn，避开
 // script(1) 在本机对非 TTY stdin 的 tcgetattr 限制）。KEYS 用 DOWN/SPACE/ENTER 记号。
-function runInteractive(projectRoot, keys) {
+function runInteractive(projectRoot: string, keys: string[]) {
   const keyTokens = keys
     .map((key) => {
       if (key === '\x1b[B') return 'DOWN';
@@ -63,7 +63,7 @@ function runInteractive(projectRoot, keys) {
 }
 
 // 交互勾选键序：初始光标在第 0 项；逐级下移到目标下标空格勾选，回车确认
-function pickKeys(indices) {
+function pickKeys(indices: number[]): string[] {
   const keys = [];
   let cursor = 0;
   for (const target of indices) {
@@ -77,9 +77,9 @@ function pickKeys(indices) {
   return keys;
 }
 
-const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
+const sha256 = (bytes: Buffer | string): string => crypto.createHash('sha256').update(bytes).digest('hex');
 
-function listFilesRecursive(dir, base = dir) {
+function listFilesRecursive(dir: string, base: string = dir): string[] {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -93,8 +93,12 @@ function listFilesRecursive(dir, base = dir) {
 }
 
 // 落盘快照：技能文件内容指纹 + 软链表 + 锁文件（指纹与包版本；安装时间天然变化，不比）
-function snapshot(projectRoot) {
-  const snap = { skills: {}, links: {}, lock: null };
+function snapshot(projectRoot: string) {
+  const snap: {
+    skills: Record<string, string>;
+    links: Record<string, string>;
+    lock: { packageVersion: string; fingerprints: Record<string, string> } | null;
+  } = { skills: {}, links: {}, lock: null };
   const skillsRoot = path.join(projectRoot, '.agents/skills');
   if (fs.existsSync(skillsRoot)) {
     for (const rel of listFilesRecursive(skillsRoot)) {
@@ -111,7 +115,9 @@ function snapshot(projectRoot) {
   }
   const lockPath = path.join(projectRoot, '.infra-lock.json');
   if (fs.existsSync(lockPath)) {
-    const lockfile = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    const lockfile: { packageVersion: string; skills: Record<string, { fingerprint: string }> } = JSON.parse(
+      fs.readFileSync(lockPath, 'utf8'),
+    );
     snap.lock = {
       packageVersion: lockfile.packageVersion,
       fingerprints: Object.fromEntries(
@@ -149,7 +155,9 @@ test('[FR-1] 全新 git 项目交互选装部分技能：所选齐备落盘、�
 test('[FR-1] 交互安装后锁文件记账：包版本 + 逐技能指纹/安装时间', async (t) => {
   const project = makeTargetProject(t);
   await runInteractive(project, ['\r', ...pickKeys(PICK_INDICES)]);
-  const lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
+  const lockfile: { package: string; packageVersion: string; skills: Record<string, { fingerprint: string; installedAt: string }> } = JSON.parse(
+    fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'),
+  );
   assert.equal(lockfile.package, '@hankchen/infra');
   assert.equal(lockfile.packageVersion, '0.1.0');
   assert.deepEqual(Object.keys(lockfile.skills).sort(), [...PICK_NAMES].sort());
@@ -220,7 +228,7 @@ test('[FR-1] 重跑幂等：锁文件无重复条目、文件树不变', (t) => 
   const after = snapshot(project);
 
   assert.deepEqual(after, before, '重跑（同包内容）落盘快照应不变');
-  assert.deepEqual(Object.keys(after.lock.fingerprints), Object.keys(beforeLock.skills), '锁文件技能键集不变');
+  assert.deepEqual(Object.keys(after.lock!.fingerprints), Object.keys(beforeLock.skills), '锁文件技能键集不变');
   assert.equal(Object.keys(beforeLock.skills).length, 1, '无重复条目');
 });
 
@@ -237,10 +245,10 @@ test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文�
   const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-pack-'));
   t.after(() => fs.rmSync(workdir, { recursive: true, force: true }));
 
-  const pack = (cwd) => {
+  const pack = (cwd: string) => {
     const result = spawnSync('npm', ['pack', '--pack-destination', workdir], { cwd, encoding: 'utf8' });
     assert.equal(result.status, 0, `npm pack 失败：${result.stderr}`);
-    const name = result.stdout.trim().split('\n').pop();
+    const name = result.stdout.trim().split('\n').pop()!;
     return path.join(workdir, name);
   };
   const tarballA = pack(packageRoot);
@@ -258,10 +266,10 @@ test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文�
   const tarballB = pack(pkgDir);
 
   const project = makeTargetProject(t);
-  const binIn = (root) => path.join(root, 'node_modules', '@hankchen/infra', 'bin', 'infra.js');
+  const binIn = (root: string) => path.join(root, 'node_modules', '@hankchen/infra', 'bin', 'infra.js');
 
-  // 安装版本 A（模拟 npx @hankchen/infra@0.1.0）
-  let r = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballA], {
+  // 安装版本 A（模拟 npx @hankchen/infra@0.1.0）；r 依次承载 npm install / runCli（含 code）/ node 直跑结果
+  let r: { status?: number | null; code?: number | null; stdout?: string; stderr?: string; error?: Error | undefined } = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballA], {
     cwd: project,
     encoding: 'utf8',
   });

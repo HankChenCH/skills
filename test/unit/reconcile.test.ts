@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,7 +13,7 @@ import { reconcilePluginInstall } from '../../src/reconcile.ts';
 
 const PKG = '@hankchen/dsh-demo';
 
-function makeProfile(t, packageJson) {
+function makeProfile(t: TestContext, packageJson: Record<string, unknown> | "INVALID" | null) {
   const profilePath = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-profile-'));
   t.after(() => fs.rmSync(profilePath, { recursive: true, force: true }));
   if (packageJson !== null) {
@@ -41,7 +41,7 @@ test('缺 dsh.profile.bundles 行：报错指明该落点与 profile 路径', (t
   const profilePath = makeProfile(t, { dependencies: { [PKG]: '0.1.0' } });
   assert.throws(
     () => reconcilePluginInstall({ profilePath, packageName: PKG }),
-    (err) => err.message.includes('dsh.profile.bundles') && err.message.includes(profilePath),
+    (err) => (err as Error).message.includes('dsh.profile.bundles') && (err as Error).message.includes(profilePath),
   );
 });
 
@@ -49,7 +49,7 @@ test('缺 dependencies 依赖行：报错指明该落点与 profile 路径', (t)
   const profilePath = makeProfile(t, { dsh: { profile: { bundles: [PKG] } } });
   assert.throws(
     () => reconcilePluginInstall({ profilePath, packageName: PKG }),
-    (err) => err.message.includes('dependencies') && err.message.includes(profilePath),
+    (err) => (err as Error).message.includes('dependencies') && (err as Error).message.includes(profilePath),
   );
 });
 
@@ -57,7 +57,7 @@ test('两落点全缺（装了别的包）：报错一并列出两处缺失落�
   const profilePath = makeProfile(t, { dependencies: { other: '1.0.0' } });
   assert.throws(
     () => reconcilePluginInstall({ profilePath, packageName: PKG }),
-    (err) => err.message.includes('dependencies') && err.message.includes('dsh.profile.bundles'),
+    (err) => (err as Error).message.includes('dependencies') && (err as Error).message.includes('dsh.profile.bundles'),
   );
 });
 
@@ -65,7 +65,7 @@ test('profile 无 package.json（官方命令未完成安装）：报错带 prof
   const profilePath = makeProfile(t, null);
   assert.throws(
     () => reconcilePluginInstall({ profilePath, packageName: PKG }),
-    (err) => err.message.includes(profilePath) && err.message.includes('package.json'),
+    (err) => (err as Error).message.includes(profilePath) && (err as Error).message.includes('package.json'),
   );
 });
 
@@ -73,6 +73,6 @@ test('profile package.json 非法：报错带 profile 路径而非静默', (t) =
   const profilePath = makeProfile(t, 'INVALID');
   assert.throws(
     () => reconcilePluginInstall({ profilePath, packageName: PKG }),
-    (err) => err.message.includes(profilePath),
+    (err) => (err as Error).message.includes(profilePath),
   );
 });
