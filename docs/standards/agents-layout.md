@@ -111,7 +111,7 @@ agents/<宿主>/<机制>/<条目>
 
 ### 4.2 迁移步骤（round 2 迁移票按序执行）
 
-1. 建宿主/机制目录并整目录迁移：`mkdir -p agents/dsh/plugins && git mv plugins/dsh-demo agents/dsh/plugins/dsh-demo`（目标父目录先建，否则 `git mv` fatal；整目录：`package.json`、`index.js`、`cordis.patch.yml` 随迁）。
+1. 建宿主/机制目录并整目录迁移：`mkdir -p agents/dsh/plugins && git mv plugins/dsh-demo agents/dsh/plugins/dsh-demo`（目标父目录先建，否则 `git mv` fatal；整目录：`package.json`、`index.ts`、`cordis.patch.yml` 随迁——迁移执行时 demo 已全仓 TS 化，源文件是 index.ts 非 index.js，`git show 85d3785` 可查）。
 2. 根 `package.json` `files`：`"plugins"` → `"agents"`（§3.2）。
 3. `src/asset-map.ts` 插件行 `sourceDir` 改 `'agents'`，`src/catalog.ts` `listPlugins` 两级化（§3.3）。
 4. `scripts/verify-pack.ts` 路径切换：`PLUGINS_DIR` 枚举根 + 查 1 正则 + 复合键（§3.2）。
@@ -122,7 +122,7 @@ agents/<宿主>/<机制>/<条目>
 
 ### 4.3 连带引用面清单（grep 实证，2026-11-15，运行分支）
 
-第三方照抄本表即得全部连带改动点；行号随迁移前的运行分支为准。
+第三方照抄本表即得全部连带改动点；行号随迁移前的运行分支为准。标注「补录」的 4 行为迁移票 20261115-30f2 执行时实证的原清单漏列项；补录后本表与迁移提交 85d3785 的触碰面一致。
 
 | 位置 | 引用内容 | 迁移动作 |
 |---|---|---|
@@ -130,16 +130,20 @@ agents/<宿主>/<机制>/<条目>
 | `src/catalog.ts:49–84` | `listPlugins` 一级枚举消费 `sourceDir` | 两级枚举改造（行为等价迁移） |
 | `scripts/verify-pack.ts:20` | `PLUGINS_DIR = path.join(packageRoot, 'plugins')` | 改 `agents` 两级枚举根 |
 | `scripts/verify-pack.ts:76–79` | 查 1 正则 `package/plugins/` | 改 `package/agents/<宿主>/plugins/` + 复合键 |
+| `scripts/prepack.ts:8` | 头注「skills/plugins 清单与路径不变」 | 措辞随迁改 `skills/agents`（补录） |
 | `package.json:13` | `files` 含 `"plugins"` | 改 `"agents"` |
+| `tsconfig.json:31` | `include` 数组含 `"plugins"` | 改 `"agents"`（补录） |
 | `test/unit/asset-map.test.ts:31` | 期望行 `sourceDir: 'plugins'` | 改 `'agents'` |
 | `test/unit/plugin-catalog.test.ts:20` | fixture 建包于 `packageRoot/plugins/<名>` | fixture 改两级布局 |
 | `test/unit/plugin-catalog.test.ts:59` | 报错断言 `err.message.includes('plugins')` | 随枚举根文案核对改写 |
 | `test/unit/plugin-package.test.ts:11` | `PLUGIN_DIR = …/../../plugins/dsh-demo/` | 改 `…/../../agents/dsh/plugins/dsh-demo/` |
+| `test/unit/repo-ts-shape.test.ts:16` | `TS_SOURCE_ROOTS` 含 `'plugins/dsh-demo'` | 改 `'agents/dsh/plugins/dsh-demo'`（测试名与注释同批改，补录） |
 | `test/unit/verify-pack-plugins.test.ts:29–44` | stage fixture `package/plugins/` 布局 | 改 `package/agents/<宿主>/plugins/` 布局 |
 | `test/unit/verify-pack-plugins.test.ts:86` | 坏包 fixture 路径 `packageRoot/plugins/` | 随枚举根改两级 |
 | `test/unit/verify-pack-plugins.test.ts:97–101` | 断言 `files.includes('plugins')` | 改 `'agents'` |
 | `test/e2e/plugin-install.test.ts:19、275` | 读 `plugins/dsh-demo/package.json` | 改新路径 |
 | `test/e2e/dsh-plugin-integration.test.ts:23` | 读 `plugins/dsh-demo/package.json` | 改新路径 |
+| `test/e2e/dsh-ts-loading.test.ts:34` | `PLUGIN_DIR = path.join(packageRoot, 'plugins', 'dsh-demo')` | 改两级路径（补录） |
 | `docs/plugin-assets.md:8、37、106` | `plugins/dsh-demo/` 路径提法 | 随迁位回改；§1.1 布局行改述 |
 | `docs/standards/agents-layout.md`（本册） | 导语「本册描述目标态，落定前仓库根不存在 `agents/` 目录」 | 迁移落地后更新为既成事实表述 |
 
@@ -147,7 +151,7 @@ agents/<宿主>/<机制>/<条目>
 
 以下引用经 grep 实证**不受迁位影响**，迁移票不得顺手改动：
 
-- `--plugins` 旗标与示例文本（`README.md:113–114`、`src/cli-args.ts:37`、`bin/infra.ts:242`、`test/unit/menu.test.ts`）：旗标名是 CLI 表面，非目录路径。
+- `--plugins` 旗标与示例文本（`README.md:113–114`、`src/cli.ts:87`、`bin/infra.ts:242`、`test/unit/cli.test.ts`）：旗标名是 CLI 表面，非目录路径（初稿引 `src/cli-args.ts:37` 与 `test/unit/menu.test.ts`，两者已随 commander 迁移退役/迁走——工单 20261115-eed0）。
 - 包名 `@hankchen/dsh-demo` 全部引用（`test/unit/plugin-install`、`dsh-command`、`reconcile`、`verify-bundle`、`menu` 等测试与包内文件）：条目正名是包名（plugin-assets §1.1），不随目录迁位变。
 - `.infra-lock.json` 记账（`src/lockfile.ts`、`src/plugin-install.ts`）：插件区按包名记账，无仓库内路径。
 - CI workflow：步骤调 verify:pack 对账命令名不变（pnpm 形态下为 `pnpm run verify:pack`，spec 20261115-ed9f FR-4）；`.github/workflows/regression-gate.yml` 已在位（spec 20261115-f650 FR-2 交付），全部步骤只调命令名（pnpm install --frozen-lockfile / pnpm run typecheck / pnpm test / pnpm pack + pnpm run verify:pack），无 `plugins/` 目录路径引用——本行清单初稿「本分支尚无 .github/ 目录」系时序过期表述，已修正（残余 #2 核销，票 20261115-30f2）。

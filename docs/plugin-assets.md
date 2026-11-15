@@ -68,6 +68,8 @@ git tag -a v<版本> -m "v<版本>" && git push origin v<版本>
 
 （`pnpm run verify:pack` 传参不带 `--`：pnpm 12 起 `pnpm run` 原样转发 `--`，与 npm 不同，本机 12.15.0 实测。）
 
+命令块末行的 `git tag` 与 `git push` 是人工门——须问人确认后再执行，不随上方命令批量粘贴；边界与完整检查单见 `/dev-release`（README「维护者：发布流程」同口径）。
+
 发布初始化器前，对账在既有技能清单核对之外扩展三查，任一不满足拒绝发布（退出码 1）：
 
 1. **包内 agents/*/plugins/ 清单 = 仓库 agents/*/plugins/ 清单**（与 skills 对账同法，按 `<宿主>/<插件目录名>` 复合键两侧同法构造，`scripts/verify-pack.ts` 的插件侧扩展）；
@@ -131,6 +133,6 @@ dsh plugin --profile <名> add <包>
 
 1. `agents/<宿主>/plugins/<目录名>/` 建完整 npm 包：package.json 过 §1.2 四要素 + `engines.dsh` + `description`；
 2. 插件模块导出 `name` + `apply(ctx)`；`cordis.patch.yml` 以包名引用自己（照抄 `agents/dsh/plugins/dsh-demo/`）；
-3. 发布面预编译照抄 demo 的 `prepack`/`postpack` 钩子（§1.4：emit 编译产物 + 清单换载/还原，devDependencies 自持 typescript）；
+3. 发布面预编译照抄 demo 的 `prepack`/`postpack` 钩子（§1.4：emit 编译产物 + 清单换载/还原，devDependencies 自持 typescript）；同批登记 .gitignore：emit 产物（`index.js`）与清单备份不入库（demo 登记形态见仓库根 .gitignore 的 prepack 段）——漏登记则打包中途失败残留的产物会被提交入库；
 4. **先发插件包**（pack 后过 `verify-bundle --tarball` 发布态校验，`pnpm publish --access public`，过 §1.4 两道 git 门），**再发初始化器**（§1.4 双包顺序）；
 5. 初始化器发布对账三查过（§1.4）方可 publish。
