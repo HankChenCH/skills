@@ -1,6 +1,5 @@
-// commander 15.1.0 等价探针（v3）：commander 负责 token 消耗 + 未知旗标/多余位置参数检测
-// （exitOverride 错误码重映射逐字文案），顺序敏感语义（互斥/值必需/配对）沿 argv 顺序
-// 状态机复刻 cli-args.js；helpInformation 覆盖逐字 help。
+// commander 15.1.0 等价探针：commander 负责 token 消耗；未知旗标/位置参数检测让给 argv 顺序状态机
+// （exitOverride/helpDisplayed 通道 + helpInformation 覆盖逐字 help），顺序敏感语义（互斥/值必需/配对）沿 argv 顺序复刻 cli-args.js。
 import { Command } from 'commander';
 import { renderHelp } from '/tmp/r3-exp/fixtures/current-pkg/src/cli-args.js';
 
