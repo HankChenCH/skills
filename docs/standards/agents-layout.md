@@ -8,7 +8,7 @@
 
 ### 1.1 三段模式
 
-```
+```text
 agents/<宿主>/<机制>/<条目>
 ```
 
@@ -43,16 +43,16 @@ agents/<宿主>/<机制>/<条目>
 
 ### 1.5 宿主注记义务
 
-每个宿主目录的三类特例必须注记在本册 §附 宿主注记表，防安装器按单一模式误判（RQ4 输入要点 5–7）：
+每个宿主目录的四类特例必须注记在本册 §附 宿主注记表，防安装器按单一模式误判（RQ4 输入要点 5–7 及普查矩阵机制类型 O 类条的承接标注）：
 
 - 项目级路径特例：Devin 推荐 `.agents/skills/`（`.devin/skills/` legacy）——映射行逐宿主标注。
-- 本机级根变体：12+ 宿主本机根不在 `~/.<host>/`（`~/.config/`、`~/.codeium/`、`~/.snowflake/`、`~/.deepagents/` 系）——仓库树只镜像项目级布局，本机级差异由安装器映射表承担（`src/agent-dirs.ts` 的 `symlinkRule` 为既有先例）。
+- 本机级根变体：12+ 宿主本机根不在 `~/.<host>/`（`~/.config/`、`~/.codeium/`、`~/.snowflake/`、`~/.deepagents/` 系）——仓库树只镜像项目级布局，本机级差异由安装器映射表承担（`src/asset-map.ts` 映射表行的 `symlinkRule` 为既有先例）。
 - 仅生态宿主（Codemaker、Jazz、Terramind、Tinycloud、MCPJam 自身、Mux 机制页）：只按生态表行建 skills 条目，注记「待宿主官方文档公开后复核」，不虚构其余机制。
 - 不承接清单：memory 类平台内建对象（Windsurf/Augment memories、Devin Knowledge、MiniMax Heartbeat、Ona 组织级 skills）、Kiro specs（流程产物）、纯内建斜杠命令宿主（Rovo Dev、iFlow）——注记「不承接」。
 
 ## 二、各机制类型的清单要素
 
-对齐插件包四要素的思路（`docs/plugin-assets.md` §1.2）：每类条目定义**身份要素**与**内容要素**，均可机械核验。核验时点两分——编目时核身份（缺失即编目报错，插件条目先例：缺 `name` 编目报错）；发布对账时核内容（缺失即拒绝发布，verify:pack 查 2 先例，见 §三）。
+对齐插件包四要素的思路（`docs/plugin-assets.md` §1.2）：每类条目定义**身份要素**与**内容要素**，均可机械核验。核验时点两分——编目时核身份（缺失即编目报错，插件条目先例：缺 `name` 编目报错）；发布对账时核内容（缺失即拒绝发布，`verify:pack` 查 2 先例，见 §三）。
 
 | 机制 | 身份要素 | 内容要素 | 依据 |
 |---|---|---|---|
@@ -63,11 +63,11 @@ agents/<宿主>/<机制>/<条目>
 | T4 rules（目录型） | 文件名 | markdown 文件在 | `.roo/rules/` 等 8 宿主官方目录 |
 | T4 rules（单文件型） | 宿主根文件条目文件名 | markdown 文件在 | `AGENTS.md` / `CLAUDE.md` 事实标准 |
 | T5 agents | 定义文件名 | md+frontmatter 或 json 可解析（逐宿主） | RQ4 §T5 格式两分 |
-| T6 plugins | 包 package.json `name`（正名是包名，非目录名） | dsh 宿主：四要素 + `engines.dsh` + `description`（沿 plugin-assets §1.2，不重抄）；其他宿主清单文件逐宿主映射（`plugin.json` / `qwen-extension.json` / Powers 清单），接入时补映射行 | plugin-assets §1.1–§1.2 |
+| T6 plugins | 包 package.json `name`（正名是包名，非目录名） | dsh：四要素 + `engines.dsh`（沿 plugin-assets §1.2）；其他宿主逐宿主补映射 | plugin-assets §1.1–§1.2 |
 | T7 配置文件条目 | 文件名（宿主官方命名） | JSON/YAML 可解析；不含 secrets | RQ4 §T7（无一入目录扩展） |
 | T8 其他 | 逐宿主条目标注 | 随接入时按宿主官方格式定义 | RQ4 §T8 异类单列 |
 
-插件容器（T6）条目 = `agents/<宿主>/plugins/<插件目录名>/` 整目录完整 npm 包，语义化版本独立演进——与现行 `plugins/` 顶层先例同构，仅宿主层新增。
+插件容器（T6）条目 = `agents/<宿主>/plugins/<插件目录名>/` 整目录完整 npm 包，语义化版本独立演进——与现行 `plugins/` 顶层先例同构，仅宿主层新增。dsh 四要素为 `type`/`main`/`files`/`dsh`，另带 `description` 提示（沿 plugin-assets §1.2，不重抄）；其他宿主清单文件逐宿主映射（`plugin.json` / `qwen-extension.json` / Powers 清单），接入时补映射行。
 
 ## 三、发布纪律改造方案
 
@@ -111,12 +111,12 @@ agents/<宿主>/<机制>/<条目>
 
 ### 4.2 迁移步骤（round 2 迁移票按序执行）
 
-1. `git mv plugins/dsh-demo agents/dsh/plugins/dsh-demo`（整目录：`package.json`、`index.js`、`cordis.patch.yml` 随迁）。
+1. 建宿主/机制目录并整目录迁移：`mkdir -p agents/dsh/plugins && git mv plugins/dsh-demo agents/dsh/plugins/dsh-demo`（目标父目录先建，否则 `git mv` fatal；整目录：`package.json`、`index.js`、`cordis.patch.yml` 随迁）。
 2. 根 `package.json` `files`：`"plugins"` → `"agents"`（§3.2）。
 3. `src/asset-map.ts` 插件行 `sourceDir` 改 `'agents'`，`src/catalog.ts` `listPlugins` 两级化（§3.3）。
 4. `scripts/verify-pack.ts` 路径切换：`PLUGINS_DIR` 枚举根 + 查 1 正则 + 复合键（§3.2）。
 5. §4.3 引用面清单逐文件更新测试路径常量与 fixture。
-6. 文档回改：`docs/plugin-assets.md` §1.1 仓库布局行改述 agents/ 布局、§1.5 与 §三 的 `plugins/dsh-demo/` 路径提法随迁；README 插件节免改（§4.4）。
+6. 文档回改：`docs/plugin-assets.md` §1.1 仓库布局行改述 agents/ 布局，导语活样例行与 §1.3、§三 的 `plugins/dsh-demo/` 路径提法随迁；README 插件节免改（§4.4）。
 7. 全量验证：`npm test` 全绿 → `npm pack` → `npm run verify:pack -- <tarball>` 对账绿。
 8. 全部改动同一提交序列带 `[#工单号]` 提交，一步一验。
 
@@ -127,7 +127,7 @@ agents/<宿主>/<机制>/<条目>
 | 位置 | 引用内容 | 迁移动作 |
 |---|---|---|
 | `src/asset-map.ts:54` | `sourceDir: 'plugins'` | 改 `'agents'`（§3.3） |
-| `src/catalog.ts:46–84` | `listPlugins` 一级枚举消费 `sourceDir` | 两级枚举改造（行为等价迁移） |
+| `src/catalog.ts:49–84` | `listPlugins` 一级枚举消费 `sourceDir` | 两级枚举改造（行为等价迁移） |
 | `scripts/verify-pack.ts:20` | `PLUGINS_DIR = path.join(packageRoot, 'plugins')` | 改 `agents` 两级枚举根 |
 | `scripts/verify-pack.ts:76–79` | 查 1 正则 `package/plugins/` | 改 `package/agents/<宿主>/plugins/` + 复合键 |
 | `package.json:13` | `files` 含 `"plugins"` | 改 `"agents"` |
@@ -141,7 +141,7 @@ agents/<宿主>/<机制>/<条目>
 | `test/e2e/plugin-install.test.ts:19、275` | 读 `plugins/dsh-demo/package.json` | 改新路径 |
 | `test/e2e/dsh-plugin-integration.test.ts:23` | 读 `plugins/dsh-demo/package.json` | 改新路径 |
 | `docs/plugin-assets.md:8、37、106` | `plugins/dsh-demo/` 路径提法 | 随迁位回改；§1.1 布局行改述 |
-| `docs/standards/agents-layout.md`（本册） | §导语「现状基准」 | 迁移落地后更新为既成事实表述 |
+| `docs/standards/agents-layout.md`（本册） | 导语「本册描述目标态，落定前仓库根不存在 `agents/` 目录」 | 迁移落地后更新为既成事实表述 |
 
 ### 4.4 核对后不改面（清单完整性边界）
 
