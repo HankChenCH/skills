@@ -39,9 +39,16 @@ if (!fs.existsSync(tarball)) {
 const list = spawnSync('tar', ['-tzf', tarball], { encoding: 'utf8' });
 if (list.error || list.status !== 0) {
   // spawn 失败（tar 不在 PATH）时 error 持原因、stderr 为空——只拼 stderr 会出 null 空壳
-  // （票 20261116-d30c）：原因取 error 优先、stderr 兜底，并附退出码段
-  const reason = list.error?.message ?? list.stderr?.trim() ?? '（无 stderr）';
-  console.error(`✗ 无法读取 tarball：${reason}（tar 退出码 ${list.status ?? '未知（spawn 失败）'}）`);
+  // （票 20261116-d30c）：原因取 error 优先（|| 落空串）、stderr 兜底；退出码段三态——
+  // 有退出码 / spawn 失败 / 信号终止（status=null 且无 error，带 signal 名）
+  const reason = list.error?.message || list.stderr?.trim() || '（无 stderr）';
+  const exitNote =
+    list.status !== null
+      ? `tar 退出码 ${list.status}`
+      : list.error
+        ? 'tar 退出码未知（spawn 失败）'
+        : `tar 被信号终止（${list.signal}）`;
+  console.error(`✗ 无法读取 tarball：${reason}（${exitNote}）`);
   process.exit(1);
 }
 

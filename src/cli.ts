@@ -70,8 +70,10 @@ export function renderHelp(): string {
 }
 
 // §10.1 映射表：值语义状态机自担（按首现去重的并集语义在状态机）。collectFn 仅为
-// commander「选项带值」接口形态所需——其返回值不读（opts 不读，见文件头），非死代码可删：
-// 不传 collector 时 commander 对 [names] 可选值位的消费行为不同，FR-5 逐字节防线不动它。
+// commander「选项带值」接口形态装配：其返回值不读（opts 不读，见文件头）。保留装配面
+// 是 FR-5 逐字节防线的既定形态——有/无 collector 的 token 消费与错误通道经
+// commander@15.1.0 六形态探针实测同形（评审 20261116-* 标准轴；差异仅在 opts 存值
+// 形态，本模块不可观察），删除无可观察收益，不动装配面。
 const splitNames = (value: string, previous: string[] = []): string[] => [
   ...(previous ?? []),
   ...value.split(',').map((s) => s.trim()).filter(Boolean),

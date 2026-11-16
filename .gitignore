@@ -19,8 +19,8 @@ node_modules/
 # gitignore 兜底 pack 中途失败场景，npm pack 的 files 清单不受 ignore 规则影响，编译 .js
 # 照常进包。插件包发布面同法（spec 20261115-ed9f FR-7 回退，票 20261115-cf39：
 # agents/dsh/plugins/<插件>/scripts/prepack.ts emit index.js + 清单换载），产物按两级布局
-# 形态通配登记（票 20261116-bec7：新增插件包免改本文件；备份与暂存由下方无斜杠
-# basename 模式任意深度匹配，无需另列）
+# 形态通配登记（票 20261116-bec7：新增插件包免改本文件。备份文件由下方无斜杠 basename
+# 模式任意深度匹配；暂存为尾斜杠目录锚匹配，仅命中同名目录、同名文件不命中，均无需另列）
 bin/*.js
 src/**/*.js
 agents/*/plugins/*/index.js

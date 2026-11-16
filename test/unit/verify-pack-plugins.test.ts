@@ -74,10 +74,11 @@ async function stageTarball(
   }
   if (injectNodeModulesSymlink) {
     // 相对符号链接形态（RQ2 问②：真实 pack 对相对链接以链接条目入包）——镜像 pnpm 成员
-    // node_modules 指向 store 的链接形态，条目路径指包外
+    // node_modules 指向 store 的链接形态：六级 .. 萯 stage 根（tarball 根 package 之外），
+    // 与「store 在打包面外」的镜像前提一致
     const nm = path.join(stage, 'agents', 'dsh', 'plugins', 'dsh-demo', 'node_modules');
     await mkdir(nm, { recursive: true });
-    await symlink(path.join('..', '..', '..', '..', '..', 'shared-store', 'link-form-pkg'), path.join(nm, 'link-form-pkg'));
+    await symlink(path.join('..', '..', '..', '..', '..', '..', 'shared-store', 'link-form-pkg'), path.join(nm, 'link-form-pkg'));
   }
   const tarball = path.join(root, 'fixture.tgz');
   spawnSync('tar', ['-czf', tarball, '-C', path.dirname(stage), 'package']);
