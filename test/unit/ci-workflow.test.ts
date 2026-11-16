@@ -5,6 +5,8 @@
 // 期望值全部来自 spec CI workflow 契约字面（触发 push+pull_request、node 24 经 .nvmrc、
 // 步骤链 checkout → node setup → 依赖安装 → tsc --noEmit → 全量测试 → verify:pack、
 // 无 secrets 键），不从实现推导。
+// 步骤链 checkout → node setup → corepack enable → 依赖安装 → tsc --noEmit → 全量测试
+// → verify:pack（corepack enable 见票 20261116-c5f5）。
 // pnpm 契约（spec 20261115-ed9f，RQ2 方案）：依赖安装 = pnpm install --frozen-lockfile
 // （显式传参留痕——CI 本就自动 frozen；incompatible lockfile / pnpm-lock.yaml 漏提交
 // 直接红，RQ2 异常流 A #6 的正确红）；pnpm 版本两处钉——全局安装步钉主版本 12（兼供
@@ -420,6 +422,7 @@ test('负向契约：workflow 不引用 plugins/ 目录路径，依赖安装不�
   // 契约面 = 执行行（YAML 注释非执行面，票 20261116-c5f5：注释提及 npm install -g 不算违规）
   const execLines = raw.split('\n').filter((line) => !line.trim().startsWith('#'));
   // agents-layout §4.4 声明「全部步骤无 plugins/ 目录路径引用」——目录迁移契约此前无测试承载
+  // （缺口声明：本断言行级过滤仅豁免全行注释，行尾注释仍会命中；npm 面已改解析后执行值，plugins 面留此口径）
   const pluginPathLines = execLines.filter((line) => line.includes('plugins/'));
   assert.deepEqual(
     pluginPathLines,
@@ -428,13 +431,25 @@ test('负向契约：workflow 不引用 plugins/ 目录路径，依赖安装不�
   );
   // 依赖安装纪律（票 20261115-d5f4）：pnpm install --frozen-lockfile——不得退回 npm；
   // 豁免 = npm install -g pnpm@<版>（runner 引导装 pnpm 本身，票 20261115-1a89 既定机制）
-  const npmDepLines = execLines
-    .filter((line) => /\bnpm (install|ci)\b/.test(line) && !/npm install -g pnpm@/.test(line));
+  // npm 禁令改解析后执行值集合（js-yaml 相邻测试已装载同文件）：run/uses 值不含注释
+  const doc2 = loadYaml(raw) as { jobs?: Record<string, { steps?: Array<{ run?: string; uses?: string }> }> };
+  const execValues = Object.values(doc2.jobs ?? {})
+    .flatMap((job) => job.steps ?? [])
+    .map((step) => [step.run, step.uses])
+    .flat()
+    .filter((v): v is string => typeof v === 'string');
+  const npmDepLines = execValues
+    .filter((v) => /\bnpm (install|ci)\b/.test(v) && !/npm install -g pnpm@/.test(v));
   assert.deepEqual(
     npmDepLines,
     [],
     `项目依赖安装不得使用 npm install/ci（pnpm workspace 契约；引导装 pnpm 豁免），命中行：${JSON.stringify(npmDepLines)}`,
   );
+});
+
+test('packageManager 字段钉 pnpm@12.15.0——corepack enable 的 shim 版本依此字段（票 20261116-c5f5）', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+  assert.equal(pkg.packageManager, 'pnpm@12.15.0', `corepack shim 版本源自此字段，缺失或漂移即静默换版，实际：${pkg.packageManager}`);
 });
 
 test('workflow 过严格 YAML 解析（真解析器防线，杜绝平纯标量含冒号空格类结构缺陷）', () => {
