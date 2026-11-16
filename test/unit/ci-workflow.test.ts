@@ -406,3 +406,24 @@ test('全文件无 secrets：结构无 secrets 键、原文无 secrets 表达式
   assert.deepEqual(offenders, [], `workflow 出现 secrets 键——契约禁止：${offenders.join('、')}`);
   assert.doesNotMatch(raw, /\$\{\{\s*secrets\./, 'workflow 原文出现 ${{ secrets. }} 表达式——契约禁止');
 });
+
+test('负向契约：workflow 不引用 plugins/ 目录路径，依赖安装不退回 npm install/ci', () => {
+  const raw = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+  // agents-layout §4.4 声明「全部步骤无 plugins/ 目录路径引用」——目录迁移契约此前无测试承载
+  const pluginPathLines = raw.split('\n').filter((line) => line.includes('plugins/'));
+  assert.deepEqual(
+    pluginPathLines,
+    [],
+    `workflow 不得引用 plugins/ 目录路径（agents/ 迁移契约），命中行：${JSON.stringify(pluginPathLines)}`,
+  );
+  // 依赖安装纪律（票 20261115-d5f4）：pnpm install --frozen-lockfile——不得退回 npm；
+  // 豁免 = npm install -g pnpm@<版>（runner 引导装 pnpm 本身，票 20261115-1a89 既定机制）
+  const npmDepLines = raw
+    .split('\n')
+    .filter((line) => /\bnpm (install|ci)\b/.test(line) && !/npm install -g pnpm@/.test(line));
+  assert.deepEqual(
+    npmDepLines,
+    [],
+    `项目依赖安装不得使用 npm install/ci（pnpm workspace 契约；引导装 pnpm 豁免），命中行：${JSON.stringify(npmDepLines)}`,
+  );
+});
