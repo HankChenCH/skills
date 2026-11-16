@@ -7,6 +7,8 @@
 # 多于两个 prompt 的交互必须同步发键。正常透传 CLI 退出码；超时 126/124 退出。
 # ARGS 为转交给 CLI 的参数串（如 "skill add"，按词拆分；缺省空 = 裸跑，兼容既有调用）。
 # spawn 后须给 PTY 设窗口尺寸：缺省 0 行 0 列会让 clack 把菜单折行成单字一行。
+# LIT-<文本>：原样发送字面文本（票 20261116-ccfb 增补，clack.text 输入等）；
+# 文本内不得含逗号（KEYS 按逗号分词）与空格，以 LIT- 前缀进入 default 分支。
 
 set timeout 60
 set node_bin [lindex $argv 0]
@@ -38,7 +40,13 @@ foreach k [split $keys ","] {
         SPACE { send " " }
         ENTER { send "\r" }
         CTRLC { send "\x03" }
-        default { puts stderr "unknown key token: $k"; exit 125 }
+        default {
+            if {[string match "LIT-*" $k]} {
+                send [string range $k 4 end]
+            } else {
+                puts stderr "unknown key token: $k"; exit 125
+            }
+        }
     }
     incr idx
 }

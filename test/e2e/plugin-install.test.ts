@@ -110,19 +110,24 @@ function plainText(output: string): string {
 
 // 经 expect(1) 在真实 PTY 中跑交互式 CLI（plugin add 两层：插件勾选 → profile 选择/预置跳过）。
 // PATTERNS 与 KEYS 等长：发键前等对应提示文本渲染（盲发节奏会让连发菜单的按键在 prompt
-// 切换窗口被吞，见 interactive.exp 头注）。cliArgs 为转交 CLI 的参数（如 "plugin add"）。
+// 切换窗口被吞，见 interactive.exp 头注）。cliArgs 为转交 CLI 的参数（如 "plugin add"）；
+// KEYS 记号 DOWN/SPACE/ENTER/CTRLC 外支持 LIT-<文本> 直通（clack.text 字面输入）；
+// binPath 可覆盖被测入口（缺省仓库 bin，暂存破损包场景传入暂存 bin）。
 function runInteractiveIn(
   projectRoot: string,
   keys: string[],
   env: Record<string, string>,
   patterns: string[] = [],
   cliArgs = '',
+  binPath = BIN,
 ) {
   const keyTokens = keys
     .map((key) => {
       if (key === '\x1b[B') return 'DOWN';
       if (key === ' ') return 'SPACE';
       if (key === '\r') return 'ENTER';
+      if (key === '\x03') return 'CTRLC';
+      if (key.startsWith('LIT-')) return key;
       throw new Error(`runInteractiveIn 不认识的键：${JSON.stringify(key)}`);
     })
     .join(',');
@@ -132,7 +137,7 @@ function runInteractiveIn(
     [
       path.join(packageRoot, 'test', 'e2e', 'interactive.exp'),
       process.execPath,
-      BIN,
+      binPath,
       projectRoot,
       keyTokens,
       patternTokens,
@@ -452,6 +457,106 @@ test('[FR-4] PTY plugin add 选 desktop profile：拒装并说明官方保留名
   assert.match(output, /保留/, '应说明官方保留名行为');
   assert.equal(fs.existsSync(shimLog), false, '拒装不得执行任何官方命令');
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '拒装不得写锁文件');
+});
+
+// ---------- [FR-3] PTY 取消/空选（评审增量 #2，与 skill 侧 install.test 同款口径）----------
+
+test('[FR-3] PTY plugin add 勾选后取消（Ctrl-C）：退出 0 且零落盘、零官方调用', async (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+
+  const picked = await runInteractiveIn(
+    project,
+    ['\x03'],
+    { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['选择要安装的插件'],
+    'plugin add',
+  );
+  assert.equal(picked.code, 0, '取消应正常退出（现行交互纪律）');
+  assert.equal(fs.existsSync(shimLog), false, '取消不得执行官方命令');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '取消不得写锁文件');
+});
+
+test('[FR-3] PTY plugin add 确认空选：退出 0 且零落盘、零官方调用', async (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+
+  const picked = await runInteractiveIn(
+    project,
+    ['\r'],
+    { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['选择要安装的插件'],
+    'plugin add',
+  );
+  assert.equal(picked.code, 0, '空选确认应正常退出（现行交互纪律）');
+  assert.equal(fs.existsSync(shimLog), false, '空选不得执行官方命令');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '空选不得写锁文件');
+});
+
+// ---------- [FR-1] PTY 无既有 profile 输入新名（评审增量 #3）----------
+
+test('[FR-1] PTY plugin add 无既有 profile 输入新名：shim 收到该新名 profile、锁文件记账', async (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t); // 无 profiles 目录 → 交互提示输入新名
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+  // SPACE 勾选 → ENTER 确认（盲发）→ 文本提示渲染后 LIT- 键入新名 → ENTER 提交（clack.text）
+  const picked = await runInteractiveIn(
+    project,
+    [' ', '\r', 'LIT-infra-new', '\r'],
+    { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['选择要安装的插件', '', '未发现既有 dsh profile', ''],
+    'plugin add',
+  );
+  assert.equal(picked.code, 0, '输入新名安装应成功退出');
+  assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'infra-new', 'add', PKG]]);
+  const lockfile = readLockfileAt(project);
+  assert.deepEqual(lockfile.plugins[PKG].profile, 'infra-new');
+});
+
+// ---------- [FR-3|评审增量 #1 守护] 编目失败 = ✗ 通道 + 退出 1（取消/空选外无豁免）----------
+// 触发方式：整包暂存到临时目录（node_modules 符号链接带回工具链，dsh-ts-loading 同款）并写坏
+// 插件包清单——编目缺陷只可能来自包内容，暂存隔离不触仓库树；编目在首个提示渲染前失败，
+// PTY 下等 ✗ 行渲染后补一键（无操作）走 EOF。
+
+test('[FR-3] PTY plugin add 编目失败：✗ 通道退出 1、零官方调用、零锁文件', async (t) => {
+  const stage = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-stagedefect-'));
+  t.after(() => fs.rmSync(stage, { recursive: true, force: true }));
+  const staged = path.join(stage, 'package');
+  fs.cpSync(packageRoot, staged, {
+    recursive: true,
+    filter: (source) => {
+      const rel = path.relative(packageRoot, source);
+      if (rel === '') return true;
+      const top = rel.split(path.sep)[0];
+      return ['package.json', 'bin', 'src', 'skills', 'agents'].includes(top) && !source.includes('node_modules');
+    },
+  });
+  fs.symlinkSync(path.join(packageRoot, 'node_modules'), path.join(staged, 'node_modules'), 'dir');
+  fs.writeFileSync(path.join(staged, 'agents', 'dsh', 'plugins', 'dsh-demo', 'package.json'), '{ not-json');
+
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+
+  const picked = await runInteractiveIn(
+    project,
+    ['\r'],
+    { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['编目发现缺陷'],
+    'plugin add',
+    path.join(staged, 'bin', 'infra.ts'),
+  );
+  const output = picked.output.replace(ANSI_RE, '');
+  assert.equal(picked.code, 1, '编目失败应按错误口径退出 1（非取消豁免的 0）');
+  assert.match(output, /编目发现缺陷/, '应经 ✗ 通道点名编目缺陷');
+  assert.equal(fs.existsSync(shimLog), false, '编目失败不得执行官方命令');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '编目失败不得写锁文件');
 });
 
 // ---------- 旧旗标并存过渡态回归（接线复用后行为零变化；硬切退役归 20261116-bfcf）----------
