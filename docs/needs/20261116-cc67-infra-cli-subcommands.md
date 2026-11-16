@@ -1,8 +1,9 @@
 ---
 id: 20261116-cc67
-status: confirmed
+status: fulfilled
 created: 2026-11-16
 confirmed: 2026-11-16
+fulfilled: 2026-11-17
 ---
 # @hankchen/infra 命令行子命令化 + src 命令目录式分层（旗标模式硬切退役）
 
@@ -80,8 +81,8 @@ confirmed: 2026-11-16
 ### 验收折回（20261116-dd67，round 1 passed）
 
 **残余风险**（均不阻塞）：
-1. 集成级人工场景 `npx @hankchen/infra@0.2.0 skill add <名>` **未核销**——发布单向门未到时点；0.2.0 经 dev-release 发布后在全新项目人工执行补核（锁文件版本核对），此前 need 不得置 fulfilled。
-2. verify:pack 三查未在验收轮重跑（工单级不重跑口径，间接证据链完整：收口门禁绿 + 分层在位 + prepack 机制在位）；发布流程中 verify:pack 为必经门，风险自然收敛。
+1. ~~集成级人工场景 `npx @hankchen/infra@0.2.0 skill add <名>` **未核销**~~ → **已补核（2026-11-17）**：0.2.0 发布后部署验证证伪出发布 bin 元数据脱钩缺陷（registry 元数据 bin=.ts / tarball 包内 .js，npx 挂 ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING；票 20261116-c1d6 修复，v0.2.1 承载），场景在 0.2.1 上核销——全新 git 项目 `npx -y @hankchen/infra@0.2.1 skill add dev-spec` EXIT=0、技能落盘、锁文件 `"packageVersion": "0.2.1"`，registry 元数据 `bin = { infra: 'bin/infra.js' }` 同步核验。
+2. verify:pack 三查未在验收轮重跑（工单级不重跑口径，间接证据链完整：收口门禁绿 + 分层在位 + prepack 机制在位）；发布流程中 verify:pack 为必经门，风险自然收敛——发布时点已实跑（v0.2.1 四查含新增 bin 查全过）。
 3. 验收测试 profile `accept-2c58-f` 遗留 `~/.dsh/profiles/`（无影响，可随手删）。
 
 **下一轮建议**（依据：逐票评审建议项 + 验收残余风险归纳）：
