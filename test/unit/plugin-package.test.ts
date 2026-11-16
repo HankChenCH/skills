@@ -29,8 +29,8 @@ test('demo 包名与版本：registry 可发布形态——@hankchen/dsh-demo、
   // 既有 e2e 落盘版本断言承载（票 20261115-dafb）
   assert.match(
     String(pkg.version),
-    /^\d+\.\d+\.\d+(-[0-9A-Za-z-]+)?$/,
-    `版本须为合法 semver（npm publish 拒收下划线等非法字符），实际：${pkg.version}`,
+    /^\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$/,
+    `版本须为合法 semver（prerelease 为点分标识符，npm publish 拒收下划线等非法字符），实际：${pkg.version}`,
   );
   // 序数比较：两侧同一纯编码（major*10^6+minor*10^3+patch，patch 段按本仓实践 <1000），
   // 先剥 prerelease 后缀——semver 下 prerelease 高于同版 release，只比 x.y.z；
