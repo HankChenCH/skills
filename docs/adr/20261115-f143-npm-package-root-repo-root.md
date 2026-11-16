@@ -18,3 +18,7 @@ spec 20261115-8975 实现票 20261115-975c 的架构决策蒸馏。npm 包 `@han
 - 正面：仓库根即包根，资产单源；对账是机械校验而非人工核对；新增资产类型（映射表加行）自动随包分发。
 - 代价：仓库根成为 npm 包根——package.json / package-lock.json 入库、node_modules 与 *.tgz 需 .gitignore 维护（票 20261115-975c 已落）；仓库语义从「纯技能套件」扩为「套件 + 自身安装器」。
 - 边界：本裁决与包名解耦——包名随 scope 可发布性调整（2026-11-15 用户拍板 `@hankghchen/infra` → `@hankchen/infra`，fix 票 20261115-b1b8，教训「名字未被占用 ≠ scope 可发布」已折回 need D4/A2）。
+
+## 附注（2026-11-16，票 20261116-c1d6）
+
+裁决 3 的根包发布通道自 2026-11-16 起改为 tarball 三步 `pnpm pack → pnpm run verify:pack <tgz> → npm publish <tgz>`：目录直发（`npm publish` / `pnpm publish` 不带 tarball）被根包 prepublishOnly 常驻门拒绝（`scripts/publish-gate.ts`）——npm publish 在 pack 内 postpack 还原 package.json（bin 回仓内 `.ts`）之后、上传元数据之前重读磁盘 manifest 作元数据，元数据 bin 恒为 `.ts`，npx 执行即命中 ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING（证伪报告：registry 0.2.0 元数据 bin=.ts 而 tarball bin=.js）；tarball 形态发布不跑仓库脚本、元数据取包内清单，结构上永不触门。细目见 docs/maintainer-guide.md「发布流程」。本册裁决正文不受影响。

@@ -61,7 +61,8 @@ node .sdlc/check.sh phase|frontier|validate <file>|publish <file>|all   # 本仓
 
 npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。包管理器为 pnpm（`pnpm-workspace.yaml` 声明 workspace、`packageManager` 字段钉版）。发布三步，顺序固定：
 
-1. **对账**：`pnpm pack` 产出 tarball 后跑对账校验——包内技能清单必须等于仓库 `skills/` 清单、包内插件清单等于仓库 `agents/*/plugins/` 清单且禁含 `node_modules` 条目，任一不满足即拒绝发布（退出码 1）：
+1. **升版本号**：改 `package.json` 的 `version`。semver 判据——patch：既有技能内容修订；minor：新增技能；major：移除或更名技能、安装目标或软链规则变更（后两类会改变既有项目的落盘形态）。
+2. **打包对账**：`pnpm pack` 产出 tarball 后跑对账校验——包内技能清单必须等于仓库 `skills/` 清单、包内插件清单等于仓库 `agents/*/plugins/` 清单且禁含 `node_modules` 条目、包内 package.json 的 `bin.infra` 必须指包内预编译 `.js`（bin 查，票 20261116-c1d6），任一不满足即拒绝发布（退出码 1）：
 
    ```bash
    pnpm pack
@@ -70,8 +71,7 @@ npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。�
 
    （传参不带 `--`：pnpm 12 起 `pnpm run` 原样转发 `--`，与 npm 不同。）
 
-2. **升版本号**：改 `package.json` 的 `version`。semver 判据——patch：既有技能内容修订；minor：新增技能；major：移除或更名技能、安装目标或软链规则变更（后两类会改变既有项目的落盘形态）。
-3. **发布**：`pnpm publish --access public`。pnpm publish 自带两道 git 门——工作树不干净（`ERR_PNPM_GIT_UNCLEAN`）或不在 `master`/`main` 分支（`ERR_PNPM_GIT_NOT_CORRECT_BRANCH`）都会被拒；插件包发布同门，双包顺序与对账三查见[插件资产规范](./plugin-assets.md) §1.4。发布是单向门，操作以 annotated git tag（`v<版本>`）留痕；完整检查单、CHANGELOG 纪律与「tag 与推送必须问人」的边界见 `/dev-release`。
+3. **发布**：原样发出对账过的 tarball——`npm publish hankchen-infra-<版本>.tgz --access public`。目录直发（`npm publish` / `pnpm publish` 不带 tarball）被根包 prepublishOnly 常驻门（`scripts/publish-gate.ts`）拒绝：npm publish 在 pack 内跑 postpack 还原 package.json（bin 回仓内 `.ts` 形态）之后、上传元数据之前重读磁盘 manifest 作元数据，元数据 bin 恒为 `.ts`，装出去 npx 建链接执行 node_modules 下 `.ts` 即挂（0.2.0 实证，票 20261116-c1d6）；pnpm 通道同门实拦（pnpm 10 dist 在 pack 前无条件跑 prepublishOnly，本仓 pnpm 12.15.0 dry-run 实测被拒）。tarball 形态发布不跑任何仓库脚本，元数据取自已过对账的包内清单；`npm publish --ignore-scripts` 为 opt-in 逃生口，靠 `/dev-release` 发布检查单纪律兜底。原 pnpm publish 的两道 git 门（`ERR_PNPM_GIT_UNCLEAN` / `ERR_PNPM_GIT_NOT_CORRECT_BRANCH`）随通道切换不再生效，主干与干净工作树前置由 `/dev-release` 入口门承担；插件包发布与双包顺序见[插件资产规范](./plugin-assets.md) §1.4。发布是单向门，操作以 annotated git tag（`v<版本>`）留痕；完整检查单、CHANGELOG 纪律与「tag 与推送必须问人」的边界见 `/dev-release`。
 
 依赖维护节奏：CLI 解析依赖 commander 锁 minor（`package.json` 钉 `^15.1.0`），官方 major 年更——14→15 间隔 12 个月，15 系已移除 `exitProcess` 改为 `exitOverride`（RQ3 调研实测先例，docs/research/cli-lib/ 报告 §10.4-4）。每年升 major 时以 `test/unit/cli.test.ts` 的十六案例等价矩阵（逐字节断言）为回归防线，全量 `pnpm test` 绿后再发版。
 
