@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// @hankchen/infra 装配壳（票 20261116-f761）：入口只做三件事——TTY raw 模式前置、
-// 调程序装配层 run、未预期错误 ✗ 出口。命令注册、前置分发、顶层帮助在 src/program.ts
-// （程序装配层）；旧旗标路径在 src/legacy-flags.ts（过渡并存）；bin 不承载任何分发与交互。
+// @hankchen/infra 装配壳（票 20261116-f761 起、20261116-bfcf 硬切定稿）：入口只做三件事——
+// TTY raw 模式前置、调程序装配层 run、未预期错误 ✗ 出口。命令注册、前置分发、顶层帮助在
+// src/program.ts（程序装配层）；bin 不承载任何分发与交互（raw 模式唯一装载点亦在本入口）。
 // （TS 迁移注：仓库内本入口为 .ts 直跑〔node ≥24.9 默认剥类型〕；发布面经 prepack 编译
 //  为同路径 bin/infra.js，并显式换载打包清单 bin 直指它〔备份 package.json → 改写 bin:
 //  bin/infra.js → postpack 还原〕——spec D8 修订。）
