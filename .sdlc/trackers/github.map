@@ -243,3 +243,9 @@ docs/tickets/spec20261115-ed9f-20261116-bec7-gitignore-wildcard.md	254	https://g
 docs/tickets/spec20261115-f650-20261116-0304-ci-workflow-yaml-strict-parse.md	255	https://github.com/HankChenCH/skills/issues/255
 docs/tickets/spec20261115-f650-20261116-c5f5-ci-pnpm-path-after-setup-node.md	256	https://github.com/HankChenCH/skills/issues/256
 docs/tickets/spec20261115-8975-20261116-0fdd-e2e-root-version-pin-decouple.md	257	https://github.com/HankChenCH/skills/issues/257
+docs/needs/20261116-cc67-infra-cli-subcommands.md	258	https://github.com/HankChenCH/ai-infra/issues/258
+docs/specs/need20261116-cc67-20261116-2c58-infra-cli-subcommands.md	259	https://github.com/HankChenCH/ai-infra/issues/259
+docs/tickets/spec20261116-2c58-20261116-1875-infra-core-relocate.md	260	https://github.com/HankChenCH/ai-infra/issues/260
+docs/tickets/spec20261116-2c58-20261116-f761-infra-skill-add-command.md	261	https://github.com/HankChenCH/ai-infra/issues/261
+docs/tickets/spec20261116-2c58-20261116-ccfb-infra-plugin-add-command.md	262	https://github.com/HankChenCH/ai-infra/issues/262
+docs/tickets/spec20261116-2c58-20261116-bfcf-infra-subcommand-hardcut-docs.md	263	https://github.com/HankChenCH/ai-infra/issues/263

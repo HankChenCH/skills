@@ -32,7 +32,7 @@ node .sdlc/check.sh phase|frontier|validate <file>|publish <file>|all   # 流程
 
 ## 已知坑
 
-- **双态/双份同步资产**：改 skills/ 内容或 agents/ 插件后，README 技能清单、包内清单须同步——`verify-pack` 对账不过即拒绝发布（技能清单相等、插件清单相等、禁含 node_modules 三查）。
+- **双态/双份同步资产**：改 skills/ 内容或 agents/ 插件后，docs/skills.md 技能清单、包内清单须同步——`verify-pack` 对账不过即拒绝发布（技能清单相等、插件清单相等、禁含 node_modules 三查）。
 - **文件即契约**：`.github/workflows/regression-gate.yml` 被 `test/unit/ci-workflow.test.ts` 静态守护，改工作流必须同步过该测试。
 - bash 兼容 darwin bash 3.2：变量展开紧邻多字节字符必须 `${VAR}` 花括号（docs/standards/bash-multibyte-bracing.md）；日志禁 `head -c` 截 UTF-8。
 - node:test 前置门跳过纪律（t.skip 只标注不截断）：docs/standards/node-test-skip-gate.md；替身保真与证伪形态门：docs/standards/stub-fidelity-integration.md、falsified-form-gate.md。

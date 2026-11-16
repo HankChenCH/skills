@@ -1,18 +1,21 @@
 // 端到端：临时目录 + 真实 CLI 进程 + 真实文件系统（不 mock）。
-// 交互路径经 script(1) 提供 PTY——clack 需要真 TTY 才收按键；旗标路径直接 spawnSync。
+// 交互路径经 expect(1) 提供 PTY——clack 需要真 TTY 才收按键；非交互路径直接 spawnSync（stdin 非 TTY）。
+// 票 20261116-f761：skill 侧交互与非交互用例改写新命令面（skill add）。
+// 票 20261116-bfcf 硬切：旧旗标（--all/--skills/--plugins）与裸跑两层菜单退役——旧输入按
+// 未知旗标口径报错、裸跑打印顶层帮助；顶层命令面的 FR-2 文案矩阵与帮助定稿断言落本文件。
 
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 期望值来源：src/cli.ts 的 renderHelp（文本字节的对账锚在 test/unit/cli.test.ts 对
-// 迁移前参照 evidence/probe-ref-matrix.txt 的逐字转录，此处只对账通道形态）。
-import { renderHelp } from '../../src/cli.ts';
+// 期望值来源：src/program.ts 的 renderTopHelp（票 20261116-f761 新命令面顶层帮助；
+// 文本字节定稿锚随硬切票 20261116-bfcf，此处只对账通道形态）。
+import { renderTopHelp } from '../../src/program.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');
@@ -41,13 +44,16 @@ function runCli(projectRoot: string, args: string[]) {
 
 
 // 经 expect(1) 在真实 PTY 中跑交互式 CLI 并逐键注入（expect 于 PTY 内 spawn，避开
-// script(1) 在本机对非 TTY stdin 的 tcgetattr 限制）。KEYS 用 DOWN/SPACE/ENTER 记号。
-function runInteractive(projectRoot: string, keys: string[]) {
+// script(1) 在本机对非 TTY stdin 的 tcgetattr 限制）。KEYS 用 DOWN/SPACE/ENTER/CTRLC 记号；
+// PATTERNS 与 KEYS 等长（空串 = 不等待）；cliArgs 为转交 CLI 的参数（硬切后缺省裸跑 =
+// 打印顶层帮助退出 0，本文件交互用例均显式传参）。
+function runInteractive(projectRoot: string, keys: string[], patterns: string[] = [], cliArgs = '') {
   const keyTokens = keys
     .map((key) => {
       if (key === '\x1b[B') return 'DOWN';
       if (key === ' ') return 'SPACE';
       if (key === '\r') return 'ENTER';
+      if (key === '\x03') return 'CTRLC';
       throw new Error(`runInteractive 不认识的键：${JSON.stringify(key)}`);
     })
     .join(',');
@@ -59,6 +65,8 @@ function runInteractive(projectRoot: string, keys: string[]) {
       BIN,
       projectRoot,
       keyTokens,
+      patterns.join(','),
+      cliArgs,
     ],
     { cwd: projectRoot, encoding: 'utf8', timeout: 120000 },
   );
@@ -82,6 +90,9 @@ function pickKeys(indices: number[]): string[] {
   keys.push('\r');
   return keys;
 }
+
+// skill add 无参交互勾选的等待锚：条目多选提示（按名排序后光标在第 0 项）
+const PICK_PATTERN = '选择要安装的技能';
 
 const sha256 = (bytes: Buffer | string): string => crypto.createHash('sha256').update(bytes).digest('hex');
 
@@ -134,15 +145,16 @@ function snapshot(projectRoot: string) {
   return snap;
 }
 
-test('[FR-1] 全新 git 项目交互选装部分技能：所选齐备落盘、未选不落盘', async (t) => {
-  const project = makeTargetProject(t);
-  const { code } = await runInteractive(project, ['\r', ...pickKeys(PICK_INDICES)]);
-  assert.equal(code, 0, '交互安装应成功退出');
+// ---------- [FR-1] skill add 带名免交互安装全链 ----------
 
-  for (const name of PICK_NAMES) {
+test('[FR-1] skill add dev-spec dev-plan 真进程安装 2 项：拷贝 + 软链 + 锁文件 + 摘要 + 退出 0', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', 'dev-spec', 'dev-plan']);
+  assert.equal(code, 0, `带名安装应成功退出：${stderr}`);
+
+  for (const name of ['dev-spec', 'dev-plan']) {
     const installed = path.join(project, '.agents/skills', name);
     assert.ok(fs.existsSync(path.join(installed, 'SKILL.md')), `${name}/SKILL.md 应落盘`);
-    assert.ok(fs.statSync(path.join(installed, 'references')).isDirectory(), `${name}/references/ 应落盘`);
     // 落盘内容与包内来源逐文件一致（原样拷贝）
     const sourceFiles = listFilesRecursive(path.join(REPO_SKILLS, name));
     assert.deepEqual(listFilesRecursive(installed), sourceFiles, `${name} 目录树应与包内一致`);
@@ -153,14 +165,136 @@ test('[FR-1] 全新 git 项目交互选装部分技能：所选齐备落盘、�
         `${name}/${rel} 内容应与包内一致`,
       );
     }
+    // agent 目录软链
+    const link = path.join(project, '.claude/skills', name);
+    assert.equal(fs.lstatSync(link).isSymbolicLink(), true, `.claude/skills/${name} 应为软链`);
+    assert.equal(fs.readlinkSync(link), '../../.agents/skills/' + name, '软链应为相对路径');
   }
-  const installedNames = fs.readdirSync(path.join(project, '.agents/skills')).sort();
-  assert.deepEqual(installedNames, [...PICK_NAMES].sort(), '未勾选技能不应落盘');
+
+  // 锁文件记账：包版本 + 逐技能指纹/安装时间
+  const lockfile: { packageVersion: string; skills: Record<string, { fingerprint: string; installedAt: string }> } =
+    JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
+  assert.equal(lockfile.packageVersion, rootVersion, '锁文件记录所装包的实际版本（=根 package.json）');
+  assert.deepEqual(Object.keys(lockfile.skills).sort(), ['dev-plan', 'dev-spec']);
+  for (const entry of Object.values(lockfile.skills)) {
+    assert.match(entry.fingerprint, /^[0-9a-f]{64}$/);
+    assert.match(entry.installedAt, /^\d{4}-\d{2}-\d{2}T/);
+  }
+
+  // 完成摘要列出安装项
+  const output = stdout + stderr;
+  assert.match(output, /已安装 2 项技能/, '摘要应记安装项数');
+  assert.match(output, /dev-spec、dev-plan/, '摘要应列安装项名');
 });
 
-test('[FR-1] 交互安装后锁文件记账：包版本 + 逐技能指纹/安装时间', async (t) => {
+test('[FR-4] skill add 不存在的名字：报错列可用技能清单、退出 1、零落盘', (t) => {
   const project = makeTargetProject(t);
-  await runInteractive(project, ['\r', ...pickKeys(PICK_INDICES)]);
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', 'no-such-skill']);
+  assert.equal(code, 1, '未知名应失败退出');
+  const output = stdout + stderr;
+  assert.match(output, /no-such-skill/, '报错应点名未知技能');
+  assert.match(output, /可用条目/, '报错应列可用技能清单');
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '报错路径不得产生安装落盘');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '报错路径不得写锁文件');
+});
+
+test('[FR-4] 软链位置被真实文件占用：跳过并在完成摘要列出，使用者数据未覆盖', (t) => {
+  const project = makeTargetProject(t);
+  const userFile = path.join(project, '.claude/skills/dev-spec');
+  fs.mkdirSync(path.dirname(userFile), { recursive: true });
+  fs.writeFileSync(userFile, '使用者自有数据');
+
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', 'dev-spec']);
+  assert.equal(code, 0, `冲突跳过不应失败退出：${stderr}`);
+  assert.equal(fs.readFileSync(userFile, 'utf8'), '使用者自有数据', '冲突位置真实文件不得被覆盖');
+  const output = stdout + stderr;
+  assert.match(output, /跳过软链（该位置已有真实文件，未改动使用者数据）/, '摘要应列软链冲突跳过');
+  assert.match(output, /\.claude\/skills\/dev-spec/, '摘要应点名冲突位置');
+  assert.ok(fs.existsSync(path.join(project, '.agents/skills/dev-spec/SKILL.md')), '技能本体应正常落盘');
+});
+
+test('[FR-4] 跨包版本两次 skill add：按当前包内容刷新、锁文件包版本与指纹更新、无重复条目', (t) => {
+  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-pack-'));
+  t.after(() => fs.rmSync(workdir, { recursive: true, force: true }));
+
+  const pack = (cwd: string) => {
+    const result = spawnSync('npm', ['pack', '--pack-destination', workdir], { cwd, encoding: 'utf8' });
+    assert.equal(result.status, 0, `npm pack 失败：${result.stderr}`);
+    const name = result.stdout.trim().split('\n').pop()!;
+    return path.join(workdir, name);
+  };
+  const tarballA = pack(packageRoot);
+
+  // 版本 B：解包 A → 升版本（根版本 patch +1，恒高于当前包一档、随根版本自动错开）
+  // → 改一个技能文件内容 → 重新打包
+  const [major, minor, patch] = rootVersion.split('.').map(Number);
+  const bumpedVersion = `${major}.${minor}.${patch + 1}`;
+  const extracted = path.join(workdir, 'b');
+  fs.mkdirSync(extracted);
+  spawnSync('tar', ['-xzf', tarballA, '-C', extracted]);
+  const pkgDir = path.join(extracted, 'package');
+  const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
+  pkg.version = bumpedVersion;
+  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify(pkg, null, 2));
+  const bumpedSkill = path.join(pkgDir, 'skills', PICK_NAMES[0], 'SKILL.md');
+  fs.writeFileSync(bumpedSkill, `${fs.readFileSync(bumpedSkill, 'utf8')}\n<!-- e2e 升级标记 -->\n`);
+  const tarballB = pack(pkgDir);
+
+  const project = makeTargetProject(t);
+  const binIn = (root: string) => path.join(root, 'node_modules', '@hankchen/infra', 'bin', 'infra.js');
+
+  // 安装版本 A（模拟 npx @hankchen/infra@<根包当前版本>，tarballA 打自仓库根）；r 依次承载 npm install / runCli（含 code）/ node 直跑结果
+  let r: { status?: number | null; code?: number | null; stdout?: string; stderr?: string; error?: Error | undefined } = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballA], {
+    cwd: project,
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 0, `安装 tarball A 失败：${r.stderr}`);
+  r = runCli(project, ['skill', 'add', PICK_NAMES[0]]);
+  assert.equal(r.code, 0, `版本 A 安装失败：${r.stderr}`);
+  let lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
+  assert.equal(lockfile.packageVersion, rootVersion, '锁文件应记录版本 A（=根 package.json，tarballA 打自仓库根）');
+  const contentA = fs.readFileSync(path.join(project, '.agents/skills', PICK_NAMES[0], 'SKILL.md'), 'utf8');
+  assert.ok(!contentA.includes('升级标记'), '版本 A 落盘不应含版本 B 标记');
+
+  // 升级到版本 B 并重跑（模拟 npx @hankchen/infra@<版本 B> + 幂等刷新）
+  r = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballB], {
+    cwd: project,
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 0, `安装 tarball B 失败：${r.stderr}`);
+  r = spawnSync(process.execPath, [binIn(project), 'skill', 'add', PICK_NAMES[0]], {
+    cwd: project,
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 0, `版本 B 刷新失败：${r.stderr}`);
+  const contentB = fs.readFileSync(path.join(project, '.agents/skills', PICK_NAMES[0], 'SKILL.md'), 'utf8');
+  assert.ok(contentB.includes('升级标记'), '版本 B 落盘应为该版本内容（刷新生效）');
+  lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
+  assert.equal(lockfile.packageVersion, bumpedVersion, '锁文件应记录版本 B');
+  assert.deepEqual(Object.keys(lockfile.skills), [PICK_NAMES[0]], '升级重跑无重复条目');
+});
+
+// ---------- [FR-1/FR-3] skill add 交互路径（PTY）与非交互路径落盘一致 ----------
+
+test('[FR-1] PTY skill add 无参勾选 2 项：落盘与免交互路径一致', async (t) => {
+  const interactiveProject = makeTargetProject(t);
+  // skill add 无第一层类型选择：pickKeys 首键（DOWN）前等条目多选提示渲染（盲发会在渲染窗口被吞）
+  const picked = await runInteractive(interactiveProject, pickKeys(PICK_INDICES), [PICK_PATTERN], 'skill add');
+  assert.equal(picked.code, 0, '交互勾选安装应成功退出');
+
+  const namedProject = makeTargetProject(t);
+  const { code, stderr } = runCli(namedProject, ['skill', 'add', `${PICK_NAMES[0]},${PICK_NAMES[1]}`]);
+  assert.equal(code, 0, `免交互安装应成功退出：${stderr}`);
+
+  const a = snapshot(interactiveProject);
+  const b = snapshot(namedProject);
+  assert.deepEqual(a, b, 'PTY 勾选与免交互路径的落盘快照应完全一致（除安装时间）');
+});
+
+test('[FR-1] PTY skill add 安装后锁文件记账：包版本 + 逐技能指纹/安装时间', async (t) => {
+  const project = makeTargetProject(t);
+  const picked = await runInteractive(project, pickKeys(PICK_INDICES), [PICK_PATTERN], 'skill add');
+  assert.equal(picked.code, 0);
   const lockfile: { package: string; packageVersion: string; skills: Record<string, { fingerprint: string; installedAt: string }> } = JSON.parse(
     fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'),
   );
@@ -173,10 +307,26 @@ test('[FR-1] 交互安装后锁文件记账：包版本 + 逐技能指纹/安装
   }
 });
 
-test('[FR-2] .claude 存在、.zcode 不存在：存在者得相对软链、不存在者跳过不报错', async (t) => {
+test('[FR-3] PTY skill add 勾选后取消（Ctrl-C）：退出 0 且零落盘', async (t) => {
   const project = makeTargetProject(t);
-  const { code } = await runInteractive(project, ['\r', ...pickKeys(PICK_INDICES)]);
-  assert.equal(code, 0, '存在缺失 agent 目录时进程不应报错');
+  const picked = await runInteractive(project, ['\x03'], [PICK_PATTERN], 'skill add');
+  assert.equal(picked.code, 0, '取消应正常退出（现行交互纪律）');
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '取消不得产生安装落盘');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '取消不得写锁文件');
+});
+
+test('[FR-3] PTY skill add 确认空选：退出 0 且零落盘', async (t) => {
+  const project = makeTargetProject(t);
+  const picked = await runInteractive(project, ['\r'], [PICK_PATTERN], 'skill add');
+  assert.equal(picked.code, 0, '空选确认应正常退出（现行交互纪律）');
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '空选不得产生安装落盘');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '空选不得写锁文件');
+});
+
+test('[FR-2] .claude 存在、.zcode 不存在：存在者得相对软链、不存在者跳过不报错', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', `${PICK_NAMES[0]},${PICK_NAMES[1]}`]);
+  assert.equal(code, 0, `存在缺失 agent 目录时进程不应报错：${stderr}`);
 
   for (const name of PICK_NAMES) {
     const link = path.join(project, '.claude/skills', name);
@@ -187,145 +337,183 @@ test('[FR-2] .claude 存在、.zcode 不存在：存在者得相对软链、不�
       fs.realpathSync(path.join(project, '.agents/skills', name)),
     );
   }
+  assert.match(stdout + stderr, /跳过 \d+ 个 agent 目录/, '摘要应列不存在 agent 目录的跳过');
   assert.equal(fs.existsSync(path.join(project, '.zcode')), false, '不存在的 agent 目录不应被创建');
 });
 
-test('[FR-6] 第一层选占位类型（规范）：确认后零动作退出', async (t) => {
+// ---------- [FR-1] --all 全装、非 TTY 守卫 ----------
+
+test('[FR-1] skill add --all 全部技能免交互安装（与旧 --all 行为等价；旧旗标已硬切退役）', (t) => {
   const project = makeTargetProject(t);
-  // 第一层序 = 技能、插件、规范：下移两次到占位行（规范退第三行，spec 20261115-495e）
-  const { code } = await runInteractive(project, ['\x1b[B', '\x1b[B', '\r']);
-  assert.equal(code, 0, '占位类型确认应正常退出');
-  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '占位类型不应产生安装动作');
-  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '占位类型不应写锁文件');
-});
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', '--all']);
+  assert.equal(code, 0, `skill add --all 应成功退出：${stderr}`);
 
-test('[FR-6] 旗标路径与交互路径落盘一致（内容指纹 + 软链 + 锁文件指纹）', async (t) => {
-  const interactiveProject = makeTargetProject(t);
-  await runInteractive(interactiveProject, ['\r', ...pickKeys(PICK_INDICES)]);
-
-  const flagProject = makeTargetProject(t);
-  const { code, stderr } = runCli(flagProject, ['--skills', `${PICK_NAMES[0]},${PICK_NAMES[1]}`]);
-  assert.equal(code, 0, `旗标安装应成功退出：${stderr}`);
-
-  const a = snapshot(interactiveProject);
-  const b = snapshot(flagProject);
-  assert.deepEqual(a, b, '两条路径的落盘快照应完全一致（除安装时间）');
-});
-
-test('[FR-6] --all 免交互安装全部 31 项技能', (t) => {
-  const project = makeTargetProject(t);
-  const { code, stderr } = runCli(project, ['--all']);
-  assert.equal(code, 0, `--all 应成功退出：${stderr}`);
   const repoSkills = fs.readdirSync(REPO_SKILLS).sort();
-  assert.deepEqual(fs.readdirSync(path.join(project, '.agents/skills')).sort(), repoSkills);
+  assert.deepEqual(fs.readdirSync(path.join(project, '.agents/skills')).sort(), repoSkills, '全量技能落盘');
+  assert.match(stdout + stderr, new RegExp(`已安装 ${repoSkills.length} 项技能`), '摘要应记安装项数');
   const lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
-  assert.equal(Object.keys(lockfile.skills).length, repoSkills.length);
+  assert.equal(Object.keys(lockfile.skills).length, repoSkills.length, '锁文件逐技能记账');
 });
 
-test('[FR-1] 重跑幂等：锁文件无重复条目、文件树不变', (t) => {
+test('[FR-3] 非 TTY skill add 无参：守卫文案报错、退出 1、零落盘', (t) => {
   const project = makeTargetProject(t);
-  const first = runCli(project, ['--skills', PICK_NAMES[0]]);
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add']);
+  assert.equal(code, 1, '非 TTY 无参应失败退出');
+  assert.equal(stdout, '');
+  // 守卫文案为 spec 命令面契约原文（含 plugin add 用法指引；plugin 侧行为随票 20261116-ccfb 验）
+  assert.equal(
+    stderr,
+    '✗ 交互选择需要终端（TTY）；非交互请改用 skill add <名...>、skill add --all 或 plugin add <名...> --profile <名>\n',
+  );
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '守卫路径不得产生安装落盘');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '守卫路径不得写锁文件');
+});
+
+// ---------- 帮助定稿（票 20261116-bfcf）：裸跑、顶层 -h/--help、逐命令 --help 三形态 ----------
+// 定稿断言：通道形态（全文走 stdout + 恰一尾换行 + stderr 空 + 退出码 0）+ 顶层帮助含
+// skill add 与 plugin add 用法示例且不含旧旗标名（--skills/--plugins 已退役）。
+
+test('[FR-1] 裸跑打印顶层帮助：退出码 0、零落盘（两层菜单退役）', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, []);
+  assert.equal(code, 0);
+  assert.equal(stdout, `${renderTopHelp()}\n`, '裸跑应打印定稿顶层帮助（全文 stdout、恰一尾换行）');
+  assert.equal(stderr, '');
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '裸跑不得产生安装落盘');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '裸跑不得写锁文件');
+});
+
+test('[FR-1] 顶层 --help 打印定稿命令面帮助：两命令用法示例、不含旧旗标名、退出码 0', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['--help']);
+  assert.equal(code, 0);
+  assert.equal(stdout, `${renderTopHelp()}\n`, '顶层帮助应全文走 stdout 且恰一尾换行');
+  assert.equal(stderr, '');
+  for (const needle of ['skill add dev-spec,dev-plan', 'skill add --all', 'plugin add @hankchen/dsh-demo --profile dev', 'npx @hankchen/infra']) {
+    assert.ok(stdout.includes(needle), `顶层帮助应含新形态用法示例 ${needle}`);
+  }
+  for (const retired of ['--skills', '--plugins']) {
+    assert.equal(stdout.includes(retired), false, `顶层帮助不得含旧旗标名 ${retired}`);
+  }
+});
+
+test('[FR-1] 顶层 -h 与 --help 等价', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout } = runCli(project, ['-h']);
+  assert.equal(code, 0);
+  assert.equal(stdout, `${renderTopHelp()}\n`);
+});
+
+test('[FR-1] skill add --help 打印命令级帮助：用法与示例、不含旧旗标名、退出码 0', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', '--help']);
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  for (const needle of ['skill add [名...]', '--all', 'skill add dev-spec,dev-plan']) {
+    assert.ok(stdout.includes(needle), `skill add --help 应含 ${needle}`);
+  }
+  for (const retired of ['--skills', '--plugins']) {
+    assert.equal(stdout.includes(retired), false, `skill add --help 不得含旧旗标名 ${retired}`);
+  }
+});
+
+test('[FR-1] skill 无动词打印该命令帮助、退出码 0', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['skill']);
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  assert.ok(stdout.includes('add'), 'skill 命令帮助应列出 add 动词');
+});
+
+// ---------- [FR-2] 未知子命令/未知旗标新文案矩阵（票 20261116-bfcf 硬切定稿）----------
+// 旧旗标（--all/--skills/--plugins）与任意未知 token 按 spec 命令面契约原文报错：
+// 文案含实际输入 + 指路 --help，三通道逐字节（✗ 行走 stderr、stdout 空、退出码 1）、零落盘。
+// --all×名互斥两序（spec S1「含顺序反转 2 例」）一并落本节。
+
+test('[FR-2] 未知子命令 foo：未知命令文案（可用命令清单 + --help 指路）、退出 1、零落盘', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['foo']);
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(stderr, '✗ 未知命令「foo」；可用命令：skill、plugin（--help 查看用法示例）\n');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '报错路径不得写锁文件');
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '报错路径不得产生安装落盘');
+});
+
+test('[FR-2] 旧旗标 --skills dev-spec：未知旗标口径（实际旗标名 + 指路 --help）、退出 1、零落盘', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['--skills', 'dev-spec']);
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(stderr, '✗ 未知旗标「--skills」；运行 --help 查看全部命令与用法\n');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '报错路径不得写锁文件');
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false, '报错路径不得产生安装落盘');
+});
+
+test('[FR-2] 旧旗标 --all：未知旗标口径、退出 1、零落盘', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['--all']);
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(stderr, '✗ 未知旗标「--all」；运行 --help 查看全部命令与用法\n');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
+});
+
+test('[FR-2] 旧旗标 --plugins x --profile dev：未知旗标口径（首个命中即报）、退出 1、零落盘', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['--plugins', 'x', '--profile', 'dev']);
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(stderr, '✗ 未知旗标「--plugins」；运行 --help 查看全部命令与用法\n');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
+});
+
+test('[FR-2] skill add --foo：命令级任意旗标按未知旗标口径、退出 1、零落盘', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', '--foo']);
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(stderr, '✗ 未知旗标「--foo」；运行 --help 查看全部命令与用法\n');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
+  assert.equal(fs.existsSync(path.join(project, '.agents')), false);
+});
+
+test('[FR-2] 裸 -- 分隔符按未知旗标口径报错（旧矩阵边角口径随迁）、退出 1', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['--']);
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(stderr, '✗ 未知旗标「--」；运行 --help 查看全部命令与用法\n');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
+});
+
+test('[FR-2] --all 与名互斥两序（dev-spec --all / --all dev-spec）：同文案、退出 1、零落盘', (t) => {
+  const mutexError = '✗ --all 与技能名互斥：全装与按条目指定只能选一\n';
+  for (const argv of [['skill', 'add', 'dev-spec', '--all'], ['skill', 'add', '--all', 'dev-spec']]) {
+    const project = makeTargetProject(t);
+    const { code, stdout, stderr } = runCli(project, argv);
+    assert.equal(code, 1, `互斥应失败退出：${argv.join(' ')}`);
+    assert.equal(stdout, '');
+    assert.equal(stderr, mutexError, `互斥文案逐字节（${argv.join(' ')}）`);
+    assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '互斥路径不得写锁文件');
+    assert.equal(fs.existsSync(path.join(project, '.agents')), false, '互斥路径不得产生安装落盘');
+  }
+});
+
+// ---------- [FR-1] 重跑幂等（skill add 新形态）：锁文件无重复条目、文件树不变 ----------
+
+test('[FR-1] 重跑幂等（skill add 同名重跑）：锁文件无重复条目、文件树不变', (t) => {
+  const project = makeTargetProject(t);
+  const first = runCli(project, ['skill', 'add', PICK_NAMES[0]]);
   assert.equal(first.code, 0);
   const before = snapshot(project);
   const beforeLock = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
 
-  const second = runCli(project, ['--skills', PICK_NAMES[0]]);
+  const second = runCli(project, ['skill', 'add', PICK_NAMES[0]]);
   assert.equal(second.code, 0);
   const after = snapshot(project);
 
   assert.deepEqual(after, before, '重跑（同包内容）落盘快照应不变');
   assert.deepEqual(Object.keys(after.lock!.fingerprints), Object.keys(beforeLock.skills), '锁文件技能键集不变');
   assert.equal(Object.keys(beforeLock.skills).length, 1, '无重复条目');
-});
-
-test('[FR-6] --help 列明全部旗标与示例、退出码 0', (t) => {
-  const project = makeTargetProject(t);
-  const { code, stdout } = runCli(project, ['--help']);
-  assert.equal(code, 0);
-  for (const needle of ['--all', '--skills', '--help', 'npx @hankchen/infra']) {
-    assert.ok(stdout.includes(needle), `--help 输出应含 ${needle}`);
-  }
-});
-
-// 通道锚点（工单 20261115-eed0，RQ3 §10.3 出口通道映射）：文本字节由 test/unit/cli.test.ts
-// 对迁移前参照转录守卫；此处守卫真实入口的通道形态——stdout 载全文 + 恰一尾换行、
-// stderr 空、退出码 0（npx 裸跑入口的 --help 出口契约）。
-test('[FR-5] --help 通道逐字节：全文走 stdout、单尾换行、stderr 空', (t) => {
-  const project = makeTargetProject(t);
-  const { code, stdout, stderr } = runCli(project, ['--help']);
-  assert.equal(code, 0);
-  assert.equal(stdout, `${renderHelp()}\n`);
-  assert.equal(stderr, '');
-});
-
-// 互斥报错三通道（RQ3 §6.3 矩阵参照 evidence/probe-ref-matrix.txt --all --skills dev-spec 行）：
-// 报错原文 + 提示行走 stderr、stdout 空、退出码 1——bin ✗ 出口契约在真实入口逐字节守护。
-test('[FR-5] 互斥报错通道逐字节：文案与提示行走 stderr、退出码 1', (t) => {
-  const project = makeTargetProject(t);
-  const { code, stdout, stderr } = runCli(project, ['--all', '--skills', 'dev-spec']);
-  assert.equal(code, 1);
-  assert.equal(stdout, '');
-  assert.equal(
-    stderr,
-    '✗ --all 与 --skills 互斥：全装与按条目指定只能选一\n' +
-      '  运行 npx @hankchen/infra --help 查看全部旗标与示例。\n',
-  );
-});
-
-test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文件记录该版本', (t) => {
-  const workdir = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-pack-'));
-  t.after(() => fs.rmSync(workdir, { recursive: true, force: true }));
-
-  const pack = (cwd: string) => {
-    const result = spawnSync('npm', ['pack', '--pack-destination', workdir], { cwd, encoding: 'utf8' });
-    assert.equal(result.status, 0, `npm pack 失败：${result.stderr}`);
-    const name = result.stdout.trim().split('\n').pop()!;
-    return path.join(workdir, name);
-  };
-  const tarballA = pack(packageRoot);
-
-  // 版本 B：解包 A → 升版本 0.2.0 → 改一个技能文件内容 → 重新打包
-  const extracted = path.join(workdir, 'b');
-  fs.mkdirSync(extracted);
-  spawnSync('tar', ['-xzf', tarballA, '-C', extracted]);
-  const pkgDir = path.join(extracted, 'package');
-  const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
-  pkg.version = '0.2.0';
-  fs.writeFileSync(path.join(pkgDir, 'package.json'), JSON.stringify(pkg, null, 2));
-  const bumpedSkill = path.join(pkgDir, 'skills', PICK_NAMES[0], 'SKILL.md');
-  fs.writeFileSync(bumpedSkill, `${fs.readFileSync(bumpedSkill, 'utf8')}\n<!-- e2e v0.2.0 标记 -->\n`);
-  const tarballB = pack(pkgDir);
-
-  const project = makeTargetProject(t);
-  const binIn = (root: string) => path.join(root, 'node_modules', '@hankchen/infra', 'bin', 'infra.js');
-
-  // 安装版本 A（模拟 npx @hankchen/infra@<根包当前版本>，tarballA 打自仓库根）；r 依次承载 npm install / runCli（含 code）/ node 直跑结果
-  let r: { status?: number | null; code?: number | null; stdout?: string; stderr?: string; error?: Error | undefined } = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballA], {
-    cwd: project,
-    encoding: 'utf8',
-  });
-  assert.equal(r.status, 0, `安装 tarball A 失败：${r.stderr}`);
-  r = runCli(project, ['--skills', PICK_NAMES[0]]);
-  assert.equal(r.code, 0, `版本 A 安装失败：${r.stderr}`);
-  let lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
-  assert.equal(lockfile.packageVersion, rootVersion, '锁文件应记录版本 A（=根 package.json，tarballA 打自仓库根）');
-  const contentA = fs.readFileSync(path.join(project, '.agents/skills', PICK_NAMES[0], 'SKILL.md'), 'utf8');
-  assert.ok(!contentA.includes('v0.2.0 标记'), '版本 A 落盘不应含版本 B 标记');
-
-  // 升级到版本 B 并重跑（模拟 npx @hankchen/infra@0.2.0 + 幂等刷新）
-  r = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballB], {
-    cwd: project,
-    encoding: 'utf8',
-  });
-  assert.equal(r.status, 0, `安装 tarball B 失败：${r.stderr}`);
-  r = spawnSync(process.execPath, [binIn(project), '--skills', PICK_NAMES[0]], {
-    cwd: project,
-    encoding: 'utf8',
-  });
-  assert.equal(r.status, 0, `版本 B 刷新失败：${r.stderr}`);
-  const contentB = fs.readFileSync(path.join(project, '.agents/skills', PICK_NAMES[0], 'SKILL.md'), 'utf8');
-  assert.ok(contentB.includes('v0.2.0 标记'), '版本 B 落盘应为该版本内容（刷新生效）');
-  lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
-  assert.equal(lockfile.packageVersion, '0.2.0', '锁文件应记录版本 B');
-  assert.deepEqual(Object.keys(lockfile.skills), [PICK_NAMES[0]], '升级重跑无重复条目');
 });
