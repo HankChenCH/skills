@@ -9,7 +9,8 @@
 # 改本文件须同步过该测试。
 #
 # pnpm 契约（RQ2 方案，RQ2 异常流 A #6）：pnpm 版本两处钉——本文件全局安装步钉主版本 12
-#   （兼容 dsh 集成测试转发），package.json packageManager 字段钉精确版 12.15.0（pnpm
+#   （仅供 setup-node cache 取版哈希；dsh 集成测试转发由 corepack enable 重建的 shim
+#   承担，票 20261116-c5f5），package.json packageManager 字段钉精确版 12.15.0（pnpm
 #   据此经 lockfile packageManagerDependencies 自管理，frozen 安装强制版本对齐）；
 #   frozen-lockfile 显式传参留痕——CI 本就自动 frozen，incompatible lockfile 或
 #   pnpm-lock.yaml 漏提交直接红，这是防漂移的正确行为，不静默回退。

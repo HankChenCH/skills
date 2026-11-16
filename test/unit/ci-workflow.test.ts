@@ -9,8 +9,9 @@
 // → verify:pack（corepack enable 见票 20261116-c5f5）。
 // pnpm 契约（spec 20261115-ed9f，RQ2 方案）：依赖安装 = pnpm install --frozen-lockfile
 // （显式传参留痕——CI 本就自动 frozen；incompatible lockfile / pnpm-lock.yaml 漏提交
-// 直接红，RQ2 异常流 A #6 的正确红）；pnpm 版本两处钉——全局安装步钉主版本 12（兼供
-// dsh 集成测试转发），packageManager 字段钉精确版 12.15.0（lockfile
+// 直接红，RQ2 异常流 A #6 的正确红）；pnpm 版本两处钉——全局安装步钉主版本 12（仅供
+// setup-node cache 取版哈希；dsh 集成测试转发由 corepack shim 承担，票 20261116-c5f5），
+// packageManager 字段钉精确版 12.15.0（lockfile
 // packageManagerDependencies 记账，frozen 安装强制对齐）；setup-node 缓存随 pnpm
 // lockfile（cache: pnpm），故全局 pnpm 安装步须先于 setup-node。
 // 解析防线两层（票 20261116-0304 后并陈）：① js-yaml（devDep，仅测试面）承「严格可
@@ -367,13 +368,14 @@ test('交互 e2e 的 expect 前置由安装步骤真实供应（装了就真跑�
   );
 });
 
-test('dsh 集成段的 pnpm 前置由安装步骤真实供应（官方 dsh plugin 命令转发 pnpm 执行）', () => {
+test('pnpm 全局安装步先于 setup-node（setup-node cache: pnpm 取版哈希的前置；dsh 集成前置由 corepack shim 承担，票 20261116-c5f5）', () => {
   // 缺陷钉住（fix 票 20261115-1a89）：Actions 首跑红——既有 FR-5 集成测试真跑段经官方
   // dsh plugin add 转发 pnpm，runner PATH 无 pnpm 时 spawn ENOENT 使安装中止（exit 127），
   // 断言红（run 43722887029）。pnpm 安装步骤必须先于 pnpm test，装了就真跑（与 expect
   // 同款定夺：补前置门跳过会让集成覆盖永久缺失）。
-  // pnpm 迁移后本步身兼两职（spec 20261115-ed9f FR-4）：dsh 集成前置 + setup-node
-  // cache: pnpm 的取版前置——故顺序契约加一条：先于 setup-node。
+  // 本步前置定位 = setup-node cache: pnpm 的取版哈希（spec 20261115-ed9f FR-4）——
+  // 故顺序契约加一条：先于 setup-node。dsh 集成前置已由 corepack enable 重建的 shim
+  // 承担（切版后全局 pnpm 出 PATH，票 20261116-c5f5）。
   const steps = readWorkflowSteps(readWorkflowDoc());
   const pnpmIdx = steps.findIndex(
     (s) => typeof s.run === 'string' && /npm\s+install\s+-g\s+pnpm@/.test(s.run)
@@ -438,12 +440,12 @@ test('负向契约：workflow 不引用 plugins/ 目录路径，依赖安装不�
     .map((step) => [step.run, step.uses])
     .flat()
     .filter((v): v is string => typeof v === 'string');
-  const npmDepLines = execValues
+  const npmDepViolations = execValues
     .filter((v) => /\bnpm (install|ci)\b/.test(v) && !/npm install -g pnpm@/.test(v));
   assert.deepEqual(
-    npmDepLines,
+    npmDepViolations,
     [],
-    `项目依赖安装不得使用 npm install/ci（pnpm workspace 契约；引导装 pnpm 豁免），命中行：${JSON.stringify(npmDepLines)}`,
+    `项目依赖安装不得使用 npm install/ci（pnpm workspace 契约；引导装 pnpm 豁免），命中：${JSON.stringify(npmDepViolations)}`,
   );
 });
 
