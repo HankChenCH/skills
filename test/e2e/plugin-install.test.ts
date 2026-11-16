@@ -2,7 +2,8 @@
 // 真实文件系统（不 mock）。官方执行体在 OS 边界注入：PATH 里放 shim 可执行文件（记录 argv
 // 并按官方语义写 profile 两落点），CLI 真实走 PATH 探测 → spawnSync → 对账 → 锁文件全链，
 // 绝不实跑官方 dsh/npx。
-// 旧旗标 --plugins 的并存期回归保留一节（硬切退役归 20261116-bfcf）。
+// 票 20261116-bfcf 硬切：旧旗标 --plugins 路径退役（按未知旗标口径报错，矩阵在 install.test
+// 顶层命令面节），本文件只承载 plugin add 新命令面。
 
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -314,9 +315,9 @@ test('[FR-3] 非 TTY plugin add 无参：守卫文案报错、退出 1、零落�
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '守卫路径不得写锁文件');
 });
 
-// ---------- [FR-1] plugin add 帮助可用（过渡态：定稿断言随 20261116-bfcf）----------
+// ---------- [FR-1] plugin add 帮助定稿（票 20261116-bfcf）----------
 
-test('[FR-1] 顶层 --help 含 plugin add 用法示例（票 20261116-ccfb 补位）', (t) => {
+test('[FR-1] 顶层 --help 含 plugin add 用法示例、不含旧旗标名', (t) => {
   const project = makeProject(t);
   const { code, stdout, stderr } = runCliIn(project, ['--help'], {});
   assert.equal(code, 0);
@@ -328,15 +329,21 @@ test('[FR-1] 顶层 --help 含 plugin add 用法示例（票 20261116-ccfb 补�
   ]) {
     assert.ok(stdout.includes(needle), `顶层帮助应含 ${needle}`);
   }
+  for (const retired of ['--skills', '--plugins']) {
+    assert.equal(stdout.includes(retired), false, `顶层帮助不得含旧旗标名 ${retired}`);
+  }
 });
 
-test('[FR-1] plugin add --help 打印命令级帮助：用法与示例、退出码 0', (t) => {
+test('[FR-1] plugin add --help 打印命令级帮助：用法与示例、不含旧旗标名、退出码 0', (t) => {
   const project = makeProject(t);
   const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', '--help'], {});
   assert.equal(code, 0);
   assert.equal(stderr, '');
   for (const needle of ['plugin add [名...]', '--profile <名>', 'plugin add @hankchen/dsh-demo --profile dev']) {
     assert.ok(stdout.includes(needle), `plugin add --help 应含 ${needle}`);
+  }
+  for (const retired of ['--skills', '--plugins']) {
+    assert.equal(stdout.includes(retired), false, `plugin add --help 不得含旧旗标名 ${retired}`);
   }
 });
 
@@ -559,37 +566,20 @@ test('[FR-3] PTY plugin add 编目失败：✗ 通道退出 1、零官方调用�
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '编目失败不得写锁文件');
 });
 
-// ---------- 旧旗标并存过渡态回归（接线复用后行为零变化；硬切退役归 20261116-bfcf）----------
+// ---------- [FR-2] 顶层旧旗标 --plugins 按未知旗标口径报错（硬切；矩阵在 install.test）----------
 
-test('[过渡] --plugins --profile 免交互安装全链（旧旗标路径与 plugin add 单源运行时）', (t) => {
+test('[FR-2] 旧旗标 --plugins x --profile dev：未知旗标口径、退出 1、零落盘、零官方调用', (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['dev']);
-  const shimDir = makeShimDir(t, ['dsh']);
   const shimLog = makeShimLog(t);
 
-  const { code, stderr } = runCliIn(project, ['--plugins', PKG, '--profile', 'dev'], {
+  const { code, stdout, stderr } = runCliIn(project, ['--plugins', PKG, '--profile', 'dev'], {
     DSH_HOME: dshHome,
     DSH_SHIM_LOG: shimLog,
-    PATH: `${shimDir}${path.delimiter}${process.env.PATH}`,
   });
-  assert.equal(code, 0, `旧旗标安装应成功退出：${stderr}`);
-  assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'dev', 'add', PKG]]);
-  const lockfile = readLockfileAt(project);
-  assert.deepEqual(lockfile.plugins[PKG].profile, 'dev');
-});
-
-test('[过渡] --plugins 缺 --profile：三行结构（旧形态示例行），与 plugin add 新示例行区分', (t) => {
-  const project = makeProject(t);
-  const dshHome = makeDshHome(t, ['dev']);
-
-  const { code, stderr } = runCliIn(project, ['--plugins', PKG], { DSH_HOME: dshHome });
   assert.equal(code, 1);
-  assert.equal(
-    stderr,
-    [
-      '✗ 插件安装需要 --profile <名> 指定目标 dsh profile。',
-      '  既有 profile：dev',
-      '  示例：npx @hankchen/infra --plugins @hankchen/dsh-demo --profile dev',
-    ].join('\n') + '\n',
-  );
+  assert.equal(stdout, '');
+  assert.equal(stderr, '✗ 未知旗标「--plugins」；运行 --help 查看全部命令与用法\n');
+  assert.equal(fs.existsSync(shimLog), false, '旧旗标输入不得执行任何官方命令');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
 });
