@@ -104,7 +104,7 @@ Progress、实现交接转交验收代理。串联调用时执行体自带实现
    在执行合并之后承载调用（spec 实现决策 4），序列内容不变；缺省形态按本条原文
    即时执行。
    1. **蒸馏四路**（各落点过 validate）——① need「假设与风险」节逐条标注验证结果（验证通过 / 证伪 / 本轮未触发，以报告「假设验证」为准），并把残余风险与「下一轮建议」及其依据补写进该节：下一轮建议与残余风险先折回 need，是清扫的前置（E3 边界），未折回不得清扫；② spec「验收场景」按实现中发现的实际边界行为修订（仅 passed 允许）；③ 有架构分量的决策新立 ADR（status: accepted）；④ 模式学习追加进 CODING_STANDARDS.md 索引的 standards/。
-   2. **清扫**——删除该 spec 名下全部 tickets、overviews、reviews 与本次验收报告文件（含本次报告；"名下"关系与 validate 残留校验同一定义；tracker 投影不回删，映射文件保留）。
+   2. **清扫**——删除该 spec 名下全部 tickets、overviews、reviews 与本次验收报告文件（含本次报告；"名下"关系与 validate 残留校验同一定义；tracker 投影不回删，映射文件保留）。删除按盘上路径执行、不依赖 git 跟踪状态——过程档自 spec 0011 起 gitignore 化为 untracked，git 感知的删除对其无效（复盘 20261116-dcc7：口径缺失期 14 份漏删已补清扫）。
    3. **置 done**——spec frontmatter `status` 改 `done`、追加 `done: <今日>`，validate 必须通过（done 名下过程档残留必须为零），publish 照旧。
    4. **原子提交**——蒸馏编辑 + 清扫删除 + 置 done 合为恰一个 `[trivial]` 提交，不产生中间态提交。
 
