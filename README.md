@@ -1,14 +1,18 @@
-# skills
+# ai-infra
 
-**门禁式 SDLC 技能集——把「团队 + AI 协作开发」的流程规矩变成机器门禁。**
+**门禁式 SDLC 技能套件 + 其 npm 安装器 `@hankchen/infra`——把「团队 + AI 协作开发」的流程规矩变成机器门禁。**
 
-31 个技能（均已实现）驱动一条脊柱流水线，九类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
+本仓库双身份、包根即仓库根：
+
+- **技能套件**：31 个技能（均已实现）驱动一条脊柱流水线，九类落盘产物承载全部流程状态，一个门禁脚本让规矩变成机器判断，把一次软件变更从想法送到验收——全程可中断、可审计、可续接：
 
 ```
 need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现）→ review（评审）→ ship（交付）→ accept（验收）
 ```
 
 脊柱三点位另有不强制的设计建议：spec 出口建议「先述标再拆票」、实现时装载设计基线与设计原则、验收时对照述标核销——由 design-\* 界面设计套件承接（见下方技能清单）。
+
+- **npm 安装器**：`npx @hankchen/infra` 把技能与插件资产装进任意目标 git 项目（见下方「快速上手」）。
 
 ## 致谢
 
@@ -195,7 +199,9 @@ npx @hankchen/infra --plugins @hankchen/dsh-demo --plugins <另一包> --profile
 
 [ref-writing](./skills/ref-writing/SKILL.md)、[ref-implementation](./skills/ref-implementation/SKILL.md)、[ref-review](./skills/ref-review/SKILL.md)、[ref-testing](./skills/ref-testing/SKILL.md)、[ref-git-commit](./skills/ref-git-commit/SKILL.md)、[ref-refactoring-ui](./skills/ref-refactoring-ui/SKILL.md)、[ref-b-side-design](./skills/ref-b-side-design/SKILL.md)——分别定义「什么是好」的文档、实现、评审、测试、提交信息、界面视觉设计与 B 端体验设计。
 
-## 接入后的工作区
+## 接入后的工作区（使用者视角）
+
+在目标项目运行 `/setup-workspace` 后，工作区长成这样：
 
 ```
 <repo>/
@@ -206,7 +212,7 @@ npx @hankchen/infra --plugins @hankchen/dsh-demo --plugins <另一包> --profile
 │   └── trackers/           # tracker 适配器（local/github/gitlab/codeup，可扩展）
 ├── docs/                   # 流程产物（人文物）
 │   ├── METHOD.md           # 流程规则唯一来源
-│   ├── needs/ specs/ designs/ tickets/ reviews/ acceptance/ adr/ research/
+│   ├── needs/ specs/ designs/ tickets/ overviews/ reviews/ acceptance/ adr/ research/
 │   └── standards/          # 编码标准（增量导入）
 ├── AGENTS.md               # sdlc 哨兵块
 ├── GLOSSARY.md             # 流程术语与项目术语
@@ -216,6 +222,61 @@ npx @hankchen/infra --plugins @hankchen/dsh-demo --plugins <另一包> --profile
 
 - **九类产物各有固定状态机**（如 spec：draft → approved → done），frontmatter 是 check.sh 的解析依据；知识档进版本库，过程档（工票 / 评审 / 验收 / 总览）被 .gitignore 排除、验收后蒸馏清扫——审计链主承载为 tracker 投影与源码提交 `[#NNNN]` 引用。状态机详见 [docs/METHOD.md](./docs/METHOD.md) §5。
 - **check.sh 常用子命令**：`phase` 全库状态总览；`frontier` 可开工的工票；`validate <file>` 产物模板与 FR 追溯校验；`publish <file>` 投影到 tracker；`all` 全量 lint/typecheck/test。提交走轻门禁（message 带 `[#NNNN]` 或 `[trivial]`），push 前走重门禁（implemented 工票必须有 approved 评审覆盖）。
+
+## 仓库结构（维护者视角）
+
+包根即仓库根。`package.json` 的 `files` 白名单（bin、src、skills、agents、scripts）全量随包分发；docs/、test/、.sdlc/ 只属仓库、不进包。
+
+```
+ai-infra/
+├── skills/                  # 31 个技能正源，安装器原样拷入目标项目
+├── agents/<宿主>/plugins/   # 插件资产（两级布局：宿主/插件目录）；当前 dsh 宿主 + dsh-demo 插件
+├── src/ + bin/infra.ts      # 安装器 CLI 源码（TypeScript ESM，仓库内零构建直跑：node 直接执行 .ts）
+├── scripts/                 # 发布面：prepack/postpack（打包编译与还原）、verify-pack（发布对账）、verify-bundle（插件 bundle 校验）
+├── test/unit、test/e2e      # node:test；e2e 含 expect 驱动的交互安装测试
+├── docs/                    # 本仓库自己的流程产物（METHOD.md、蓝图、九类产物、standards/ 分册）
+└── .sdlc/                   # 本仓库自身的门禁：check.sh、config.sh、hooks、trackers
+```
+
+安装器 CLI 的核心模块（src/，逐个头注释为职责准绳）：
+
+| 模块 | 职责 |
+|---|---|
+| [asset-map.ts](./src/asset-map.ts) | 「资产类型 → 安装机制」映射表：copy 行（文件拷贝 + 软链）、command 行（官方命令转发）、占位行（菜单显示不可安装）；新增资产类型 = 加一行，不改安装流程代码 |
+| [catalog.ts](./src/catalog.ts) | 包内资产编目：copy 类列来源目录条目并读各 SKILL.md 的 description 作菜单提示；command 类两级枚举 agents/&lt;宿主&gt;/plugins/，条目正名取各包 package.json 的 name |
+| [installer.ts](./src/installer.ts) | 技能安装执行：逐条目整目录替换拷进目标（重跑 = 按当前包内容精确刷新）、按 symlinkRule 对既有 agent 目录建软链 |
+| [plugin-install.ts](./src/plugin-install.ts) | 插件安装编排：前置检查 → 组装官方命令 → 执行 → 对账 → 锁文件记账；逐条顺序执行，单条失败即中止并报已完成/未完成清单 |
+| [reconcile.ts](./src/reconcile.ts) | 插件安装后对账：核对 profile 的 package.json 依赖行与 `dsh.profile.bundles` 数组行两处落点 |
+| [lockfile.ts](./src/lockfile.ts) | `.infra-lock.json` 记账：包名与版本 + 逐技能 sha256 指纹、安装时间 |
+| [cli.ts](./src/cli.ts) / [menu.ts](./src/menu.ts) | commander 旗标解析适配面；两层菜单构造（第一层资产类型单选、第二层条目多选） |
+| [agent-dirs.ts](./src/agent-dirs.ts) / [dsh-command.ts](./src/dsh-command.ts) / [dsh-profiles.ts](./src/dsh-profiles.ts) | agent 目录清单（软链落点）、dsh 官方命令组装、profile 根解析（`DSH_HOME` 可覆盖根目录） |
+
+## 维护者：开发与类型形态
+
+常用命令（package.json scripts，可复制执行）：
+
+```bash
+pnpm test                    # 全量（unit + e2e）
+pnpm run test:unit / test:e2e
+pnpm run typecheck           # tsc --noEmit
+pnpm pack && pnpm run verify:pack hankchen-infra-<版本>.tgz   # 发布对账（传参不带 --，pnpm 12 原样转发 --）
+node .sdlc/check.sh phase|frontier|validate <file>|publish <file>|all   # 本仓库流程门禁
+```
+
+包管理器 pnpm（`packageManager` 钉 12.15.0）；Node 下限 ≥ 24.9.0（`engines`，来自官方 `@deepseek-ai/dsh` 的 engines 前置），`.nvmrc` 钉 24.22.1——`.nvmrc` 进场版本不得低于 engines 基线，由 `test/unit/node-baseline.test.ts` 守护。
+
+类型与运行形态硬约束（tsconfig.json 头部注释是这些拍板的权威记录）：
+
+- ESM + nodenext + **显式 .ts 扩展名导入**（`allowImportingTsExtensions`）；`erasableSyntaxOnly`（禁 enum/namespace/参数属性）；strict 全开，唯一例外 `useUnknownInCatchVariables=false`。
+- tsconfig include 覆盖 src/bin/scripts/test/agents/——测试与插件模块同受类型检查（agents 插件模块是仓库正源，测试经动态 URL import 加载）。
+- **仓库树常态零构建**：node 直接执行 .ts；发布面 emit 只走 scripts/prepack.ts（compiler API：打包前把 src/bin 编译为同路径 .js 进 tarball，postpack 还原仓库树），不走 tsconfig——不要在仓内留 .js 编译产物。
+
+已知坑（改前必查）：
+
+- **双态/双份同步资产**：改 skills/ 内容或 agents/ 插件后，包内随包清单与 README 技能清单须同步——包侧由 verify-pack 机器对账把关（技能清单相等、插件清单相等、禁含 node_modules 三查，任一不过即拒绝发布，退出码 1）；README 技能清单当前靠人工同步，无机器门禁，改动时自查。
+- **文件即契约**：`.github/workflows/regression-gate.yml` 被 `test/unit/ci-workflow.test.ts` 静态守护，改工作流必须同步过该测试。
+- **bash 兼容 darwin bash 3.2**：变量展开紧邻多字节字符必须 `${VAR}` 花括号（[docs/standards/bash-multibyte-bracing.md](./docs/standards/bash-multibyte-bracing.md)）；日志禁 `head -c` 截 UTF-8。
+- **node:test 纪律**：前置门跳过纪律（t.skip 只标注不截断，[docs/standards/node-test-skip-gate.md](./docs/standards/node-test-skip-gate.md)）；替身保真与证伪形态门（[docs/standards/stub-fidelity-integration.md](./docs/standards/stub-fidelity-integration.md)、[docs/standards/falsified-form-gate.md](./docs/standards/falsified-form-gate.md)）。
 
 ## 维护者：发布流程
 
@@ -245,6 +306,7 @@ npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。�
 | [docs/sdlc-skills-blueprint.md](./docs/sdlc-skills-blueprint.md) | **设计蓝图**（唯一设计真相源）：设计原则、流程拓扑、全部技能规格（§11）、进度台账（§10.2）；治理规则「先改文档再改技能」 |
 | [docs/concepts.md](./docs/concepts.md) | **概念定位档案**：全部概念的定义、来源（外部出处/方法自创）与落点 |
 | [docs/plugin-assets.md](./docs/plugin-assets.md) | **插件资产规范**：套件插件的生产约定（仓库布局、清单四要素、双包发布顺序、新宿主接入）与 dsh 官方格式逐字段运行时形态 |
+| [docs/standards/](./docs/standards/) | **编码标准分册**：bash 多字节花括号、node:test 跳过纪律、替身保真门、插件 agents/ 布局等标准细则 |
 | [docs/sessions/](./docs/sessions/) | 设计会话纪要：方法论定稿过程的决策记录 |
 | [GLOSSARY.md](./GLOSSARY.md) | 术语表：流程术语与状态定义 |
 
