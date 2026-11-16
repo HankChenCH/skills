@@ -154,7 +154,7 @@ agents/<宿主>/<机制>/<条目>
 - `--plugins` 旗标与示例文本（`README.md:113–114`、`src/cli.ts:87`、`bin/infra.ts:242`、`test/unit/cli.test.ts`）：旗标名是 CLI 表面，非目录路径（初稿引 `src/cli-args.ts:37` 与 `test/unit/menu.test.ts`，两者已随 commander 迁移退役/迁走——工单 20261115-eed0）。
 - 包名 `@hankchen/dsh-demo` 全部引用（`test/unit/plugin-install`、`dsh-command`、`reconcile`、`verify-bundle`、`menu` 等测试与包内文件）：条目正名是包名（plugin-assets §1.1），不随目录迁位变。
 - `.infra-lock.json` 记账（`src/lockfile.ts`、`src/plugin-install.ts`）：插件区按包名记账，无仓库内路径。
-- CI workflow：步骤调 verify:pack 对账命令名不变（pnpm 形态下为 `pnpm run verify:pack`，spec 20261115-ed9f FR-4）；`.github/workflows/regression-gate.yml` 已在位（spec 20261115-f650 FR-2 交付），全部步骤只调命令名（pnpm install --frozen-lockfile / pnpm run typecheck / pnpm test / pnpm pack + pnpm run verify:pack），无 `plugins/` 目录路径引用——本行清单初稿「本分支尚无 .github/ 目录」系时序过期表述，已修正（残余 #2 核销，票 20261115-30f2）。
+- CI workflow：步骤调 verify:pack 对账命令名不变（pnpm 形态下为 `pnpm run verify:pack`，spec 20261115-ed9f FR-4）；`.github/workflows/regression-gate.yml` 已在位（spec 20261115-f650 FR-2 交付），全部步骤只调命令名（pnpm install --frozen-lockfile / pnpm run typecheck / pnpm test / pnpm pack + pnpm run verify:pack），无 `plugins/` 目录路径引用——本行清单初稿「本分支尚无 .github/ 目录」系时序过期表述，已修正（残余 #2 核销，票 20261115-30f2）。契约测试的负向断言守「workflow 禁引用 `plugins/` 路径 + 项目依赖安装禁退回 npm」（票 20261116-94c1）：workflow 未来需引用 agents 布局合法路径时，该断言须同步收窄（评审 20261116-7c73 范围外备注蒸馏）。
 - 历史知识档不回改：`docs/needs/`、`docs/specs/`、`docs/research/`（rq2 报告结论节已自注「round 1 后为 agents/ 布局时改 patterns」）。
 
 ### 4.5 need FR-1 引用清单核对结论
