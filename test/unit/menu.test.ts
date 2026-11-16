@@ -4,10 +4,12 @@ import assert from 'node:assert/strict';
 import { typeOptions, skillOptions } from '../../src/kernel/menu.ts';
 import { ASSET_MAP } from '../../src/kernel/asset-map.ts';
 import { resolveSkillSelection } from '../../src/commands/skill/names.ts';
+import { resolvePluginSelection } from '../../src/commands/plugin/names.ts';
 
 // 旗标解析与 --help 断言已随 commander 迁移（工单 20261115-eed0）迁至 test/unit/cli.test.ts。
 // 票 20261116-f761：skill add 无参交互分支与非 TTY 守卫断言落本文件（交互构造与守卫域，
 // spec 20261116-2c58 测试决策 S3；解析矩阵域归 cli.test.ts）。
+// 票 20261116-ccfb：plugin add 交互分支（预置 profile 与否）同域落本文件。
 
 // ---------- 菜单构造（第一层由映射表生成，占位行带占位提示） ----------
 
@@ -57,4 +59,20 @@ test('无参且非 TTY：按守卫文案报错（spec 契约原文，含 plugin 
         '交互选择需要终端（TTY）；非交互请改用 skill add <名...>、skill add --all 或 plugin add <名...> --profile <名>',
     },
   );
+});
+
+// ---------- plugin add 交互分支（票 20261116-ccfb，spec S3 交互守卫域）----------
+
+test('plugin add 无参且有 TTY：进交互分支（不预置 profile，进插件多选 + profile 选择）', () => {
+  assert.deepEqual(resolvePluginSelection({ tokens: [], profile: undefined, isTTY: true }), {
+    kind: 'interactive',
+    presetProfile: undefined,
+  });
+});
+
+test('plugin add 无名但有 --profile dev：进交互分支且预置 profile（不再提示 profile）', () => {
+  assert.deepEqual(resolvePluginSelection({ tokens: [], profile: 'dev', isTTY: true }), {
+    kind: 'interactive',
+    presetProfile: 'dev',
+  });
 });

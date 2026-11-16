@@ -17,6 +17,11 @@ import assert from 'node:assert/strict';
 import { parseArgs, renderHelp } from '../../src/cli.ts';
 import type { ParsedArgs } from '../../src/cli.ts';
 import { normalizeNames, resolveSkillSelection } from '../../src/commands/skill/names.ts';
+import {
+  ERR_PROFILE_VALUE,
+  profileRequiredLines,
+  resolvePluginSelection,
+} from '../../src/commands/plugin/names.ts';
 
 // ---- 参照转录（evidence/probe-ref-matrix.txt）：报错文案逐字 ----
 
@@ -194,4 +199,137 @@ test('选择校验：无参且非 TTY 按守卫文案报错', () => {
         '交互选择需要终端（TTY）；非交互请改用 skill add <名...>、skill add --all 或 plugin add <名...> --profile <名>',
     },
   );
+});
+
+// ---- spec 20261116-2c58 plugin add 新矩阵（票 20261116-ccfb）----
+// seam = src/commands/plugin/names.ts（plugin add 位置参数归一化与选择校验）。
+// 期望值独立来源 = spec 实现决策原文：名归一化与 skill 侧同构（共享同一实现）、
+// 空名 / --profile 缺值 / 非 TTY 守卫三条错误文案逐字、缺 --profile 三行结构原文。
+
+const ERR_PLUGIN_NAMES_EMPTY =
+  'plugin add 需要至少一个插件名（如 plugin add @hankchen/dsh-demo --profile dev）';
+
+const PLUGIN_ROWS: Array<{
+  name: string;
+  tokens: string[];
+  profile: string | undefined;
+  isTTY: boolean;
+  want: { kind: string; names?: string[]; profile?: string; presetProfile?: string | undefined; message?: string };
+}> = [
+  {
+    name: '带名免交互：归一化后按名安装（名与 --profile 顺序无关）',
+    tokens: ['@hankchen/dsh-demo'],
+    profile: 'dev',
+    isTTY: false,
+    want: { kind: 'names', names: ['@hankchen/dsh-demo'], profile: 'dev' },
+  },
+  {
+    name: '空格 variadic 与逗号混合双收（与 skill 侧同构：a b,c d → [a,b,c,d]）',
+    tokens: ['a', 'b,c', 'd'],
+    profile: 'dev',
+    isTTY: false,
+    want: { kind: 'names', names: ['a', 'b', 'c', 'd'], profile: 'dev' },
+  },
+  {
+    name: '重复名按首现保序去重（与 skill 侧同构：a,a → [a]）',
+    tokens: ['a', 'a'],
+    profile: 'dev',
+    isTTY: false,
+    want: { kind: 'names', names: ['a'], profile: 'dev' },
+  },
+  {
+    name: '逐 token 拆逗号、trim、滤空段',
+    tokens: [' a , ,b ', '  c  '],
+    profile: 'qa',
+    isTTY: false,
+    want: { kind: 'names', names: ['a', 'b', 'c'], profile: 'qa' },
+  },
+  {
+    name: '带名缺 --profile：三行结构分支',
+    tokens: ['@hankchen/dsh-demo'],
+    profile: undefined,
+    isTTY: true,
+    want: { kind: 'profile-required' },
+  },
+  {
+    name: '空串 token 过滤后为空报空名错（与 skill 侧同构）',
+    tokens: [''],
+    profile: 'dev',
+    isTTY: true,
+    want: { kind: 'error', message: ERR_PLUGIN_NAMES_EMPTY },
+  },
+  {
+    name: '纯逗号空段 token 过滤后为空报空名错',
+    tokens: [' , '],
+    profile: undefined,
+    isTTY: false,
+    want: { kind: 'error', message: ERR_PLUGIN_NAMES_EMPTY },
+  },
+  {
+    name: '--profile 空串值按缺值口径报错（先于其余分支）',
+    tokens: ['@hankchen/dsh-demo'],
+    profile: '',
+    isTTY: true,
+    want: { kind: 'error', message: ERR_PROFILE_VALUE },
+  },
+  {
+    name: '--profile 空白值按缺值口径报错',
+    tokens: [],
+    profile: '  ',
+    isTTY: true,
+    want: { kind: 'error', message: ERR_PROFILE_VALUE },
+  },
+  {
+    name: '无参且有 TTY：进交互分支（不预置 profile）',
+    tokens: [],
+    profile: undefined,
+    isTTY: true,
+    want: { kind: 'interactive', presetProfile: undefined },
+  },
+  {
+    name: '无名但有 --profile dev：进交互且预置 profile（不再提示）',
+    tokens: [],
+    profile: 'dev',
+    isTTY: true,
+    want: { kind: 'interactive', presetProfile: 'dev' },
+  },
+  {
+    name: '无参且非 TTY：按守卫文案报错（两命令共用同一条）',
+    tokens: [],
+    profile: undefined,
+    isTTY: false,
+    want: {
+      kind: 'error',
+      message:
+        '交互选择需要终端（TTY）；非交互请改用 skill add <名...>、skill add --all 或 plugin add <名...> --profile <名>',
+    },
+  },
+];
+
+for (const row of PLUGIN_ROWS) {
+  test(`plugin 选择校验：${row.name}`, () => {
+    const selection = resolvePluginSelection({ tokens: row.tokens, profile: row.profile, isTTY: row.isTTY });
+    assert.deepEqual(selection, row.want);
+  });
+}
+
+test('plugin 选择校验：--profile 缺值文案为 spec 契约原文', () => {
+  assert.equal(ERR_PROFILE_VALUE, '--profile 需要一个 profile 名（如 plugin add @hankchen/dsh-demo --profile dev）');
+});
+
+// 缺 --profile 三行结构（spec 契约原文：沿用现行三行结构、示例行改新形态）
+test('缺 --profile 三行结构：有既有项列既有 profile（按名排序由调用方注入）', () => {
+  assert.deepEqual(profileRequiredLines(['dev', 'work']), [
+    '插件安装需要 --profile <名> 指定目标 dsh profile。',
+    '既有 profile：dev、work',
+    '示例：npx @hankchen/infra plugin add @hankchen/dsh-demo --profile dev',
+  ]);
+});
+
+test('缺 --profile 三行结构：无既有项输出任意新名说明行', () => {
+  assert.deepEqual(profileRequiredLines([]), [
+    '插件安装需要 --profile <名> 指定目标 dsh profile。',
+    '未发现既有 profile（$DSH_HOME/profiles/，缺省 ~/.dsh/profiles/）——可用任意新名。',
+    '示例：npx @hankchen/infra plugin add @hankchen/dsh-demo --profile dev',
+  ]);
 });
