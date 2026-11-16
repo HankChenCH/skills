@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // 发布前机械对账：pnpm pack 产物里的资产清单必须 = 仓库清单，不等即拒绝（退出码 1）。
 // 技能侧（spec 20261115-8975）：包内技能清单 = 仓库 skills/ 清单。
-// 插件侧两查（spec 20261115-495e FR-2，docs/plugin-assets.md §1.4；agents/ 两级布局随
+// 插件侧三查（spec 20261115-495e FR-2 立查 1/查 2，票 20261115-d5f4 加查 1.5 后三查；
+// docs/plugin-assets.md §1.4；agents/ 两级布局随
 // spec 20261115-ed9f 迁移，agents-layout.md §3.2——对账键为 <宿主>/<插件目录名> 复合键，
 // 两侧同法构造，报错消息点名宿主段）：
 //   查 1 包内 agents/*/plugins/ 清单 = 仓库 agents/*/plugins/ 清单；
@@ -73,7 +74,7 @@ if (missing.length > 0 || extra.length > 0) {
 
 console.log(`✓ 对账通过：包内技能清单 = 仓库 skills/ 清单（${repo.size} 项）`);
 
-// ---------- 插件两查（agents/<宿主>/plugins/ 两级布局） ----------
+// ---------- 插件三查（agents/<宿主>/plugins/ 两级布局） ----------
 if (!fs.existsSync(AGENTS_DIR)) {
   console.error('✗ 仓库缺 agents/ 目录——插件资产无从对账，拒绝发布');
   process.exit(1);

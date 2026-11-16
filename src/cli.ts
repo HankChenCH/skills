@@ -17,8 +17,10 @@
 // 「-h 位于错误 token 之后」（--foo -h 应报未知旗标）与「-h 处于值位」（--skills -h
 // 应取值 '-h'，§10.4-1）；自派发同时令裸 `--` 自然保持「未知旗标 --」口径（§10.4-2
 // 无需预扫描）。帮助文本仍经 helpInformation() 覆盖装配（官方定制面；将来若恢复
-// 库侧拦截，文本照旧复刻现行）。选项值消费（collectFn split+trim+filter）照 §10.1
-// 映射表装配；解析结果以状态机为唯一权威——opts 不读（与 RQ3 探针同形）。
+// 库侧拦截，文本照旧复刻现行）。选项值消费分工实况：commander 只承担旗标形 token
+// 消耗（collectFn split+trim+filter 照 §10.1 装配，其返回值不读）；值语义（拆分、
+// 去重、校验）全部由状态机承担，解析结果以状态机为唯一权威——opts 不读（与 RQ3
+// 探针同形）。
 //
 // 解析结果：解析器逐旗标增量构造（单对象增量写），故 skills/plugins/profile 为可选；
 // mode='skills' 时 skills 恒非空数组、mode='plugins' 时 plugins 恒非空数组——由解析内
@@ -67,7 +69,9 @@ export function renderHelp(): string {
   - 重跑本命令 = 按当前包内容覆盖刷新已装资产并更新锁文件，无重复堆积`;
 }
 
-// §10.1 映射表：值消耗交库（collectFn split+trim+filter；按首现去重的并集语义由状态机复刻）
+// §10.1 映射表：值语义状态机自担（按首现去重的并集语义在状态机）。collectFn 仅为
+// commander「选项带值」接口形态所需——其返回值不读（opts 不读，见文件头），非死代码可删：
+// 不传 collector 时 commander 对 [names] 可选值位的消费行为不同，FR-5 逐字节防线不动它。
 const splitNames = (value: string, previous: string[] = []): string[] => [
   ...(previous ?? []),
   ...value.split(',').map((s) => s.trim()).filter(Boolean),

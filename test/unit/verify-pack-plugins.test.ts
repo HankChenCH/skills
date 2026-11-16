@@ -1,4 +1,4 @@
-// 发布对账的插件两查（seam 落点：verify-pack CLI 的外部可观察行为）。
+// 发布对账的插件三查（seam 落点：verify-pack CLI 的外部可观察行为）。
 // 契约（spec 20261115-495e FR-2 / docs/plugin-assets.md §1.4，agents/ 两级布局随
 // spec 20261115-ed9f 迁移）：
 //   查 1 包内 agents/*/plugins/ 清单 = 仓库 agents/*/plugins/ 清单（<宿主>/<目录名> 复合键）；
