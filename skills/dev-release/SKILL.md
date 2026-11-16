@@ -57,7 +57,12 @@ description: 把一段已合入主干的历史变成一次正式发布——按�
    （message = 本版一句话摘要），push BASE_REF 与 tag。TRACKER=github 且 gh
    可用 → 附带问是否 `gh release create`（正文取 CHANGELOG 该版本节）。
    **用户显式确认才执行；沉默或"都行"不算确认。**
-5. **部署验证**：问清部署方式与验证判据（一条可判定的检查，如冒烟命令/健康检查）。
+5. **部署验证（含发布通道纪律）**：npm 类包先确认发布通道——包设有 `prepublishOnly`
+   发布门的（如本套件 `@hankchen/infra`：门封死目录直发，堵「发布元数据与 tarball
+   包内清单脱钩」的证伪通道，npm/pnpm 双通道实证均被拦），唯一放行通道 = 门指路的
+   tarball 三步 `pnpm pack → pnpm run verify:pack <tgz> → npm publish <tgz>`；
+   `--ignore-scripts` 为 opt-in 逃生口，靠本检查单纪律兜底，禁用；无发布门的包照常发布。
+   问清部署方式与验证判据（一条可判定的检查，如冒烟命令/健康检查）。
    有部署 → 部署后按判据验证并报告结果；库类产物（无部署面）→ 记"不适用"；
    验证执行不了 → 如实报告，不装绿。结果只在会话中报告，不回写 CHANGELOG。
 6. **出口（指路，不自动串联）**：报告四件——版本号、tag、CHANGELOG 位置、
