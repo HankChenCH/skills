@@ -1,16 +1,22 @@
 // commander 适配面测试（工单 20261115-eed0；原 cli-args 单测自 menu.test.ts 迁入）。
 //
-// seam = src/cli.ts 的 parseArgs / renderHelp（bin/infra.ts 消费的唯一解析入口）。
+// seam = src/cli.ts 的 parseArgs / renderHelp（旧旗标路径消费的解析入口）+ 票 20261116-f761
+// 起新命令面解析 seam = src/commands/skill/names.ts（名归一化与选择校验）。
 // 期望值独立来源：RQ3 §6.3 迁移前参照输出（docs/research/cli-lib/evidence/
-// probe-ref-matrix.txt，真实 cli-args 驱动逐字节留档）转录为字面量——不由实现推导。
+// probe-ref-matrix.txt，真实 cli-args 驱动逐字节留档）转录为字面量——不由实现推导；
+// 新命令面矩阵期望值 = spec 20261116-2c58 实现决策原文（名归一化语义 + 错误文案逐字）。
 // 报错文案断言逐字节一致（FR-5 防线）：✗ 行去掉 bin 层前缀即 err.message 原文。
-// 案例清单 = RQ3 §11.4 十六案例矩阵 + §10.4 边角回归集 + spec 20261115-495e 插件旗标语义。
+// 案例清单 = RQ3 §11.4 十六案例矩阵 + §10.4 边角回归集 + spec 20261115-495e 插件旗标语义
+// + spec 20261116-2c58 子命令形态新矩阵。
+// 暂存注记（票 20261116-f761）：旧旗标矩阵为过渡并存期回归防线，暂存不删——
+// 硬切（旧旗标按未知旗标口径报错）随票 20261116-bfcf 退役，届时整节删除。
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { parseArgs, renderHelp } from '../../src/cli.ts';
 import type { ParsedArgs } from '../../src/cli.ts';
+import { normalizeNames, resolveSkillSelection } from '../../src/commands/skill/names.ts';
 
 // ---- 参照转录（evidence/probe-ref-matrix.txt）：报错文案逐字 ----
 
@@ -126,3 +132,66 @@ const HELP_TEXT = `@hankchen/infra —— 套件资产初始化 CLI
     node 版本须 ≥ 24.9.0；装后读 profile package.json 对账落点并记入 .infra-lock.json
   - 安装后在项目根写 .infra-lock.json 记账（包版本 + 逐技能指纹/逐插件版本与安装时间）
   - 重跑本命令 = 按当前包内容覆盖刷新已装资产并更新锁文件，无重复堆积`;
+
+// ---- spec 20261116-2c58 子命令形态新矩阵（票 20261116-f761）----
+// seam = src/commands/skill/names.ts（skill add 位置参数归一化与选择校验）。
+// 期望值独立来源 = spec 实现决策原文：名归一化语义（拆逗号/trim/滤空/首现保序去重，
+// `skill add a b,c d` → [a, b, c, d]、`skill add a,a` → [a]）与三条错误文案逐字。
+
+const ERR_ALL_MUTEX = '--all 与技能名互斥：全装与按条目指定只能选一';
+const ERR_NAMES_EMPTY = 'skill add 需要至少一个技能名（如 skill add dev-spec,dev-plan）';
+
+const NORMALIZE_ROWS: Array<{ name: string; tokens: string[]; want: string[] }> = [
+  { name: '空格 variadic 逐个收集', tokens: ['dev-spec', 'dev-plan'], want: ['dev-spec', 'dev-plan'] },
+  { name: '空格与逗号混合双收（spec 原例 a b,c d → [a,b,c,d]）', tokens: ['a', 'b,c', 'd'], want: ['a', 'b', 'c', 'd'] },
+  { name: '重复名按首现保序去重（spec 原例 a,a → [a]）', tokens: ['a', 'a'], want: ['a'] },
+  { name: '逐 token 拆逗号、trim、滤空段', tokens: [' a , ,b ', '  c  '], want: ['a', 'b', 'c'] },
+  { name: '首现保序：后现重复让位于首现位置', tokens: ['b', 'a', 'b', 'c', 'a'], want: ['b', 'a', 'c'] },
+  { name: '全空段过滤为空数组', tokens: ['', ',', ' , '], want: [] },
+];
+
+for (const row of NORMALIZE_ROWS) {
+  test(`名归一化：${row.name}`, () => {
+    assert.deepEqual(normalizeNames(row.tokens), row.want);
+  });
+}
+
+const SELECTION_ROWS: Array<{
+  name: string;
+  tokens: string[];
+  all: boolean;
+  isTTY: boolean;
+  error?: string;
+  want?: { kind: string; names?: string[] };
+}> = [
+  { name: '带名免交互：归一化后按名安装', tokens: ['dev-spec', 'dev-plan'], all: false, isTTY: false, want: { kind: 'names', names: ['dev-spec', 'dev-plan'] } },
+  { name: '--all 全装', tokens: [], all: true, isTTY: false, want: { kind: 'all' } },
+  { name: '--all 与名互斥（--all 先行）', tokens: ['dev-spec'], all: true, isTTY: true, error: ERR_ALL_MUTEX },
+  { name: '--all 与多名并集互斥', tokens: ['dev-spec', 'dev-plan'], all: true, isTTY: true, error: ERR_ALL_MUTEX },
+  { name: '空串 token 过滤后为空报错', tokens: [''], all: false, isTTY: true, error: ERR_NAMES_EMPTY },
+  { name: '纯逗号空段 token 过滤后为空报错', tokens: [' , '], all: false, isTTY: false, error: ERR_NAMES_EMPTY },
+  { name: '--all 与空段 token 同用按全装（无可互斥之名）', tokens: [' , '], all: true, isTTY: true, want: { kind: 'all' } },
+];
+
+for (const row of SELECTION_ROWS) {
+  test(`选择校验：${row.name}`, () => {
+    const selection = resolveSkillSelection({ tokens: row.tokens, all: row.all, isTTY: row.isTTY });
+    if (row.error !== undefined) {
+      assert.deepEqual(selection, { kind: 'error', message: row.error });
+    } else {
+      assert.deepEqual(selection, row.want);
+    }
+  });
+}
+
+// 非 TTY 交互守卫（文案为 spec 命令面契约原文；交互分支断言在 menu.test 交互守卫节）
+test('选择校验：无参且非 TTY 按守卫文案报错', () => {
+  assert.deepEqual(
+    resolveSkillSelection({ tokens: [], all: false, isTTY: false }),
+    {
+      kind: 'error',
+      message:
+        '交互选择需要终端（TTY）；非交互请改用 skill add <名...>、skill add --all 或 plugin add <名...> --profile <名>',
+    },
+  );
+});
