@@ -76,8 +76,11 @@ async function stageTarball(
   return tarball;
 }
 
-function runVerifyPack(tarball: string) {
-  return spawnSync(process.execPath, [VERIFY_PACK, tarball], { encoding: 'utf8' });
+function runVerifyPack(tarball: string, options: { env?: NodeJS.ProcessEnv } = {}) {
+  return spawnSync(process.execPath, [VERIFY_PACK, tarball], {
+    encoding: 'utf8',
+    ...(options.env ? { env: options.env } : {}),
+  });
 }
 
 test('对账通过：包内插件 = 仓库插件且每插件过校验，skills 对账行为不变（退出码 0）', async (t) => {
@@ -144,4 +147,14 @@ test('根包 files 清单含 agents（插件资产随 agents/ 两级布局随包
     pkg.files.includes('agents'),
     `files 清单应含 agents（与 skills 同法），实际：${JSON.stringify(pkg.files)}`,
   );
+});
+
+test('tar 不可执行时拒绝发布且报错带 spawn 失败原因与退出码段（非空壳 null）', async (t) => {
+  // PATH 剔除 → verify-pack 内 spawnSync('tar') 解析失败：error 对象持原因、stderr 为空——
+  // 票 20261116-d30c：旧实现只拼 stderr，此场景报错为「无法读取 tarball：null」空壳。
+  const tarball = await stageTarball(await makeTempRoot(t));
+  const result = runVerifyPack(tarball, { env: { ...process.env, PATH: '/zz-nonexistent-path' } });
+  assert.equal(result.status, 1, `应拒绝发布退出 1，实际 ${result.status}：${result.stdout}`);
+  assert.match(result.stderr, /ENOENT|spawn/, '报错应含 spawn 失败的具体原因（现状 null 即本票红态）');
+  assert.match(result.stderr, /退出码/, '报错应含退出码段（spawn 失败时显式标未知）');
 });
