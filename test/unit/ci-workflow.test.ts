@@ -11,9 +11,12 @@
 // dsh 集成测试转发），packageManager 字段钉精确版 12.15.0（lockfile
 // packageManagerDependencies 记账，frozen 安装强制对齐）；setup-node 缓存随 pnpm
 // lockfile（cache: pnpm），故全局 pnpm 安装步须先于 setup-node。
-// 解析器 = 本文件内置的 YAML 子集解析器（块映射 / 块序列 / 字面块标量 / flow 序列 /
-// 全行注释）：仓依赖树无 YAML 库，以子集解析器承载「yaml 可解析」这一 seam 检查；
-// 解析失败带行号显式报错（坏缩进、tab、非 key 行都拒绝）。
+// 解析防线两层（票 20261116-0304 后并陈）：① js-yaml（devDep，仅测试面）承「严格可
+// 解析」真解析器防线——内置子集解析器的 KEY_RE 不校验平纯标量冒号空格（4de56c7 步名
+// 「cache: pnpm」漏入致 GitHub 0s startup failure 的缺口），由真解析器封死；② 本文件
+// 内置的 YAML 子集解析器（块映射 / 块序列 / 字面块标量 / flow 序列 / 全行注释）承结构
+// 契约断言（步骤链、secrets 遍历等），解析失败带行号显式报错（坏缩进、tab、非 key 行
+// 都拒绝）。
 // 环境缺失处置的取证口径：dsh 集成测试自带前置门（node/registry 不满足显式 skip 报因，
 // 见 test/e2e/dsh-plugin-integration.test.ts）；交互 e2e 的 expect 缺失时红（runInteractive
 // throw，非假绿）——workflow 内显式 apt 安装 expect 使交互段真跑（design 定夺：装了就真跑，
