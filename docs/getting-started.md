@@ -12,30 +12,31 @@ git 与 bash；安装资产另需 Node.js ≥ 24.9.0（升级指引见下方「�
 
 ## 第 1 步：安装技能
 
-在目标 git 项目根目录裸跑一条命令，进入两层菜单：
+在目标 git 项目根目录运行 `skill add`，无参进交互勾选：
 
 ```bash
-npx @hankchen/infra
+npx @hankchen/infra skill add
 ```
 
-第一层选资产类型（「技能」与「插件」可安装，插件见下方「安装插件」节；「规范」为占位，显示但不可安装），第二层空格勾选要装的条目、回车确认。安装器做完三件事：
+空格勾选要装的技能、回车确认。安装器做完三件事：
 
 - 所选技能实体拷入项目 `.agents/skills/<技能名>/`，内容随包原样分发（与仓库 [skills/](../skills/) 清单一致）；
 - 对项目内已存在的 agent 目录（`.claude`、`.zcode` 等）建相对软链；不存在的跳过并列入完成摘要，不报错；
 - 在项目根写 `.infra-lock.json` 记账：包版本 + 逐技能指纹/安装时间。
 
-脚本与 CI 里免交互安装，落盘结果与菜单路径一致：
+脚本与 CI 里免交互安装，落盘结果与交互路径一致：
 
 ```bash
-npx @hankchen/infra --all                        # 安装全部 31 项技能
-npx @hankchen/infra --skills dev-spec,dev-plan   # 只装指定技能（逗号分隔）
-npx @hankchen/infra --skills dev-spec --skills ref-testing   # 可重复出现，取并集
+npx @hankchen/infra skill add --all                      # 安装全部技能
+npx @hankchen/infra skill add dev-spec,dev-plan          # 只装指定技能（逗号分隔）
+npx @hankchen/infra skill add dev-spec ref-testing       # 空格分隔多个名字（与逗号混用均可）
 ```
 
-全部旗标与示例见 `npx @hankchen/infra --help`。
+全部命令与用法示例见 `npx @hankchen/infra --help`（裸跑与任何位置 `-h` 都给对应层级帮助）。
 
 - **重跑即升级**：再跑一次同一条命令，已装技能按当前包内容覆盖刷新、锁文件同步更新，不重复堆积。
-- **锁版本**：`npx @hankchen/infra@<版本>` 安装指定版本（如 `npx @hankchen/infra@0.1.0`），锁文件记录实际安装的版本号，团队以此对齐同一版本。
+- **从 0.1.x 升级**：命令面已切为子命令形态，0.1.x 的旧旗标输入已退役（跑出来会按「未知旗标」口径报错并指路 `--help`）——已装 0.1.x 的使用者直接改跑 `npx @hankchen/infra skill add`（或带名/`--all`）即按当前包内容刷新，无需先卸载。
+- **锁版本**：`npx @hankchen/infra@<版本> skill add <名...>` 安装指定版本（如 `npx @hankchen/infra@0.2.0 skill add dev-spec`），锁文件记录实际安装的版本号，团队以此对齐同一版本。
 
 npm 访问受限（内网、公司代理）时，先配镜像或代理再跑安装：
 
@@ -60,22 +61,22 @@ npm config set https-proxy http://127.0.0.1:7890
 fnm install 24 && fnm use 24    # 或 nvm install 24 && nvm use 24
 ```
 
-两层菜单安装：
+交互安装（勾选插件与目标 profile）：
 
 ```bash
-npx @hankchen/infra
+npx @hankchen/infra plugin add
 ```
 
-第一层选「插件」，第二层空格勾选要装的插件（条目正名为 npm 包名），回车后选定目标 profile——菜单列出 `~/.dsh/profiles/` 既有项（`DSH_HOME` 可覆盖根目录），无既有项时可输入新名。安装器把勾选包逐条转发官方命令 `dsh plugin --profile <名> add <包>`（`dsh` 不在 PATH 时自动改经 `npx @deepseek-ai/dsh` 运行）；完成摘要给出对账结果——profile 的 package.json 依赖行 + `dsh.profile.bundles` 行两处落点——并记入 `.infra-lock.json`。
+空格勾选要装的插件（条目正名为 npm 包名），回车后选定目标 profile——菜单列出 `~/.dsh/profiles/` 既有项（`DSH_HOME` 可覆盖根目录），无既有项时可输入新名。安装器把勾选包逐条转发官方命令 `dsh plugin --profile <名> add <包>`（`dsh` 不在 PATH 时自动改经 `npx @deepseek-ai/dsh` 运行）；完成摘要给出对账结果——profile 的 package.json 依赖行 + `dsh.profile.bundles` 行两处落点——并记入 `.infra-lock.json`。
 
-脚本与 CI 里免交互安装，落盘结果与菜单路径一致：
+脚本与 CI 里免交互安装，落盘结果与交互路径一致：
 
 ```bash
-npx @hankchen/infra --plugins @hankchen/dsh-demo --profile default
-npx @hankchen/infra --plugins @hankchen/dsh-demo --plugins <另一包> --profile work   # 可重复出现，取并集
+npx @hankchen/infra plugin add @hankchen/dsh-demo --profile default
+npx @hankchen/infra plugin add @hankchen/dsh-demo <另一包> --profile work   # 空格分隔多个（逗号亦可）
 ```
 
-`--profile` 必填：插件安装缺它即报错并列出既有 profile。全部旗标与示例见 `npx @hankchen/infra --help`。
+`--profile` 必填：插件安装缺它即报错并列出既有 profile。全部命令与用法示例见 `npx @hankchen/infra --help`。
 
 两个例外：
 

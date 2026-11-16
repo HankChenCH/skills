@@ -15,10 +15,10 @@ need（澄清）→ spec（规格）→ plan（拆票）→ implement（实现�
 依赖 git 与 bash；安装资产另需 Node.js ≥ 24.9.0。在目标 git 项目根目录装技能：
 
 ```bash
-npx @hankchen/infra
+npx @hankchen/infra skill add    # 交互勾选要安装的技能（skill add <名...>、--all 免交互）
 ```
 
-然后在目标仓库的会话里运行 `/setup-workspace` 接门禁。顺序固定：先装技能、后接门禁；只装技能不接门禁，流程技能会在入口校验时拒绝并提示先运行 /setup-workspace。安装旗标、插件安装、npm 镜像代理与 tracker 配置见[安装与接入](./docs/getting-started.md)。
+然后在目标仓库的会话里运行 `/setup-workspace` 接门禁。顺序固定：先装技能、后接门禁；只装技能不接门禁，流程技能会在入口校验时拒绝并提示先运行 /setup-workspace。安装命令形态、插件安装、npm 镜像代理与 tracker 配置见[安装与接入](./docs/getting-started.md)。
 
 一轮最小闭环：
 
@@ -30,7 +30,7 @@ npx @hankchen/infra
 
 | 文档 | 说明 |
 |---|---|
-| [docs/getting-started.md](./docs/getting-started.md) | **安装与接入**：技能/插件安装旗标、npm 镜像代理、接入后的工作区、check.sh 子命令 |
+| [docs/getting-started.md](./docs/getting-started.md) | **安装与接入**：技能/插件安装命令、npm 镜像代理、接入后的工作区、check.sh 子命令 |
 | [docs/design-rationale.md](./docs/design-rationale.md) | **设计动机与特色**：要解决的三种失控、四层防线、七个特色设计、致谢 |
 | [docs/skills.md](./docs/skills.md) | **技能清单**：31 个技能的分组职责表 |
 | [docs/maintainer-guide.md](./docs/maintainer-guide.md) | **维护者指南**：仓库结构、src 模块、开发命令与类型硬约束、已知坑、发布流程 |
