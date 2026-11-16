@@ -42,7 +42,7 @@ jobs:
         # actions/checkout v4.4.0（钉完整 commit SHA：可变 tag 不是供应链信任锚；升版改此处并同步静态核验测试）
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
-      - name: Install pnpm (official dsh plugin command forwards to pnpm; setup-node cache: pnpm needs it on PATH)
+      - name: Install pnpm (official dsh plugin command forwards to pnpm; setup-node pnpm cache needs it on PATH)
         # fix 20261115-1a89：ubuntu runner 不预装 pnpm，官方 dsh plugin 命令转发 pnpm 执行，
         # 缺装时 spawn ENOENT 使 FR-5 集成测试红（Actions run 43722887029）。装了就真跑
         # （与 expect 同款定夺：给测试补前置门跳过会让集成覆盖永久缺失）。钉主版本 12。

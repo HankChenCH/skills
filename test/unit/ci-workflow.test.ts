@@ -24,6 +24,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { load as loadYaml } from 'js-yaml';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -426,4 +427,25 @@ test('负向契约：workflow 不引用 plugins/ 目录路径，依赖安装不�
     [],
     `项目依赖安装不得使用 npm install/ci（pnpm workspace 契约；引导装 pnpm 豁免），命中行：${JSON.stringify(npmDepLines)}`,
   );
+});
+
+test('workflow 过严格 YAML 解析（真解析器防线，杜绝平纯标量含冒号空格类结构缺陷）', () => {
+  // 票 20261116-0304 红绿：4de56c7 步名含未引号「cache: pnpm」（冒号+空格）——平纯标量
+  // 非法，GitHub plan 阶段 0s startup failure 且自写解析器（本文件 KEY_RE）不校验此类。
+  // 防线 = 真解析器（js-yaml）全文件解析，解析报错即红；YAML 合法性是 workflow 的
+  // 发布前置面，与步骤链契约同级。
+  const raw = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+  let parsed: unknown;
+  try {
+    parsed = loadYaml(raw);
+  } catch (err) {
+    assert.fail(
+      `workflow YAML 严格解析失败（GitHub 将 0s startup failure）：${
+        err instanceof Error ? err.message.split('\n').slice(0, 3).join(' / ') : String(err)
+      }`,
+    );
+  }
+  assert.ok(parsed && typeof parsed === 'object', '解析结果须为映射');
+  const doc = parsed as { on?: unknown; jobs?: unknown };
+  assert.ok(doc.on && doc.jobs, 'on 触发器与 jobs 须在位');
 });
