@@ -1,6 +1,8 @@
-// 插件安装端到端：临时目录 + 真实 CLI 进程 + 真实文件系统（不 mock）。
-// 官方执行体在 OS 边界注入：PATH 里放 shim 可执行文件（记录 argv 并按官方语义写 profile
-// 两落点），CLI 真实走 PATH 探测 → spawnSync → 对账 → 锁文件全链，绝不实跑官方 dsh/npx。
+// 插件安装端到端（票 20261116-ccfb 改写新命令面 plugin add）：临时目录 + 真实 CLI 进程 +
+// 真实文件系统（不 mock）。官方执行体在 OS 边界注入：PATH 里放 shim 可执行文件（记录 argv
+// 并按官方语义写 profile 两落点），CLI 真实走 PATH 探测 → spawnSync → 对账 → 锁文件全链，
+// 绝不实跑官方 dsh/npx。
+// 旧旗标 --plugins 的并存期回归保留一节（硬切退役归 20261116-bfcf）。
 
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,11 +12,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { renderTopHelp } from '../../src/program.ts';
+
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 const PKG = '@hankchen/dsh-demo';
 // 插件版本唯一来源 = 仓库插件包 package.json（shim 模拟官方安装当前包的实际版本，
-// 断言与之共用；版本升位零改动，ticket 20261115-f158：0.1.0 → 0.1.1）
+// 断言与之共用；版本升位零改动）
 const PLUGIN_VERSION = JSON.parse(
   fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo', 'package.json'), 'utf8'),
 ).version;
@@ -104,10 +108,16 @@ function plainText(output: string): string {
   return output.replace(ANSI_RE, '').replace(/\s+/g, '');
 }
 
-// 经 expect(1) 在真实 PTY 中跑交互式 CLI（三层菜单：类型 → 插件勾选 → profile 选择）。
-// PATTERNS 与 KEYS 等长：发键前等对应提示文本渲染（盲发节奏会让三层连发菜单的
-// 按键在 prompt 切换窗口被吞，见 interactive.exp 头注）。
-function runInteractiveIn(projectRoot: string, keys: string[], env: Record<string, string>, patterns: string[] = []) {
+// 经 expect(1) 在真实 PTY 中跑交互式 CLI（plugin add 两层：插件勾选 → profile 选择/预置跳过）。
+// PATTERNS 与 KEYS 等长：发键前等对应提示文本渲染（盲发节奏会让连发菜单的按键在 prompt
+// 切换窗口被吞，见 interactive.exp 头注）。cliArgs 为转交 CLI 的参数（如 "plugin add"）。
+function runInteractiveIn(
+  projectRoot: string,
+  keys: string[],
+  env: Record<string, string>,
+  patterns: string[] = [],
+  cliArgs = '',
+) {
   const keyTokens = keys
     .map((key) => {
       if (key === '\x1b[B') return 'DOWN';
@@ -126,6 +136,7 @@ function runInteractiveIn(projectRoot: string, keys: string[], env: Record<strin
       projectRoot,
       keyTokens,
       patternTokens,
+      cliArgs,
     ],
     { cwd: projectRoot, encoding: 'utf8', timeout: 120000, env: { ...process.env, ...env } },
   );
@@ -135,13 +146,31 @@ function runInteractiveIn(projectRoot: string, keys: string[], env: Record<strin
   return { code: result.status, output: result.stdout + result.stderr };
 }
 
-test('[FR-3] dsh 在 PATH（注入 shim）：--plugins --profile 免交互安装全链', (t) => {
+// 期望值独立来源（spec 20261116-2c58 命令面契约原文，tests 逐字锚定）
+const PROFILE_REQUIRED_LISTED = [
+  '✗ 插件安装需要 --profile <名> 指定目标 dsh profile。',
+  '  既有 profile：dev、work',
+  '  示例：npx @hankchen/infra plugin add @hankchen/dsh-demo --profile dev',
+].join('\n') + '\n';
+const PROFILE_REQUIRED_NONE = [
+  '✗ 插件安装需要 --profile <名> 指定目标 dsh profile。',
+  '  未发现既有 profile（$DSH_HOME/profiles/，缺省 ~/.dsh/profiles/）——可用任意新名。',
+  '  示例：npx @hankchen/infra plugin add @hankchen/dsh-demo --profile dev',
+].join('\n') + '\n';
+const ERR_PROFILE_VALUE =
+  '✗ --profile 需要一个 profile 名（如 plugin add @hankchen/dsh-demo --profile dev）\n';
+const ERR_TTY_GUARD =
+  '✗ 交互选择需要终端（TTY）；非交互请改用 skill add <名...>、skill add --all 或 plugin add <名...> --profile <名>\n';
+
+// ---------- [FR-1] plugin add 带名免交互安装全链 ----------
+
+test('[FR-1] dsh 在 PATH（注入 shim）：plugin add 免交互安装全链（argv/两落点/锁文件/摘要）', (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['dev']);
   const shimDir = makeShimDir(t, ['dsh']);
   const shimLog = makeShimLog(t);
 
-  const { code, stdout, stderr } = runCliIn(project, ['--plugins', PKG, '--profile', 'dev'], {
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', PKG, '--profile', 'dev'], {
     DSH_HOME: dshHome,
     DSH_SHIM_LOG: shimLog,
     PATH: `${shimDir}${path.delimiter}${process.env.PATH}`,
@@ -156,7 +185,7 @@ test('[FR-3] dsh 在 PATH（注入 shim）：--plugins --profile 免交互安装
     '摘要应记插件落盘版本',
   );
 
-  // 执行体收到的命令形态（组装断言在进程边界）
+  // 执行体收到的命令形态（组装断言在进程边界；spec FR-1 场景原文形态）
   assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'dev', 'add', PKG]]);
 
   // profile 两落点齐备（shim 按官方语义写入）
@@ -170,13 +199,13 @@ test('[FR-3] dsh 在 PATH（注入 shim）：--plugins --profile 免交互安装
   assert.match(lockfile.plugins[PKG].installedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
-test('[FR-3] dsh 不在 PATH（仅 npx shim）：自动改 npx @deepseek-ai/dsh 执行体形态', (t) => {
+test('[FR-4] dsh 不在 PATH（仅 npx shim）：plugin add 自动回退 npx @deepseek-ai/dsh 执行体形态', (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['dev']);
   const shimDir = makeShimDir(t, ['npx']);
   const shimLog = makeShimLog(t);
 
-  const { code, stdout, stderr } = runCliIn(project, ['--plugins', PKG, '--profile', 'dev'], {
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', PKG, '--profile', 'dev'], {
     DSH_HOME: dshHome,
     DSH_SHIM_LOG: shimLog,
     PATH: shimDir, // PATH 里没有 dsh，只有 npx shim
@@ -187,25 +216,78 @@ test('[FR-3] dsh 不在 PATH（仅 npx shim）：自动改 npx @deepseek-ai/dsh 
   assert.deepEqual(Object.keys(lockfile.plugins), [PKG]);
 });
 
-test('[FR-1] 缺 --profile：报错并列出既有 profile', (t) => {
+test('[FR-4] 重跑刷新（新形态）：锁文件插件区无重复条目', (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+  const env = { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` };
+
+  assert.equal(runCliIn(project, ['plugin', 'add', PKG, '--profile', 'dev'], env).code, 0);
+  assert.equal(runCliIn(project, ['plugin', 'add', PKG, '--profile', 'dev'], env).code, 0);
+  const lockfile = readLockfileAt(project);
+  assert.deepEqual(Object.keys(lockfile.plugins), [PKG], '重跑不应产生重复条目');
+  assert.deepEqual(lockfile.plugins[PKG].profile, 'dev');
+  assert.deepEqual(lockfile.plugins[PKG].version, PLUGIN_VERSION);
+});
+
+// ---------- [FR-4] plugin add 校验报错路径（文案 = spec 命令面契约原文，逐字节） ----------
+
+test('[FR-4] 缺 --profile 且有既有项：三行结构逐字节（既有列表 + 新形态示例行）', (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['work', 'dev']);
 
-  const { code, stderr } = runCliIn(project, ['--plugins', PKG], { DSH_HOME: dshHome });
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', PKG], { DSH_HOME: dshHome });
   assert.equal(code, 1, '缺 --profile 应失败退出');
-  assert.match(stderr, /--profile/);
-  assert.match(stderr, /dev/, '应列出既有 profile dev');
-  assert.match(stderr, /work/, '应列出既有 profile work');
+  assert.equal(stdout, '');
+  assert.equal(stderr, PROFILE_REQUIRED_LISTED);
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '报错路径不得写锁文件');
 });
 
-test('[FR-3|异常流B] --profile desktop：拒装并说明官方保留名，不执行任何官方命令', (t) => {
+test('[FR-4] 缺 --profile 且无既有项：三行结构第二行为任意新名说明行', (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t); // 无 profiles 目录
+
+  const { code, stderr } = runCliIn(project, ['plugin', 'add', PKG], { DSH_HOME: dshHome });
+  assert.equal(code, 1);
+  assert.equal(stderr, PROFILE_REQUIRED_NONE);
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
+});
+
+test('[FR-4] --profile 缺值：spec 契约原文报错（commander 值必需经出口通道转译）', (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', PKG, '--profile'], { DSH_HOME: dshHome });
+  assert.equal(code, 1);
+  assert.equal(stdout, '');
+  assert.equal(stderr, ERR_PROFILE_VALUE);
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
+});
+
+test('[FR-4] plugin add 不存在的插件名：报错列可用插件清单、退出 1、零落盘', (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimLog = makeShimLog(t);
+
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', '@hankchen/no-such', '--profile', 'dev'], {
+    DSH_HOME: dshHome,
+    DSH_SHIM_LOG: shimLog,
+  });
+  assert.equal(code, 1, '未知插件名应失败退出');
+  assert.equal(stdout, '');
+  assert.equal(stderr, `✗ 以下插件不在套件包内：@hankchen/no-such；可用插件：${PKG}\n`);
+  assert.equal(fs.existsSync(shimLog), false, '未知插件名不得执行官方命令');
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
+});
+
+test('[FR-4] --profile desktop：拒装并说明官方保留名，不执行任何官方命令', (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['desktop']);
   const shimDir = makeShimDir(t, ['dsh']);
   const shimLog = makeShimLog(t);
 
-  const { code, stdout, stderr } = runCliIn(project, ['--plugins', PKG, '--profile', 'desktop'], {
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', PKG, '--profile', 'desktop'], {
     DSH_HOME: dshHome,
     DSH_SHIM_LOG: shimLog,
     PATH: `${shimDir}${path.delimiter}${process.env.PATH}`,
@@ -218,61 +300,114 @@ test('[FR-3|异常流B] --profile desktop：拒装并说明官方保留名，不
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '拒装不得写锁文件');
 });
 
-test('[FR-5] 重跑刷新：锁文件插件区无重复条目、安装时间刷新', (t) => {
+test('[FR-3] 非 TTY plugin add 无参：守卫文案报错、退出 1、零落盘（双命令齐验之 plugin 侧）', (t) => {
   const project = makeProject(t);
-  const dshHome = makeDshHome(t, ['dev']);
-  const shimDir = makeShimDir(t, ['dsh']);
-  const shimLog = makeShimLog(t);
-  const env = { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` };
-
-  assert.equal(runCliIn(project, ['--plugins', PKG, '--profile', 'dev'], env).code, 0);
-  const first = readLockfileAt(project);
-  assert.deepEqual(Object.keys(first.plugins), [PKG]);
-
-  assert.equal(runCliIn(project, ['--plugins', PKG, '--profile', 'dev'], env).code, 0);
-  const second = readLockfileAt(project);
-  assert.deepEqual(Object.keys(second.plugins), [PKG], '重跑不应产生重复条目');
-  assert.deepEqual(second.plugins[PKG].profile, 'dev');
-  assert.deepEqual(second.plugins[PKG].version, PLUGIN_VERSION);
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add'], {});
+  assert.equal(code, 1, '非 TTY 无参应失败退出');
+  assert.equal(stdout, '');
+  assert.equal(stderr, ERR_TTY_GUARD);
+  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '守卫路径不得写锁文件');
 });
 
-test('[FR-1] 交互路径三层菜单（类型→插件→profile）与旗标路径落盘一致', async (t) => {
-  const envOf = (dshHome: string, shimLog: string) => ({
-    DSH_HOME: dshHome,
-    DSH_SHIM_LOG: shimLog,
-    PATH: `${makeShimDir(t, ['dsh'])}${path.delimiter}${process.env.PATH}`,
-  });
-  const interactiveProject = makeProject(t);
-  const interactiveHome = makeDshHome(t, ['work', 'dev']);
-  const interactiveLog = makeShimLog(t);
-  // 第一层 DOWN 到插件 → ENTER；第二层 SPACE 勾选唯一条目 → ENTER；第三层回车选首个 profile（dev）
-  const picked = await runInteractiveIn(
-    interactiveProject,
-    ['\x1b[B', '\r', ' ', '\r', '\r'],
-    envOf(interactiveHome, interactiveLog),
-    ['选择要安装的资产类型', '', '选择要安装的插件', '', '选择目标 dsh profile'],
-  );
-  assert.equal(picked.code, 0, '交互插件安装应成功退出');
+// ---------- [FR-1] plugin add 帮助可用（过渡态：定稿断言随 20261116-bfcf）----------
 
-  const flagProject = makeProject(t);
-  const flagHome = makeDshHome(t, ['dev']);
-  const flagLog = makeShimLog(t);
-  const flagged = runCliIn(flagProject, ['--plugins', PKG, '--profile', 'dev'], envOf(flagHome, flagLog));
-  assert.equal(flagged.code, 0, `旗标安装应成功退出：${flagged.stderr}`);
-
-  // 两路径落盘一致：profile package.json 完全一致；锁文件插件区同键同版本同 profile（安装时间除外）
-  const a = JSON.parse(fs.readFileSync(path.join(interactiveHome, 'profiles', 'dev', 'package.json'), 'utf8'));
-  const b = JSON.parse(fs.readFileSync(path.join(flagHome, 'profiles', 'dev', 'package.json'), 'utf8'));
-  assert.deepEqual(a, b);
-  const la = readLockfileAt(interactiveProject).plugins;
-  const lb = readLockfileAt(flagProject).plugins;
-  assert.deepEqual(Object.keys(la), Object.keys(lb));
-  for (const name of Object.keys(la)) {
-    assert.deepEqual({ version: la[name].version, profile: la[name].profile }, { version: lb[name].version, profile: lb[name].profile });
+test('[FR-1] 顶层 --help 含 plugin add 用法示例（票 20261116-ccfb 补位）', (t) => {
+  const project = makeProject(t);
+  const { code, stdout, stderr } = runCliIn(project, ['--help'], {});
+  assert.equal(code, 0);
+  assert.equal(stdout, `${renderTopHelp()}\n`, '顶层帮助应全文走 stdout 且恰一尾换行');
+  assert.equal(stderr, '');
+  for (const needle of [
+    'npx @hankchen/infra plugin add @hankchen/dsh-demo --profile dev',
+    'plugin add [名...] --profile <名>',
+  ]) {
+    assert.ok(stdout.includes(needle), `顶层帮助应含 ${needle}`);
   }
 });
 
-test('[FR-1] 交互第二层条目以正名呈现、提示为包 description，完成摘要逐条列对账结果', async (t) => {
+test('[FR-1] plugin add --help 打印命令级帮助：用法与示例、退出码 0', (t) => {
+  const project = makeProject(t);
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', '--help'], {});
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  for (const needle of ['plugin add [名...]', '--profile <名>', 'plugin add @hankchen/dsh-demo --profile dev']) {
+    assert.ok(stdout.includes(needle), `plugin add --help 应含 ${needle}`);
+  }
+});
+
+test('[FR-1] plugin 无动词打印该命令帮助、退出码 0', (t) => {
+  const project = makeProject(t);
+  const { code, stdout, stderr } = runCliIn(project, ['plugin'], {});
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  assert.ok(stdout.includes('add'), 'plugin 命令帮助应列出 add 动词');
+});
+
+// ---------- [FR-1/FR-4] plugin add 交互路径（PTY，两层：插件勾选 → profile）----------
+
+test('[FR-1] PTY plugin add 无参选插件 + 选 profile：shim 调用与所选组合一致、落盘与带名路径一致', async (t) => {
+  const interactiveProject = makeProject(t);
+  const interactiveHome = makeDshHome(t, ['work', 'dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const interactiveLog = makeShimLog(t);
+  // 插件多选 SPACE 勾选唯一条目 → ENTER 确认（盲发，0.4s 节奏）→ profile 单选渲染后 ENTER 选首个（dev 居首）
+  const picked = await runInteractiveIn(
+    interactiveProject,
+    [' ', '\r', '\r'],
+    { DSH_HOME: interactiveHome, DSH_SHIM_LOG: interactiveLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['选择要安装的插件', '', '选择目标 dsh profile'],
+    'plugin add',
+  );
+  assert.equal(picked.code, 0, '交互插件安装应成功退出');
+  assert.deepEqual(readShimCalls(interactiveLog), [['plugin', '--profile', 'dev', 'add', PKG]]);
+
+  const namedProject = makeProject(t);
+  const namedHome = makeDshHome(t, ['dev']);
+  const namedLog = makeShimLog(t);
+  const named = runCliIn(namedProject, ['plugin', 'add', PKG, '--profile', 'dev'], {
+    DSH_HOME: namedHome,
+    DSH_SHIM_LOG: namedLog,
+    PATH: `${shimDir}${path.delimiter}${process.env.PATH}`,
+  });
+  assert.equal(named.code, 0, `带名安装应成功退出：${named.stderr}`);
+
+  // 两路径落盘一致：profile package.json 完全一致；锁文件插件区同键同版本同 profile（安装时间除外）
+  const a = JSON.parse(fs.readFileSync(path.join(interactiveHome, 'profiles', 'dev', 'package.json'), 'utf8'));
+  const b = JSON.parse(fs.readFileSync(path.join(namedHome, 'profiles', 'dev', 'package.json'), 'utf8'));
+  assert.deepEqual(a, b);
+  const la = readLockfileAt(interactiveProject).plugins;
+  const lb = readLockfileAt(namedProject).plugins;
+  assert.deepEqual(Object.keys(la), Object.keys(lb));
+  for (const name of Object.keys(la)) {
+    assert.deepEqual(
+      { version: la[name].version, profile: la[name].profile },
+      { version: lb[name].version, profile: lb[name].profile },
+    );
+  }
+});
+
+test('[FR-1] PTY plugin add --profile dev 无名预置：仅提示插件多选、不再提示 profile、shim 用预置 profile', async (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['work', 'dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+  // 只发插件多选两键；若实现仍提示 profile 选择，expect 将等不到 EOF 而超时 124 → 本测红
+  const picked = await runInteractiveIn(
+    project,
+    [' ', '\r'],
+    { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
+    ['选择要安装的插件', ''],
+    'plugin add --profile dev',
+  );
+  assert.equal(picked.code, 0, '预置 profile 交互安装应成功退出');
+  assert.match(plainText(picked.output), /已安装插件/, '应走完安装');
+  assert.equal(plainText(picked.output).includes('选择目标dshprofile'), false, '预置 profile 时不得渲染 profile 选择提示');
+  assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'dev', 'add', PKG]]);
+  const lockfile = readLockfileAt(project);
+  assert.deepEqual(lockfile.plugins[PKG].profile, 'dev');
+});
+
+test('[FR-1] PTY plugin add 条目以正名呈现、提示为包 description，完成摘要逐条列对账结果', async (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['dev']);
   const shimDir = makeShimDir(t, ['dsh']);
@@ -280,36 +415,36 @@ test('[FR-1] 交互第二层条目以正名呈现、提示为包 description，�
   // 期望字面独立来源：agents/dsh/plugins/dsh-demo/package.json（正名 = name、提示 = description、版本随包）
   const demoPkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
 
-  // 第一层 DOWN 到插件 → ENTER；第二层 SPACE 勾选 → ENTER；第三层回车选 dev
   const picked = await runInteractiveIn(
     project,
-    ['\x1b[B', '\r', ' ', '\r', '\r'],
+    [' ', '\r', '\r'],
     { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
-    ['选择要安装的资产类型', '', '选择要安装的插件', '', '选择目标 dsh profile'],
+    ['选择要安装的插件', '', '选择目标 dsh profile'],
+    'plugin add',
   );
   assert.equal(picked.code, 0, '交互插件安装应成功退出');
 
   const plain = plainText(picked.output);
-  assert.ok(plain.includes(demoPkg.name), `第二层应以正名呈现条目：${demoPkg.name}`);
-  assert.ok(plain.includes(demoPkg.description.replace(/\s+/g, '')), `第二层提示应为包 description：${demoPkg.description}`);
+  assert.ok(plain.includes(demoPkg.name), `条目应以正名呈现：${demoPkg.name}`);
+  assert.ok(plain.includes(demoPkg.description.replace(/\s+/g, '')), `条目提示应为包 description：${demoPkg.description}`);
   assert.ok(
     plain.includes(`已安装插件${demoPkg.name}@${demoPkg.version}→dshprofiledev（对账：依赖行+bundles行齐备）`),
     '完成摘要应逐条列插件名/版本与对账状态',
   );
 });
 
-test('[FR-3|异常流B] 交互三层选 desktop：拒装并说明官方保留名，不执行官方命令、不写锁文件', async (t) => {
+test('[FR-4] PTY plugin add 选 desktop profile：拒装并说明官方保留名、零官方调用、零锁文件', async (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['desktop', 'dev']); // 按名排序 desktop 居首，回车即选中它
   const shimDir = makeShimDir(t, ['dsh']);
   const shimLog = makeShimLog(t);
 
-  // 同款三层按键：类型→插件→profile；第三层回车选排序首项 desktop
   const picked = await runInteractiveIn(
     project,
-    ['\x1b[B', '\r', ' ', '\r', '\r'],
+    [' ', '\r', '\r'],
     { DSH_HOME: dshHome, DSH_SHIM_LOG: shimLog, PATH: `${shimDir}${path.delimiter}${process.env.PATH}` },
-    ['选择要安装的资产类型', '', '选择要安装的插件', '', '选择目标 dsh profile'],
+    ['选择要安装的插件', '', '选择目标 dsh profile'],
+    'plugin add',
   );
   const output = picked.output.replace(ANSI_RE, '');
   assert.equal(picked.code, 1, '交互选 desktop 应拒装（退出码 1）');
@@ -317,4 +452,39 @@ test('[FR-3|异常流B] 交互三层选 desktop：拒装并说明官方保留名
   assert.match(output, /保留/, '应说明官方保留名行为');
   assert.equal(fs.existsSync(shimLog), false, '拒装不得执行任何官方命令');
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '拒装不得写锁文件');
+});
+
+// ---------- 旧旗标并存过渡态回归（接线复用后行为零变化；硬切退役归 20261116-bfcf）----------
+
+test('[过渡] --plugins --profile 免交互安装全链（旧旗标路径与 plugin add 单源运行时）', (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+
+  const { code, stderr } = runCliIn(project, ['--plugins', PKG, '--profile', 'dev'], {
+    DSH_HOME: dshHome,
+    DSH_SHIM_LOG: shimLog,
+    PATH: `${shimDir}${path.delimiter}${process.env.PATH}`,
+  });
+  assert.equal(code, 0, `旧旗标安装应成功退出：${stderr}`);
+  assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'dev', 'add', PKG]]);
+  const lockfile = readLockfileAt(project);
+  assert.deepEqual(lockfile.plugins[PKG].profile, 'dev');
+});
+
+test('[过渡] --plugins 缺 --profile：三行结构（旧形态示例行），与 plugin add 新示例行区分', (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+
+  const { code, stderr } = runCliIn(project, ['--plugins', PKG], { DSH_HOME: dshHome });
+  assert.equal(code, 1);
+  assert.equal(
+    stderr,
+    [
+      '✗ 插件安装需要 --profile <名> 指定目标 dsh profile。',
+      '  既有 profile：dev',
+      '  示例：npx @hankchen/infra --plugins @hankchen/dsh-demo --profile dev',
+    ].join('\n') + '\n',
+  );
 });
