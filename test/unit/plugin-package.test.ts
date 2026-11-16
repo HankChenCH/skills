@@ -21,10 +21,26 @@ async function readPluginJson(name: string) {
   return JSON.parse(await readPluginFile(name));
 }
 
-test('demo 包名与版本：@hankchen/dsh-demo 0.1.1（0.1.0 已发布且含坏清单，npm 同版本不可重发）', async () => {
+test('demo 包名与版本：registry 可发布形态——@hankchen/dsh-demo、合法 semver 且高于已烧版 0.1.0', async () => {
   const pkg = await readPluginJson('package.json');
   assert.equal(pkg.name, PLUGIN_NAME);
-  assert.equal(pkg.version, '0.1.1');
+  // 版本断言降耦合（票 20261116-94c1）：钉死 0.1.1 使每次升版发布必红——改断言合法
+  // semver 形 + 耐久约束（高于已烧版 0.1.0，npm 同版本不可重发）；当前值一致性由
+  // 既有 e2e 落盘版本断言承载（票 20261115-dafb）
+  assert.match(
+    String(pkg.version),
+    /^\d+\.\d+\.\d+(-[\w.]+)?$/,
+    `版本须为合法 semver，实际：${pkg.version}`,
+  );
+  // 序数比较：两侧同一纯编码（major*10^6+minor*10^3+patch），目标 = 已烧版字面量 '0.1.0'
+  const semverCode = (v: string): number => {
+    const [major, minor, patch] = v.split('.').map(Number);
+    return major * 1_000_000 + minor * 1_000 + patch;
+  };
+  assert.ok(
+    semverCode(String(pkg.version)) > semverCode('0.1.0'),
+    `版本须高于已烧版 0.1.0（npm 同版本不可重发），实际：${pkg.version}`,
+  );
 });
 
 test('demo 包四要素齐备（源码态）：type module、main 直指 .ts 模块、files 含 .ts 与清单、dsh.bundle.patch', async () => {
