@@ -3,6 +3,12 @@
 本项目的所有显著变更记录于此。
 格式遵循 Keep a Changelog（https://keepachangelog.com），版本遵循语义化版本。
 
+## [v0.2.1] - 2026-11-17
+
+### Fixed
+
+- 发布 bin 元数据脱钩：`npm publish` 目录直发在打包后重读磁盘清单作上传元数据，registry 0.2.0 元数据 bin=`bin/infra.ts` 而 tarball 包内已换载为 `bin/infra.js`，npx 按元数据建 bin 链接即挂 `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`（票 20261116-c1d6）——修复：verify-pack 新增常驻 bin 查（包内清单 bin 必须指 `.js` 且目标在包内）+ `prepublishOnly` 门封死目录直发（npm/pnpm 双通道实证均被拦），唯一放行通道改 tarball 三步 `pnpm pack → pnpm run verify:pack <tgz> → npm publish <tgz>`；maintainer-guide 与 ADR 20261115-f143 附注同步发布通道
+
 ## [v0.2.0] - 2026-11-16
 
 ### Added
