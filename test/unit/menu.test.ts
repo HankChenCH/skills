@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { typeOptions, skillOptions } from '../../src/menu.ts';
-import { ASSET_MAP } from '../../src/asset-map.ts';
+import { typeOptions, skillOptions } from '../../src/kernel/menu.ts';
+import { ASSET_MAP } from '../../src/kernel/asset-map.ts';
 
 // 旗标解析与 --help 断言已随 commander 迁移（工单 20261115-eed0）迁至 test/unit/cli.test.ts。
 

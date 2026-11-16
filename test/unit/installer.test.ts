@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { installAssets } from '../../src/installer.ts';
-import type { InstallRow } from '../../src/installer.ts';
-import { readLockfile, lockfilePath, LOCKFILE_NAME } from '../../src/lockfile.ts';
+import { installAssets } from '../../src/kernel/installer.ts';
+import type { InstallRow } from '../../src/kernel/installer.ts';
+import { readLockfile, lockfilePath, LOCKFILE_NAME } from '../../src/kernel/lockfile.ts';
 
 // 测试用映射行：与 ASSET_MAP 技能行同构（表驱动分发用合成行复验，见末测试）
 const SKILL_ROW = {

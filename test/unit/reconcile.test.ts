@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { reconcilePluginInstall } from '../../src/reconcile.ts';
+import { reconcilePluginInstall } from '../../src/kernel/reconcile.ts';
 
 // 安装后对账（spec 20261115-495e 实现决策「安装后对账」+ docs/plugin-assets.md §2.3）：
 // 逐插件读目标 profile 的 package.json，断言两处落点——dependencies 含该包、

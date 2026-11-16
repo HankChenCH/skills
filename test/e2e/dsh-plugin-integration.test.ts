@@ -15,7 +15,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assertPluginPreconditions, commandExists } from '../../src/dsh-command.ts';
+import { assertPluginPreconditions, commandExists } from '../../src/kernel/dsh-command.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');

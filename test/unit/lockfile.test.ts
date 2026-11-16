@@ -9,7 +9,7 @@ import {
   readLockfile,
   writeLockfile,
   LOCKFILE_NAME,
-} from '../../src/lockfile.ts';
+} from '../../src/kernel/lockfile.ts';
 
 function makeSkillDir(t: TestContext, files: Record<string, string>) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-lock-'));
