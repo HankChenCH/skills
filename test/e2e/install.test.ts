@@ -299,7 +299,7 @@ test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文�
   const project = makeTargetProject(t);
   const binIn = (root: string) => path.join(root, 'node_modules', '@hankchen/infra', 'bin', 'infra.js');
 
-  // 安装版本 A（模拟 npx @hankchen/infra@0.1.0）；r 依次承载 npm install / runCli（含 code）/ node 直跑结果
+  // 安装版本 A（模拟 npx @hankchen/infra@<根包当前版本>，tarballA 打自仓库根）；r 依次承载 npm install / runCli（含 code）/ node 直跑结果
   let r: { status?: number | null; code?: number | null; stdout?: string; stderr?: string; error?: Error | undefined } = spawnSync('npm', ['install', '--prefer-offline', '--no-audit', '--no-fund', tarballA], {
     cwd: project,
     encoding: 'utf8',
