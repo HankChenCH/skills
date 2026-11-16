@@ -11,6 +11,12 @@
 //       卷入包，装出去即悬空链接/异机路径的结构性坏包——逐条列出即拒绝；
 //   查 2 每个仓库插件目录过 bundle 清单校验（复用 scripts/verify-bundle.ts；
 //       查 1 成立时包内内容 = 仓库内容，校验仓库目录即校验发出去的内容）。
+// bin 查（票 20261116-c1d6，falsified-form-gate.md 证伪形态常驻门）：包内 package.json 的
+//   bin.infra 必须指 .js 且目标文件在包内——bin 入口指 .ts 等非 .js 形态时，安装/执行链在
+//   node_modules 下执行 TypeScript 被 node 拒绝（ERR_UNSUPPORTED_NODE_MODULES_TYPE_
+//   STRIPPING），0.2.0 已实证 npx 主流程不可用；发布元数据通道（目录直发时元数据≠包内清单）
+//   由 prepublishOnly 门 scripts/publish-gate.ts 封死，放行通道 npm publish <tgz> 的元数据
+//   即包内清单，故本查是 bin 形态的唯一判定点。
 // 发布流程属单向门，本入口供 dev-release / 维护者在 `pnpm pack` 之后、`pnpm publish` 之前调用
 // （pnpm 12 起 `pnpm run` 原样转发 `--`，传参不带 `--`）：
 //
@@ -51,6 +57,54 @@ if (list.error || list.status !== 0) {
   console.error(`✗ 无法读取 tarball：${reason}（${exitNote}）`);
   process.exit(1);
 }
+
+// ---------- bin 查：包内 package.json 的 bin.infra 必须指 .js 且目标文件在包内 ----------
+// 读的是 tarball 内清单真身（清单行只知存在、不知内容）， tar -xO 抽出后解析。
+const manifestEntry = 'package/package.json';
+const listLines = list.stdout.split('\n');
+if (!listLines.includes(manifestEntry)) {
+  console.error(`✗ 包内缺 ${manifestEntry}——bin 查无从进行（包体无清单即结构性坏包），拒绝发布`);
+  process.exit(1);
+}
+const manifestExtract = spawnSync('tar', ['-xzf', tarball, '-O', manifestEntry], {
+  encoding: 'utf8',
+  maxBuffer: 10 * 1024 * 1024,
+});
+if (manifestExtract.error || manifestExtract.status !== 0 || manifestExtract.stdout.trim() === '') {
+  // spawn 失败/退出码/信号终止三态留痕（票 20261116-d30c 同法：原因取 error 优先，不拼 null 空壳）
+  const reason =
+    manifestExtract.error?.message || manifestExtract.stderr?.trim() || '（无 stderr）';
+  console.error(`✗ 无法读取包内 ${manifestEntry}：${reason}，拒绝发布`);
+  process.exit(1);
+}
+let packedManifest: { bin?: unknown };
+try {
+  packedManifest = JSON.parse(manifestExtract.stdout) as { bin?: unknown };
+} catch (err) {
+  console.error(
+    `✗ 包内 ${manifestEntry} 不是合法 JSON：${err instanceof Error ? err.message : String(err)}，拒绝发布`,
+  );
+  process.exit(1);
+}
+const binInfra = (packedManifest.bin as Record<string, unknown> | undefined)?.infra;
+const binPath = typeof binInfra === 'string' && binInfra !== '' ? binInfra : null;
+const binTargetInPackage = binPath !== null && listLines.includes(`package/${binPath}`);
+if (binPath === null || !binPath.endsWith('.js') || !binTargetInPackage) {
+  console.error(
+    `✗ 包内 package.json bin.infra = ${JSON.stringify(binInfra ?? null)}，拒绝发布（证伪形态常驻门，票 20261116-c1d6）：`,
+  );
+  if (binPath === null) {
+    console.error('  bin 字段或 infra 键缺失——安装面无 bin 入口，npx 无从执行');
+  } else if (!binPath.endsWith('.js')) {
+    console.error(
+      `  指 ${binPath}——非 .js 形态：node 对 node_modules 下 .ts 一律拒绝剥类型（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING，无旗标逃生），bin 入口执行即挂——0.2.0 已实证 npx 主流程不可用`,
+    );
+  } else {
+    console.error(`  指 ${binPath} 但 package/${binPath} 不在包内——悬空 bin，装出去入口即缺文件`);
+  }
+  process.exit(1);
+}
+console.log(`✓ 对账通过：包内 package.json bin.infra 指 ${binPath} 且 ${binPath} 在包内`);
 
 // tarball 内技能 = 含 package/skills/<名>/SKILL.md 的目录名
 const packed = new Set<string>();

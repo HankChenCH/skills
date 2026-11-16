@@ -26,15 +26,19 @@ async function makeTempRoot(t: TestContext) {
 // （agents/<宿主>/plugins/<插件目录>/ 两级布局随仓库原样进包）。
 // options：omitPlugin（从包内抽走某插件使其缺席）、addExtraPlugin（塞进仓库没有的幽灵插件）、
 // injectNodeModules（成员内嵌 node_modules——RQ2 异常流 A #3 的卷入通道：pnpm install 后
-// 成员目录生成的 node_modules 被 files 白名单卷入包）。
+// 成员目录生成的 node_modules 被 files 白名单卷入包）、
+// binForm（根清单 bin 查 fixture，票 20261116-c1d6——'js' 真实 pack 换载后形态：bin.infra=
+// bin/infra.js 且 bin/infra.js 在包内；'ts' prepack 换载失效的回归形态：bin.infra 指 .ts；
+// 'dangling' bin.infra 指 .js 但 bin/infra.js 不在包内；'absent' 清单缺 bin 字段）。
 // 抽走/塞入均落在 dsh 宿主名下——fixture 镜像本仓库现态（唯一宿主 dsh），多宿主接入时随仓库扩展。
 async function stageTarball(
   root: string,
-  { omitPlugin = null, addExtraPlugin = false, injectNodeModules = false, injectNodeModulesSymlink = false }: {
+  { omitPlugin = null, addExtraPlugin = false, injectNodeModules = false, injectNodeModulesSymlink = false, binForm = 'js' }: {
     omitPlugin?: string | null;
     addExtraPlugin?: boolean;
     injectNodeModules?: boolean;
     injectNodeModulesSymlink?: boolean;
+    binForm?: 'js' | 'ts' | 'dangling' | 'absent';
   } = {},
 ) {
   const stage = path.join(root, 'stage', 'package');
@@ -80,6 +84,17 @@ async function stageTarball(
     await mkdir(nm, { recursive: true });
     await symlink(path.join('..', '..', '..', '..', '..', '..', 'shared-store', 'link-form-pkg'), path.join(nm, 'link-form-pkg'));
   }
+  // 根清单 + bin 编译产物按 binForm 镜像真实 pack 产物（票 20261116-c1d6）：bin 查读的是
+  // 包内 package.json 真身与包内文件行，fixture 必须给到这两处。
+  const manifest: Record<string, unknown> = { name: '@hankchen/infra', version: '0.0.0-fixture' };
+  if (binForm !== 'absent') {
+    manifest.bin = { infra: binForm === 'ts' ? 'bin/infra.ts' : 'bin/infra.js' };
+  }
+  await writeFile(path.join(stage, 'package.json'), `${JSON.stringify(manifest)}\n`);
+  if (binForm === 'js' || binForm === 'ts') {
+    await mkdir(path.join(stage, 'bin'), { recursive: true });
+    await writeFile(path.join(stage, 'bin', binForm === 'ts' ? 'infra.ts' : 'infra.js'), '#!/usr/bin/env node\n');
+  }
   const tarball = path.join(root, 'fixture.tgz');
   spawnSync('tar', ['-czf', tarball, '-C', path.dirname(stage), 'package']);
   return tarball;
@@ -99,6 +114,39 @@ test('对账通过：包内插件 = 仓库插件且每插件过校验，skills �
   assert.match(result.stdout, /✓ 对账通过：包内技能清单 = 仓库 skills\/ 清单/, '既有 skills 对账输出不变');
   assert.match(result.stdout, /✓ 对账通过：包内插件清单 = 仓库 agents\/\*\/plugins\/ 清单/, '插件清单对账应有独立通过行');
   assert.match(result.stdout, /bundle 校验/, '插件过校验应在通过行言明');
+  assert.match(
+    result.stdout,
+    /✓ 对账通过：包内 package\.json bin\.infra 指 bin\/infra\.js 且 bin\/infra\.js 在包内/,
+    'bin 查应通过并言明包内目标',
+  );
+});
+
+test('包内清单 bin.infra 指 .ts 即拒绝发布：证伪形态常驻门（registry 0.2.0 npx 命中拒剥类型）', async (t) => {
+  // 证伪形态 fixture（falsified-form-gate.md：fixture 钉住、缺陷信息引用证伪报告，skip 不存在）：
+  // bin.infra 指 .ts = prepack 换载失效/被移除的回归形态——装出去 npx 按清单建 bin 链接执行
+  // node_modules 下 .ts，node 拒绝剥类型（ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING），
+  // 0.2.0 已实证 npx 主流程不可用。
+  const tarball = await stageTarball(await makeTempRoot(t), { binForm: 'ts' });
+  const result = runVerifyPack(tarball);
+  assert.equal(result.status, 1, `bin 指 .ts 应拒绝发布，实际退出码 ${result.status}：${result.stdout}`);
+  assert.match(result.stderr, /bin\.infra/, '拒绝信息应点名 bin.infra 字段');
+  assert.match(result.stderr, /bin\/infra\.ts/, '拒绝信息应给出实际指向');
+  assert.match(result.stderr, /ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING/, '缺陷信息应引用证伪报告');
+});
+
+test('包内清单 bin.infra 指 .js 但目标不在包内即拒绝发布：悬空 bin 装出去即坏', async (t) => {
+  const tarball = await stageTarball(await makeTempRoot(t), { binForm: 'dangling' });
+  const result = runVerifyPack(tarball);
+  assert.equal(result.status, 1, `悬空 bin 应拒绝发布，实际退出码 ${result.status}：${result.stdout}`);
+  assert.match(result.stderr, /bin\.infra/, '拒绝信息应点名 bin.infra 字段');
+  assert.match(result.stderr, /不在包内/, '拒绝信息应言明悬空（目标缺包）');
+});
+
+test('包内清单缺 bin 字段即拒绝发布：npx 主通道无入口', async (t) => {
+  const tarball = await stageTarball(await makeTempRoot(t), { binForm: 'absent' });
+  const result = runVerifyPack(tarball);
+  assert.equal(result.status, 1, `缺 bin 字段应拒绝发布，实际退出码 ${result.status}：${result.stdout}`);
+  assert.match(result.stderr, /bin/, '拒绝信息应点名 bin');
 });
 
 test('包内缺仓库有的插件即拒绝发布：退出码 1 并点名缺失插件的复合键', async (t) => {
