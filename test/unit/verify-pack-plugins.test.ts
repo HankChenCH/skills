@@ -8,7 +8,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, rm, cp, readdir, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, rm, cp, readdir, readFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,10 +30,11 @@ async function makeTempRoot(t: TestContext) {
 // 抽走/塞入均落在 dsh 宿主名下——fixture 镜像本仓库现态（唯一宿主 dsh），多宿主接入时随仓库扩展。
 async function stageTarball(
   root: string,
-  { omitPlugin = null, addExtraPlugin = false, injectNodeModules = false }: {
+  { omitPlugin = null, addExtraPlugin = false, injectNodeModules = false, injectNodeModulesSymlink = false }: {
     omitPlugin?: string | null;
     addExtraPlugin?: boolean;
     injectNodeModules?: boolean;
+    injectNodeModulesSymlink?: boolean;
   } = {},
 ) {
   const stage = path.join(root, 'stage', 'package');
@@ -70,6 +71,13 @@ async function stageTarball(
     await writeFile(path.join(nested, 'package.json'), '{"name":"sisteransi","version":"0.0.0"}');
     await mkdir(path.join(nested, 'lib'), { recursive: true });
     await writeFile(path.join(nested, 'lib', 'index.js'), 'export {};\n');
+  }
+  if (injectNodeModulesSymlink) {
+    // 相对符号链接形态（RQ2 问②：真实 pack 对相对链接以链接条目入包）——镜像 pnpm 成员
+    // node_modules 指向 store 的链接形态，条目路径指包外
+    const nm = path.join(stage, 'agents', 'dsh', 'plugins', 'dsh-demo', 'node_modules');
+    await mkdir(nm, { recursive: true });
+    await symlink(path.join('..', '..', '..', '..', '..', 'shared-store', 'link-form-pkg'), path.join(nm, 'link-form-pkg'));
   }
   const tarball = path.join(root, 'fixture.tgz');
   spawnSync('tar', ['-czf', tarball, '-C', path.dirname(stage), 'package']);
@@ -157,4 +165,13 @@ test('tar 不可执行时拒绝发布且报错带 spawn 失败原因与退出码
   assert.equal(result.status, 1, `应拒绝发布退出 1，实际 ${result.status}：${result.stdout}`);
   assert.match(result.stderr, /ENOENT|spawn/, '报错应含 spawn 失败的具体原因（现状 null 即本票红态）');
   assert.match(result.stderr, /退出码/, '报错应含退出码段（spawn 失败时显式标未知）');
+});
+
+test('包内混入 node_modules 的相对符号链接条目同样被禁入查拦截', async (t) => {
+  // RQ2 问②实测：相对链接以链接条目入包——对账只看清单行，链接形态与真实文件形态都该拦
+  //（fixture 注释声明两形态，此前链接形态从未构造——票 20261116-94c1 补覆盖）
+  const tarball = await stageTarball(await makeTempRoot(t), { injectNodeModulesSymlink: true });
+  const result = runVerifyPack(tarball);
+  assert.equal(result.status, 1, `含链接形态坏包应拒绝发布，实际 ${result.status}：${result.stdout}`);
+  assert.match(result.stderr, /node_modules\/link-form-pkg/, '拒绝清单应点名符号链接条目');
 });
