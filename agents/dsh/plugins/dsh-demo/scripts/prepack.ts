@@ -61,7 +61,11 @@ function runPrepack(): void {
   if (diagnostics.length > 0) {
     console.error(`✗ prepack：编译诊断 ${diagnostics.length} 条，中止打包：`);
     for (const diagnostic of diagnostics) {
-      console.error(`  - ${typescript.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`);
+      // 诊断行带 file:line 定位（比照根包 scripts/prepack.ts 先例）：编译失败可直接定位坏行
+      const position = diagnostic.file
+        ? `${path.relative(pluginRoot, diagnostic.file.fileName)}:${typescript.getLineAndCharacterOfPosition(diagnostic.file, diagnostic.start ?? 0).line + 1}`
+        : '（无文件）';
+      console.error(`  - ${position}：${typescript.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`);
     }
     process.exit(1);
   }
