@@ -16,6 +16,8 @@ import { renderHelp } from '../../src/cli.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');
+// 根包版本单一事实源（票 20261116-0fdd）：锁文件 packageVersion 断言期望值随根 package.json 走，字面量退役
+const rootVersion = (JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')) as { version: string }).version;
 const REPO_SKILLS = path.join(packageRoot, 'skills');
 
 // 交互路径勾选目标（按技能名排序后的下标）：design-brief=1、dev-clarify=5，两者 references/ 齐备
@@ -163,7 +165,7 @@ test('[FR-1] 交互安装后锁文件记账：包版本 + 逐技能指纹/安装
     fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'),
   );
   assert.equal(lockfile.package, '@hankchen/infra');
-  assert.equal(lockfile.packageVersion, '0.1.0');
+  assert.equal(lockfile.packageVersion, rootVersion, '锁文件记录所装包的实际版本（=根 package.json）');
   assert.deepEqual(Object.keys(lockfile.skills).sort(), [...PICK_NAMES].sort());
   for (const entry of Object.values(lockfile.skills)) {
     assert.match(entry.fingerprint, /^[0-9a-f]{64}$/);
@@ -306,7 +308,7 @@ test('[FR-5] 本地双版本 tarball：指定版本安装对应内容、锁文�
   r = runCli(project, ['--skills', PICK_NAMES[0]]);
   assert.equal(r.code, 0, `版本 A 安装失败：${r.stderr}`);
   let lockfile = JSON.parse(fs.readFileSync(path.join(project, '.infra-lock.json'), 'utf8'));
-  assert.equal(lockfile.packageVersion, '0.1.0', '锁文件应记录版本 A');
+  assert.equal(lockfile.packageVersion, rootVersion, '锁文件应记录版本 A（=根 package.json，tarballA 打自仓库根）');
   const contentA = fs.readFileSync(path.join(project, '.agents/skills', PICK_NAMES[0], 'SKILL.md'), 'utf8');
   assert.ok(!contentA.includes('v0.2.0 标记'), '版本 A 落盘不应含版本 B 标记');
 
