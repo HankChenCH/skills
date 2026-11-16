@@ -64,7 +64,8 @@ jobs:
         # 票 20261116-c5f5：上方全局 pnpm（npm install -g）落旧 node bin，setup-node 切版
         # 改写 PATH 后不在新 PATH——FR-5 集成红、FR-7 前置门 pnpm ENOENT。corepack 随
         # setup-node 版 node 分发，enable 按 packageManager 字段（钉 12.15.0）在新 bin
-        # 重建 pnpm shim，此后步骤链 pnpm 恒在 PATH。
+        # 重建 pnpm shim，此后步骤链 pnpm 恒在 PATH。远期：node 25 起不再捆绑 corepack，
+        # 升版 node 时本步需换 pnpm/action-setup 或显式安装（评审 20261116-75ad 折回）。
         run: corepack enable
 
       - name: Install expect for interactive e2e (missing expect would fail those tests red)
