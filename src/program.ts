@@ -1,21 +1,22 @@
-// 程序装配层（spec 20261116-2c58 分层拍板，票 20261116-f761）：组装 commander 程序、
-// 注册子命令（新增子命令 = 加 src/commands/<名>/ 目录 + 本文件注册一处）、前置分发。
+// 程序装配层（spec 20261116-2c58 分层拍板，票 20261116-f761/20261116-ccfb）：组装 commander
+// 程序、注册子命令（新增子命令 = 加 src/commands/<名>/ 目录 + 本文件注册一处）、前置分发。
 //
-// 过渡并存口径：argv 首个 token 为 `skill` → 新命令路径（src/commands/skill/）；顶层
-// -h/--help → 新命令面顶层帮助（skill add 用法示例先行呈现；plugin add 示例行随票
-// 20261116-ccfb 补、定稿断言随 20261116-bfcf）；其余 token（旧旗标 --all/--skills/--plugins
-// 与裸跑两层菜单）走 src/legacy-flags.ts 并存——硬切（旧旗标按未知旗标口径报错、两层菜单
-// 退役、未知命令/未知旗标 spec 新文案）归票 20261116-bfcf。
+// 过渡并存口径：argv 首个 token 为 `skill` 或 `plugin` → 新命令路径（src/commands/）；顶层
+// -h/--help → 新命令面顶层帮助（skill add 与 plugin add 用法示例；定稿断言随 20261116-bfcf）；
+// 其余 token（旧旗标 --all/--skills/--plugins 与裸跑两层菜单）走 src/legacy-flags.ts 并存——
+// 硬切（旧旗标按未知旗标口径报错、两层菜单退役、未知命令/未知旗标 spec 新文案）归票 20261116-bfcf。
 
 import { Command, CommanderError } from 'commander';
 
 import { configureCommandChannel } from './commands/channel.ts';
+import { createPluginCommand } from './commands/plugin/index.ts';
 import { createSkillCommand } from './commands/skill/index.ts';
 import { resolveProgramContext } from './context.ts';
 import type { ProgramContext } from './context.ts';
 import { runLegacyFlags } from './legacy-flags.ts';
 
-// 顶层帮助（过渡态命令面）：skill add 用法示例；plugin add 示例行随票 20261116-ccfb 补。
+// 顶层帮助（过渡态命令面）：skill add 与 plugin add 用法示例（plugin add 示例行随票
+// 20261116-ccfb 补齐；文本定稿断言随硬切票 20261116-bfcf）。
 export function renderTopHelp(): string {
   return `@hankchen/infra —— 套件资产初始化 CLI
 
@@ -24,16 +25,19 @@ export function renderTopHelp(): string {
   npx @hankchen/infra skill add                     # 交互勾选要安装的技能
   npx @hankchen/infra skill add --all               # 免交互安装全部技能
   npx @hankchen/infra@<semver> skill add <名...>    # 指定版本安装（锁文件记录该版本）
+  npx @hankchen/infra plugin add @hankchen/dsh-demo --profile dev   # 免交互安装插件到指定 dsh profile
 
 命令：
-  skill add [名...] [--all]    安装技能；名字空格或逗号分隔均可，--all 全装，无参进交互勾选
-  -h, --help                   显示对应层级帮助
+  skill add [名...] [--all]           安装技能；名字空格或逗号分隔均可，--all 全装，无参进交互勾选
+  plugin add [名...] --profile <名>   安装插件进 dsh profile；无参进交互勾选（desktop 为官方保留名拒装）
+  -h, --help                          显示对应层级帮助
 
 行为：
   - 技能实体拷入项目 .agents/skills/<技能名>/（SKILL.md 与 references/ 随包原样齐备）
   - 对项目内已存在的 agent 目录（.claude、.zcode 等）建相对软链；不存在者跳过并列入完成摘要
-  - 安装后在项目根写 .infra-lock.json 记账（包版本 + 逐技能指纹与安装时间）
-  - 重跑 skill add 即按当前包内容刷新已装技能并更新锁文件，无重复堆积`;
+  - 插件经宿主官方命令安装进指定 dsh profile（dsh 不在 PATH 自动改 npx @deepseek-ai/dsh），装后对账
+  - 安装后在项目根写 .infra-lock.json 记账（包版本 + 逐技能指纹/逐插件版本与安装时间）
+  - 重跑本命令即按当前包内容刷新已装资产并更新锁文件，无重复堆积`;
 }
 
 function createProgram(): Command {
@@ -50,6 +54,7 @@ async function runSubcommands(argv: string[], context: ProgramContext): Promise<
   const program = createProgram();
   let actionExitCode = 0;
   program.addCommand(createSkillCommand(context, (code) => { actionExitCode = code; }));
+  program.addCommand(createPluginCommand(context, (code) => { actionExitCode = code; }));
   try {
     await program.parseAsync(argv, { from: 'user' });
     return actionExitCode;
@@ -67,15 +72,15 @@ async function runSubcommands(argv: string[], context: ProgramContext): Promise<
   }
 }
 
-// 前置分发（过渡态并存口径）：顶层 -h/--help → 新命令面帮助；skill 前缀 → 新命令路径；
-// 其余 token → 旧旗标路径（含裸跑两层菜单）。
+// 前置分发（过渡态并存口径）：顶层 -h/--help → 新命令面帮助；skill/plugin 前缀 → 新命令
+// 路径；其余 token → 旧旗标路径（含裸跑两层菜单）。
 export async function run(argv: string[]): Promise<number> {
   const context = resolveProgramContext();
   if (argv.length > 0 && (argv[0] === '-h' || argv[0] === '--help')) {
     console.log(renderTopHelp());
     return 0;
   }
-  if (argv[0] === 'skill') {
+  if (argv[0] === 'skill' || argv[0] === 'plugin') {
     return runSubcommands(argv, context);
   }
   return runLegacyFlags(argv, context);
