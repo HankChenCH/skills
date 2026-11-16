@@ -36,8 +36,12 @@ function ensureRawModeOnTty(): void {
   }
 }
 
-// 旗标解析与交互选择共用安装选择形态：技能集或（插件集 + 目标 profile）。
-type Selection = { kind: 'skills'; skills: string[] } | { kind: 'plugins'; plugins: string[]; profile: string };
+// 旗标解析与交互选择共用安装选择形态：技能集或（插件集 + 目标 profile）或编目失败
+//（评审 20261116-ccfb：编目失败交 ✗ 通道 + 退出 1，取消/空选外无退出 0 豁免）。
+type Selection =
+  | { kind: 'skills'; skills: string[] }
+  | { kind: 'plugins'; plugins: string[]; profile: string }
+  | { kind: 'catalog-error'; message: string };
 
 async function interactiveSelect(context: ProgramContext): Promise<Selection | null> {
   clack.intro(`@hankchen/infra v${context.packageVersion} · 套件资产初始化`);
@@ -59,7 +63,10 @@ async function interactiveSelect(context: ProgramContext): Promise<Selection | n
   if (isCommandRow(row)) {
     // 插件条目多选 + profile 选择与 plugin add 命令单源（含编目失败/取消/空选/空名分支）
     const picked = await selectPluginsInteractive(context, undefined);
-    if (picked === null) {
+    if (picked.kind === 'catalog-error') {
+      return picked; // 编目失败上抛，由调用方走 ✗ 通道
+    }
+    if (picked.kind === 'cancel') {
       return null;
     }
     return { kind: 'plugins', plugins: picked.plugins, profile: picked.profile };
@@ -115,6 +122,10 @@ export async function runLegacyFlags(argv: string[], context: ProgramContext): P
     const selection = await interactiveSelect(context);
     if (selection === null) {
       return 0;
+    }
+    if (selection.kind === 'catalog-error') {
+      console.error(`✗ ${selection.message}`); // 编目失败统一 ✗ 通道 + 退出 1（取消/空选外无豁免）
+      return 1;
     }
     if (selection.kind === 'plugins') {
       return installPluginsAndRender({ plugins: selection.plugins, profile: selection.profile, context });

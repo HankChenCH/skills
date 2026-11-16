@@ -17,22 +17,28 @@ import type { InstallPluginsResult } from '../../kernel/plugin-install.ts';
 import { LOCKFILE_NAME } from '../../kernel/lockfile.ts';
 import { skillOptions } from '../../kernel/menu.ts';
 
+// 交互勾选结果（评审 20261116-ccfb 增量修正）：编目失败可区分返回，调用方走 ✗ 通道 +
+// 退出 1——spec「错误统一走 ✗ 通道 + 退出码 1」，取消/空选是唯一明文豁免（零落盘退 0），
+// 编目失败不在豁免之列；成功为所选组合。
+export type PluginInteractivePick =
+  | { kind: 'catalog-error'; message: string }
+  | { kind: 'cancel' }
+  | { kind: 'picked'; plugins: string[]; profile: string };
+
 // 插件条目多选（构造保留：按名排序、正名为包名、提示为包 description，与现行形态一致）。
-// 取消（Ctrl-C）与空选确认 → 提示后返回 null，调用方按 0 退出、零落盘（现行交互纪律）。
+// 取消（Ctrl-C）与空选确认 → 提示后返回 cancel，调用方按 0 退出、零落盘（现行交互纪律）。
 // presetProfile 非空时跳过 profile 提示（spec：`plugin add --profile dev` 无名进交互
 // 仅提示插件多选、不再提示 profile）；否则既有 profile 单选、无既有项输入新名。
 // desktop 在列表中出现但选它会在安装前置被拒（官方保留名，异常流 B）。
 export async function selectPluginsInteractive(
   context: ProgramContext,
   presetProfile: string | undefined,
-): Promise<{ plugins: string[]; profile: string } | null> {
+): Promise<PluginInteractivePick> {
   let catalog;
   try {
     catalog = listPlugins(context.packageRoot, findRow(ASSET_MAP, PLUGINS_TYPE));
   } catch (err) {
-    clack.log.error(err.message);
-    clack.outro('插件编目失败——未做任何改动。');
-    return null;
+    return { kind: 'catalog-error', message: err.message }; // 交调用方 ✗ 通道（错误统一退出 1）
   }
   const names = catalog.map((entry) => entry.name);
   const descriptions = Object.fromEntries(catalog.map((entry) => [entry.name, entry.description]));
@@ -43,11 +49,11 @@ export async function selectPluginsInteractive(
   });
   if (clack.isCancel(picked)) {
     clack.cancel('已取消，未做任何改动。');
-    return null;
+    return { kind: 'cancel' };
   }
   if (picked.length === 0) {
     clack.outro('未勾选任何插件——未做任何改动。');
-    return null;
+    return { kind: 'cancel' };
   }
 
   // profile 提示（预置跳过 / 既有单选 / 无既有输入新名）：clack 的 isCancel 守卫窄化依赖
@@ -65,7 +71,7 @@ export async function selectPluginsInteractive(
       });
       if (clack.isCancel(picked)) {
         clack.cancel('已取消，未做任何改动。');
-        return null;
+        return { kind: 'cancel' };
       }
       profile = picked;
     } else {
@@ -74,18 +80,18 @@ export async function selectPluginsInteractive(
       });
       if (clack.isCancel(entered)) {
         clack.cancel('已取消，未做任何改动。');
-        return null;
+        return { kind: 'cancel' };
       }
       profile = String(entered).trim();
       if (profile === '') {
         clack.cancel('profile 名为空——未做任何改动。');
-        return null;
+        return { kind: 'cancel' };
       }
     }
   }
 
   clack.log.step(`已选 ${picked.length} 项：${picked.join('、')} → profile ${profile}`);
-  return { plugins: [...picked], profile };
+  return { kind: 'picked', plugins: [...picked], profile };
 }
 
 // 编目校验所选正名（不套件包内即报错列清单、零落盘）→ 前置检查 → 逐条转发官方命令 →

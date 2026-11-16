@@ -76,10 +76,14 @@ export async function runPluginAdd({
     case 'interactive': {
       clack.intro(`@hankchen/infra v${context.packageVersion} · 插件安装`);
       const picked = await selectPluginsInteractive(context, selection.presetProfile);
-      if (picked === null) {
+      if (picked.kind === 'catalog-error') {
+        console.error(`✗ ${picked.message}`); // 编目失败统一 ✗ 通道 + 退出 1（取消/空选外无豁免）
+        return 1;
+      }
+      if (picked.kind === 'cancel') {
         return 0; // 取消 / 空选：零落盘
       }
-      return installPluginsAndRender({ ...picked, context });
+      return installPluginsAndRender({ plugins: picked.plugins, profile: picked.profile, context });
     }
     case 'names':
       return installPluginsAndRender({ plugins: selection.names, profile: selection.profile, context });
