@@ -235,6 +235,8 @@ npm 包 `@hankchen/infra` 的包根即仓库根，skills/ 全量随包分发。�
 
 依赖维护节奏：CLI 解析依赖 commander 锁 minor（`package.json` 钉 `^15.1.0`），官方 major 年更——14→15 间隔 12 个月，15 系已移除 `exitProcess` 改为 `exitOverride`（RQ3 调研实测先例，docs/research/cli-lib/ 报告 §10.4-4）。每年升 major 时以 `test/unit/cli.test.ts` 的十六案例等价矩阵（逐字节断言）为回归防线，全量 `pnpm test` 绿后再发版。
 
+推送交付后**观测 Actions run 至终态**（FR-2 回归门是集成级兑现点）：0s startup failure 类静默红没有通知机制，以 Actions 页 run 列表巡检兜底——run 红先于一切后续交付（复盘 20261116-8af4：workflow YAML 非法致 main 全红 8+ 小时无人察觉）。
+
 ## 文档
 
 | 文档 | 说明 |
