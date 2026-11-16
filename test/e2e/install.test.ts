@@ -10,9 +10,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 期望值来源：src/cli.ts 的 renderHelp（文本字节的对账锚在 test/unit/cli.test.ts 对
-// 迁移前参照 evidence/probe-ref-matrix.txt 的逐字转录，此处只对账通道形态）。
-import { renderHelp } from '../../src/cli.ts';
+// 期望值来源：src/program.ts 的 renderTopHelp（票 20261116-f761 新命令面顶层帮助；
+// 文本字节定稿锚随硬切票 20261116-bfcf，此处只对账通道形态）。
+import { renderTopHelp } from '../../src/program.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');
@@ -238,24 +238,44 @@ test('[FR-1] 重跑幂等：锁文件无重复条目、文件树不变', (t) => 
   assert.equal(Object.keys(beforeLock.skills).length, 1, '无重复条目');
 });
 
-test('[FR-6] --help 列明全部旗标与示例、退出码 0', (t) => {
-  const project = makeTargetProject(t);
-  const { code, stdout } = runCli(project, ['--help']);
-  assert.equal(code, 0);
-  for (const needle of ['--all', '--skills', '--help', 'npx @hankchen/infra']) {
-    assert.ok(stdout.includes(needle), `--help 输出应含 ${needle}`);
-  }
-});
-
-// 通道锚点（工单 20261115-eed0，RQ3 §10.3 出口通道映射）：文本字节由 test/unit/cli.test.ts
-// 对迁移前参照转录守卫；此处守卫真实入口的通道形态——stdout 载全文 + 恰一尾换行、
-// stderr 空、退出码 0（npx 裸跑入口的 --help 出口契约）。
-test('[FR-5] --help 通道逐字节：全文走 stdout、单尾换行、stderr 空', (t) => {
+// 帮助可用（票 20261116-f761）：顶层 -h/--help 打印新命令面顶层帮助（skill add 用法示例
+// 先行呈现；plugin add 示例行随票 20261116-ccfb 补），通道形态 = 全文走 stdout + 恰一尾
+// 换行 + stderr 空 + 退出码 0。文本定稿断言随硬切票 20261116-bfcf（过渡期只锚通道与
+// 关键形态标记，不做逐字节）。
+test('[FR-1] 顶层 --help 打印新命令面帮助：skill add 用法示例、退出码 0', (t) => {
   const project = makeTargetProject(t);
   const { code, stdout, stderr } = runCli(project, ['--help']);
   assert.equal(code, 0);
-  assert.equal(stdout, `${renderHelp()}\n`);
+  assert.equal(stdout, `${renderTopHelp()}\n`, '顶层帮助应全文走 stdout 且恰一尾换行');
   assert.equal(stderr, '');
+  for (const needle of ['skill add dev-spec,dev-plan', 'skill add --all', 'npx @hankchen/infra']) {
+    assert.ok(stdout.includes(needle), `顶层帮助应含新形态用法示例 ${needle}`);
+  }
+});
+
+test('[FR-1] 顶层 -h 与 --help 等价', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout } = runCli(project, ['-h']);
+  assert.equal(code, 0);
+  assert.equal(stdout, `${renderTopHelp()}\n`);
+});
+
+test('[FR-1] skill add --help 打印命令级帮助：用法与示例、退出码 0', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['skill', 'add', '--help']);
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  for (const needle of ['skill add [名...]', '--all', 'skill add dev-spec,dev-plan']) {
+    assert.ok(stdout.includes(needle), `skill add --help 应含 ${needle}`);
+  }
+});
+
+test('[FR-1] skill 无动词打印该命令帮助、退出码 0', (t) => {
+  const project = makeTargetProject(t);
+  const { code, stdout, stderr } = runCli(project, ['skill']);
+  assert.equal(code, 0);
+  assert.equal(stderr, '');
+  assert.ok(stdout.includes('add'), 'skill 命令帮助应列出 add 动词');
 });
 
 // 互斥报错三通道（RQ3 §6.3 矩阵参照 evidence/probe-ref-matrix.txt --all --skills dev-spec 行）：
