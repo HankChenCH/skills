@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 
 import * as clack from '@clack/prompts';
 
+// 安装内核十模块归位 src/kernel/（票 20261116-1875：行为等价迁移，仅 import 路径变化）；
+// cli.ts（旗标解析）尚未归位，后续命令面工单处置。
 import {
   ASSET_MAP,
   PLUGINS_TYPE,
@@ -20,20 +22,20 @@ import {
   findRow,
   isCommandRow,
   isInstallableRow,
-} from '../src/asset-map.ts';
-import type { CommandRow, CopyRow } from '../src/asset-map.ts';
-import { installAssets } from '../src/installer.ts';
-import type { InstallAssetsResult } from '../src/installer.ts';
-import { installPlugins } from '../src/plugin-install.ts';
-import type { InstallPluginsResult } from '../src/plugin-install.ts';
-import { commandExists, DSH_COMMAND } from '../src/dsh-command.ts';
-import { listProfiles, profilesRoot } from '../src/dsh-profiles.ts';
-import { AGENT_DIRS } from '../src/agent-dirs.ts';
-import { listEntries, listPlugins, readDescriptions } from '../src/catalog.ts';
-import { skillOptions, typeOptions } from '../src/menu.ts';
+} from '../src/kernel/asset-map.ts';
+import type { CommandRow, CopyRow } from '../src/kernel/asset-map.ts';
+import { installAssets } from '../src/kernel/installer.ts';
+import type { InstallAssetsResult } from '../src/kernel/installer.ts';
+import { installPlugins } from '../src/kernel/plugin-install.ts';
+import type { InstallPluginsResult } from '../src/kernel/plugin-install.ts';
+import { commandExists, DSH_COMMAND } from '../src/kernel/dsh-command.ts';
+import { listProfiles, profilesRoot } from '../src/kernel/dsh-profiles.ts';
+import { AGENT_DIRS } from '../src/kernel/agent-dirs.ts';
+import { listEntries, listPlugins, readDescriptions } from '../src/kernel/catalog.ts';
+import { skillOptions, typeOptions } from '../src/kernel/menu.ts';
 import { parseArgs, renderHelp } from '../src/cli.ts';
 import type { ParsedArgs } from '../src/cli.ts';
-import { LOCKFILE_NAME } from '../src/lockfile.ts';
+import { LOCKFILE_NAME } from '../src/kernel/lockfile.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageVersion = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')).version;

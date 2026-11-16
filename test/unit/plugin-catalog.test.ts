@@ -4,8 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { listPlugins } from '../../src/catalog.ts';
-import { ASSET_MAP, findRow } from '../../src/asset-map.ts';
+import { listPlugins } from '../../src/kernel/catalog.ts';
+import { ASSET_MAP, findRow } from '../../src/kernel/asset-map.ts';
 
 // 插件编目（spec 20261115-495e 实现决策「插件编目」+ spec 20261115-ed9f agents/ 两级枚举）：
 // command 类行的菜单条目来自枚举根下各宿主的 plugins/ 机制目录中各插件包的 package.json

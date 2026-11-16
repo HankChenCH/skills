@@ -4,9 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { installPlugins } from '../../src/plugin-install.ts';
-import type { CommandRunner } from '../../src/plugin-install.ts';
-import { readLockfile, writeLockfile, LOCKFILE_NAME } from '../../src/lockfile.ts';
+import { installPlugins } from '../../src/kernel/plugin-install.ts';
+import type { CommandRunner } from '../../src/kernel/plugin-install.ts';
+import { readLockfile, writeLockfile, LOCKFILE_NAME } from '../../src/kernel/lockfile.ts';
 
 // 批量插件安装编排（spec 20261115-495e 实现决策「命令组装与执行」批量语义 +「锁文件多类型」）：
 // 逐条顺序执行官方命令（执行体注入——本套件不实跑），装后对账，锁文件插件区按对账结果
