@@ -3,6 +3,25 @@
 本项目的所有显著变更记录于此。
 格式遵循 Keep a Changelog（https://keepachangelog.com），版本遵循语义化版本。
 
+## [v0.2.0] - 2026-11-16
+
+### Added
+
+- `skill add [名...]` 子命令：带名免交互安装（空格 variadic 与逗号分隔双收、并集保序去重）、`--all` 全装、无参 PTY 条目多选、取消/空选零落盘、未知名列可用清单、跨包版本重跑刷新、软链冲突跳过（spec 20261116-2c58 FR-1/FR-4，票 20261116-f761）
+- `plugin add [名...] --profile <名>` 子命令：无参交互（插件多选 + profile 单选/无既有项输入新名）、无名预置 profile、缺 `--profile` 三行结构报错、`desktop` 官方保留名拒装 shim 零调用、dsh 不在 PATH 自动 npx 回退、装后对账 + 锁文件记账（spec 20261116-2c58 FR-1/FR-4，票 20261116-ccfb）
+- 分级帮助：顶层 `--help`（含 `skill add` / `plugin add` 用法示例）+ 逐命令 `--help`；裸跑 / `skill` / `plugin` 无动词打印对应层级帮助退出 0；非 TTY 交互守卫文案（spec 20261116-2c58 FR-1/FR-3，票 20261116-f761/bfcf）
+- src 三层分层：`src/program.ts` 程序装配层 / `src/commands/<命令>/` 命令定义层 / `src/kernel/` 安装内核层，「新增子命令 = 加命令目录 + 装配层注册一处」由分层契约测试守护（spec 20261116-2c58 FR-5，票 20261116-1875/f761；ADR 20261116-af69）
+
+### Changed
+
+- **破坏性**：命令面硬切子命令形态——旧旗标 `--all` / `--skills` / `--plugins` 退役，改按未知旗标口径报错并指路 `--help`；两层交互菜单与旧旗标解析状态机整体退役（spec 20261116-2c58 FR-2 拍板 D3，票 20261116-bfcf）
+- README 与 docs/getting-started 命令示例改子命令形态，含 0.1.x 升级叙事（重跑 `skill add` 即刷新）；GLOSSARY 安装器词条补子命令描述（spec 20261116-2c58 FR-6，票 20261116-bfcf）
+- 包版本 0.1.1 → 0.2.0（0.x minor 承载破坏性变更，need A1；票 20261116-bfcf）
+
+### Fixed
+
+- setup-workspace 门禁遗留哨兵（run-tests.sh:3435）断言锚随内容迁往 docs/getting-started.md——README 拆分（324332f）遗留的 `check.sh all` 红灯（票 20261116-ae48）
+
 ## [v0.1.1] - 2026-11-16
 
 ### Added
