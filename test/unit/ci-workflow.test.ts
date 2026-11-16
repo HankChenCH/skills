@@ -308,7 +308,7 @@ test('node 24 取版声明在位：setup-node 读 .nvmrc，且 .nvmrc 钉住 nod
   );
 });
 
-test('步骤链契约齐备且有序：checkout → node setup → pnpm install --frozen-lockfile → typecheck → test → verify:pack', () => {
+test('步骤链契约齐备且有序：checkout → node setup → corepack enable → pnpm install --frozen-lockfile → typecheck → test → verify:pack', () => {
   const steps = readWorkflowSteps(readWorkflowDoc());
   const chain: Array<{ label: string; match: (s: Step) => boolean }> = [
     {
@@ -318,6 +318,10 @@ test('步骤链契约齐备且有序：checkout → node setup → pnpm install 
     {
       label: 'node setup（uses 钉完整 commit SHA）',
       match: (s) => typeof s.uses === 'string' && /^actions\/setup-node@[0-9a-f]{40}$/.test(s.uses),
+    },
+    {
+      label: 'pnpm shim 就位（corepack enable 于 node setup 之后：cache 取版的全局 pnpm 落旧 node bin，setup-node 切版改写 PATH 后须按 packageManager 钉的 12.15.0 在新 bin 重建 shim——票 20261116-c5f5）',
+      match: (s) => s.run === 'corepack enable',
     },
     {
       label: '依赖安装（pnpm install --frozen-lockfile；frozen 显式留痕，incompatible lockfile 红 = 防漂移的正确行为，RQ2 异常流 A #6）',
@@ -413,8 +417,10 @@ test('全文件无 secrets：结构无 secrets 键、原文无 secrets 表达式
 
 test('负向契约：workflow 不引用 plugins/ 目录路径，依赖安装不退回 npm install/ci', () => {
   const raw = fs.readFileSync(WORKFLOW_PATH, 'utf8');
+  // 契约面 = 执行行（YAML 注释非执行面，票 20261116-c5f5：注释提及 npm install -g 不算违规）
+  const execLines = raw.split('\n').filter((line) => !line.trim().startsWith('#'));
   // agents-layout §4.4 声明「全部步骤无 plugins/ 目录路径引用」——目录迁移契约此前无测试承载
-  const pluginPathLines = raw.split('\n').filter((line) => line.includes('plugins/'));
+  const pluginPathLines = execLines.filter((line) => line.includes('plugins/'));
   assert.deepEqual(
     pluginPathLines,
     [],
@@ -422,8 +428,7 @@ test('负向契约：workflow 不引用 plugins/ 目录路径，依赖安装不�
   );
   // 依赖安装纪律（票 20261115-d5f4）：pnpm install --frozen-lockfile——不得退回 npm；
   // 豁免 = npm install -g pnpm@<版>（runner 引导装 pnpm 本身，票 20261115-1a89 既定机制）
-  const npmDepLines = raw
-    .split('\n')
+  const npmDepLines = execLines
     .filter((line) => /\bnpm (install|ci)\b/.test(line) && !/npm install -g pnpm@/.test(line));
   assert.deepEqual(
     npmDepLines,
