@@ -24,6 +24,7 @@
     "typecheck": "tsc --noEmit",
     "prepack": "node scripts/prepack.ts",
     "postpack": "node scripts/postpack.ts",
+    "prepublishOnly": "node scripts/publish-gate.ts",
     "verify:pack": "node scripts/verify-pack.ts"
   },
   "dependencies": {
