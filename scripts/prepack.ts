@@ -122,7 +122,10 @@ function runPrepack(): void {
   let typescript: typeof import('typescript');
   try {
     typescript = createRequire(import.meta.url)('typescript');
-  } catch {
+  } catch (err) {
+    // 留痕吞掉的原因（票 20261116-d30c）：typescript 缺失是幂等门的预期分支，但
+    // node_modules 损坏等其它解析失败混同于此——一行 warn 说明走分支的真实原因
+    console.warn(`• prepack：typescript 不可解析（${err instanceof Error ? err.message : String(err)}），按幂等门分支处置`);
     const emitted = collectFiles(path.join(packageRoot, 'src'), '.js');
     const binJsExists = fs.existsSync(path.join(packageRoot, 'bin', 'infra.js'));
     if (!binJsExists || emitted.length === 0) {
