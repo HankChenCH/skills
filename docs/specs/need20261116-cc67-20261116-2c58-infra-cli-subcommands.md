@@ -1,10 +1,11 @@
 ---
 id: 20261116-2c58
-status: approved
+status: done
 need: 20261116-cc67
 round: 1
 created: 2026-11-16
 approved: 2026-11-16
+done: 2026-11-16
 ---
 # @hankchen/infra 子命令化 + src 命令目录式分层（round 1：单轮全量交付）
 
@@ -85,6 +86,12 @@ seam 清单（既有同类测试为先例）：
 - [FR-6 | 工单级] When 静态断言 README.md 与 docs/getting-started.md，Then 含 `skill add` 与 `plugin add` 形态示例与升级叙事、不含 `--skills`/`--plugins`/裸跑两层菜单旧形态；GLOSSARY 安装器词条含子命令形态描述。
 - [FR-1 | 集成级 | 承载票 NNNN] Given 维护者本机 dsh 可用，When 以 .ts 插件包经 `plugin add` 装进测试 profile 并真启动，Then 插件 apply 日志可见（前置门跳过纪律：无 dsh/registry 环境显式 skip 不假绿）。
 - [FR-1 | 集成级 | 人工：需包已发布至 npm registry 方可执行，发布属单向门在验收时点完成] Given 0.2.0 已发布，When 在全新项目跑 `npx @hankchen/infra@0.2.0 skill add <名>`，Then 安装成功、锁文件记录 0.2.0（留验收阶段人工执行）。
+
+**边界行为补充（round 1 验收实测定稿，蒸馏折回 20261116-dd67）**：
+- 裸 `--`（零操作数）与 `--skills=a` 等号赋值形 → 同未知旗标口径（全 token 入文案，如 `✗ 未知旗标「--skills=a」…`），退出码 1；
+- 命令组下未知动词（如 `skill foo`）→ 同未知命令口径，可用命令清单取实际注册动词（`可用命令：add`）；
+- `help <未知命令>` → 重发顶层帮助保可见，退出码随 commander（1）；
+- 无参交互路径遇编目失败 → ✗ 通道 + 退出码 1（与带名路径同口径；取消/空选仍是唯一退出码 0 豁免——ccfb 评审增量定稿）。
 
 ## 非目标
 
