@@ -1,6 +1,6 @@
 # SDLC 流程配置（本文件归用户所有；setup-workspace 重跑绝不覆盖）
 TRACKER=github
-TRACKER_REPO="HankChenCH/skills"
+TRACKER_REPO="HankChenCH/ai-infra"
 BASE_REF=main
 RUN_ENV=
 RUN_PREFIX=""
