@@ -260,3 +260,10 @@ docs/tickets/spec20261117-34d4-20261117-218b-infra-catalog-dsh-mcp.md	272	https:
 docs/tickets/spec20261117-34d4-20261117-975b-dsh-mcp-e2e-integration.md	273	https://github.com/HankChenCH/ai-infra/issues/273
 docs/tickets/spec20261117-34d4-20261117-dd1f-dsh-mcp-service-dual-entry.md	274	https://github.com/HankChenCH/ai-infra/issues/274
 docs/acceptance/spec20261117-34d4-20261118-ef01-dsh-mcp-round1.md	275	https://github.com/HankChenCH/ai-infra/issues/275
+docs/tickets/spec20261117-34d4-20261117-f2e3-dsh-test-serial-fix.md	277	https://github.com/HankChenCH/ai-infra/issues/277
+docs/tickets/spec20261117-34d4-20261118-2d72-dsh-mcp-api-shape-fix.md	278	https://github.com/HankChenCH/ai-infra/issues/278
+docs/needs/20261118-11f8-dsh-mcp-ui-management.md	279	https://github.com/HankChenCH/ai-infra/issues/279
+docs/tickets/spec20261118-0de6-20261118-322a-dsh-mcp-dock-writes.md	280	https://github.com/HankChenCH/ai-infra/issues/280
+docs/tickets/spec20261118-0de6-20261118-6df0-dsh-mcp-web-e2e.md	281	https://github.com/HankChenCH/ai-infra/issues/281
+docs/tickets/spec20261118-0de6-20261118-7504-dsh-mcp-client-carrier.md	282	https://github.com/HankChenCH/ai-infra/issues/282
+docs/tickets/spec20261118-0de6-20261118-1812-dsh-mcp-dock-readonly.md	283	https://github.com/HankChenCH/ai-infra/issues/283
