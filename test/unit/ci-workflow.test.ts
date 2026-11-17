@@ -454,6 +454,21 @@ test('packageManager 字段钉 pnpm@12.15.0——corepack enable 的 shim 版本
   assert.equal(pkg.packageManager, 'pnpm@12.15.0', `corepack shim 版本源自此字段，缺失或漂移即静默换版，实际：${pkg.packageManager}`);
 });
 
+test('scripts.test 串行形态：pnpm test 展开 = unit 先、e2e 后（文件即契约，评审 20261118-6352 建议 1 承接）', () => {
+  // CI「全量测试 pnpm test」步骤的实际执行面 = scripts.test 的展开形态：test/e2e/ 与
+  // test/unit/ 的互斥串行处置（插件票先 unit 后 e2e 的合回机制载体，fix 票 20261118-f2e3
+  // 定稿）要求两段齐全且顺序固定——改单段或换序都会静默丢失一段覆盖，故钉死串行字面量
+  // （先例：publish-gate.test.ts 断言 scripts.prepublishOnly 接线）。
+  const pkg = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8')) as {
+    scripts?: Record<string, string>;
+  };
+  assert.equal(
+    pkg.scripts?.test,
+    'pnpm run test:unit && pnpm run test:e2e',
+    `pnpm test 须串行先 unit 后 e2e（&& 串行、顺序固定，e2e 段缺失即静默丢覆盖），实际：${pkg.scripts?.test}`,
+  );
+});
+
 test('workflow 过严格 YAML 解析（真解析器防线，杜绝平纯标量含冒号空格类结构缺陷）', () => {
   // 票 20261116-0304 红绿：4de56c7 步名含未引号「cache: pnpm」（冒号+空格）——平纯标量
   // 非法，GitHub plan 阶段 0s startup failure 且自写解析器（本文件 KEY_RE）不校验此类。

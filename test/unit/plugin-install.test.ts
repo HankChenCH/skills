@@ -76,18 +76,25 @@ function install(t: TestContext, { plugins = [PKG], now = '2026-11-15T00:00:00Z'
   });
 }
 
-test('免交互安装全链：执行体收到的命令形态正确、对账通过、返回实际落盘版本', (t) => {
-  const projectRoot = makeProject(t);
-  const profilePath = makeProfileDir(t);
-  const sim = makeOfficialSim(t, profilePath);
+// 勾选转发安装对新包成立（spec 20261117-34d4 FR-6，票 20261117-218b）：两款真实插件包
+// 走同一条命令组装路径（命令形态逐项等值）；期望包名独立来源 = agents/dsh/plugins/
+// 包清单（编目正名，@hankchen/dsh-demo 与 @hankchen/dsh-mcp）。
+const REAL_PLUGIN_NAMES = [PKG, '@hankchen/dsh-mcp'];
 
-  const result = install(t, { projectRoot, profilePath, run: sim.run });
+for (const name of REAL_PLUGIN_NAMES) {
+  test(`免交互安装全链（${name}）：执行体收到的命令形态正确、对账通过、返回实际落盘版本`, (t) => {
+    const projectRoot = makeProject(t);
+    const profilePath = makeProfileDir(t);
+    const sim = makeOfficialSim(t, profilePath);
 
-  assert.deepEqual(result, { profile: 'dev', installed: [{ name: PKG, version: '0.1.0' }] });
-  assert.equal(sim.calls.length, 1, '官方命令应恰好执行一次');
-  assert.equal(sim.calls[0].command, 'dsh');
-  assert.deepEqual(sim.calls[0].args, ['plugin', '--profile', 'dev', 'add', PKG]);
-});
+    const result = install(t, { plugins: [name], projectRoot, profilePath, run: sim.run });
+
+    assert.deepEqual(result, { profile: 'dev', installed: [{ name, version: '0.1.0' }] });
+    assert.equal(sim.calls.length, 1, '官方命令应恰好执行一次');
+    assert.equal(sim.calls[0].command, 'dsh');
+    assert.deepEqual(sim.calls[0].args, ['plugin', '--profile', 'dev', 'add', name]);
+  });
+}
 
 test('dsh 不在 PATH：执行体收到 npx @deepseek-ai/dsh 形态', (t) => {
   const projectRoot = makeProject(t);
@@ -218,24 +225,30 @@ test('node 低于基线：第一时刻拒装，官方命令一次都不执行', 
   assert.equal(fs.existsSync(path.join(projectRoot, LOCKFILE_NAME)), false, '拒装不得写锁文件');
 });
 
-test('目标 profile 为 desktop：拒装，官方命令一次都不执行', (t) => {
-  const projectRoot = makeProject(t);
-  const profilePath = makeProfileDir(t);
-  const sim = makeOfficialSim(t, profilePath);
+// desktop 拒装对新包不变（spec 20261117-34d4 FR-6，票 20261117-218b）：官方保留名 profile
+// 的拒装前置对两款插件包同口径——拒装在任何官方命令执行前，不落锁文件。
+for (const name of REAL_PLUGIN_NAMES) {
+  test(`目标 profile 为 desktop：拒装，官方命令一次都不执行（${name}）`, (t) => {
+    const projectRoot = makeProject(t);
+    const profilePath = makeProfileDir(t);
+    const sim = makeOfficialSim(t, profilePath);
 
-  assert.throws(
-    () =>
-      installPlugins({
-        profile: 'desktop',
-        plugins: [PKG],
-        profilePath,
-        dshInPath: true,
-        projectRoot,
-        packageVersion: '0.1.0',
-        now: '2026-11-15T00:00:00Z',
-        run: sim.run,
-      }),
-    (err) => (err as Error).message.includes('desktop'),
-  );
-  assert.equal(sim.calls.length, 0, '拒装不得执行任何官方命令');
-});
+    assert.throws(
+      () =>
+        installPlugins({
+          profile: 'desktop',
+          plugins: [name],
+          profilePath,
+          dshInPath: true,
+          projectRoot,
+          packageVersion: '0.1.0',
+          now: '2026-11-15T00:00:00Z',
+          nodeVersion: 'v24.22.1',
+          run: sim.run,
+        }),
+      (err) => (err as Error).message.includes('desktop'),
+    );
+    assert.equal(sim.calls.length, 0, '拒装不得执行任何官方命令');
+    assert.equal(fs.existsSync(path.join(projectRoot, LOCKFILE_NAME)), false, '拒装不得写锁文件');
+  });
+}
