@@ -243,6 +243,7 @@ for (const name of REAL_PLUGIN_NAMES) {
           projectRoot,
           packageVersion: '0.1.0',
           now: '2026-11-15T00:00:00Z',
+          nodeVersion: 'v24.22.1',
           run: sim.run,
         }),
       (err) => (err as Error).message.includes('desktop'),
