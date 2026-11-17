@@ -44,6 +44,7 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
+import { load as loadYaml } from 'js-yaml';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -125,7 +126,7 @@ function probeConstellation(): { ok: false; reason: string } | { ok: true; dshVe
     return { ok: false, reason: `前置门：registry 探测失败（环境问题，非回归）——${dshTags.reason}` };
   }
   const next = (dshTags.json as { next?: unknown }).next;
-  if (typeof next !== 'string' || !/^0\.2\.2-rc\.\d+$/.test(next)) {
+  if (typeof next !== 'string' || !/^\d+\.\d+\.\d+-rc\.\d+$/.test(next)) {
     return {
       ok: false,
       reason: `前置门：官方 dsh 无 next/rc 兼容星座可钉（dist-tags.next=${JSON.stringify(next)}）——官方 latest 主包无兼容 manager（peer 精确钉同 rc 套件），星座不可达期间集成场景以前置门 skip 兜底（spec FR-8 修订句 20261118-2d72）`,
@@ -335,7 +336,7 @@ function writeObserverPatch(dir: string) {
 - insert:
     - id: dsh-mcp-e2e-observer
       name: './${OBSERVER_FILE}'
-      inject: [commands, settings, mcpManager, tools]
+      inject: [commands, mcpManager, tools]
 `);
 }
 
@@ -396,6 +397,13 @@ async function main({ commands, mcpManager, tools }) {
     const mcpTool = tools.get('mcp__${SERVER_NAME}__echo');
     emit(\`tools.get(mcp__${SERVER_NAME}__echo): \${mcpTool ? 'FOUND' : 'MISSING'}\`);
 
+    // —— FR-8「可调用」升格（评审 20261118- Spec F1）：真实工具调用一次（echo 回显链路）——
+    const echoCall = await mcpTool.execute(
+      { text: 'probe-e2e-echo-975b' },
+      { signal: new AbortController().signal },
+    );
+    emit(\`mcp tool call echo: content=\${JSON.stringify(echoCall?.content ?? null)}\`);
+
     // —— 异常流：mcp_manage 工具入口添加不可达 server（reconnect disabled → 立即 failed）——
     const deadAdd = await toolDef.execute(
       { action: 'add', serverName: '${DEAD_NAME}', transport: 'streamable-http', url: 'http://127.0.0.1:9/mcp', reconnect: { enabled: false } },
@@ -409,7 +417,7 @@ async function main({ commands, mcpManager, tools }) {
       },
       { what: '${DEAD_NAME} failed', timeoutMs: 60000 },
     );
-    emit(\`${DEAD_NAME} final: \${JSON.stringify(dead.view?.status ?? null)}\`);
+    emit(\`${DEAD_NAME} final: state=\${dead.view?.status.state} reason=\${dead.view?.status.reason} lastError=\${dead.view?.status.lastError}\`);
 
     // /mcp list 读投影：两条 server，failed 带原因线索
     const listResult = await commandDef.handler({ agent: AGENT, rawInput: 'list' });
@@ -418,21 +426,36 @@ async function main({ commands, mcpManager, tools }) {
     // 条目保留可移除（mutate unset 删键语义）
     const removeResult = await commandDef.handler({ agent: AGENT, rawInput: 'remove ${DEAD_NAME}' });
     emit(\`remove ${DEAD_NAME}: kind=\${removeResult.kind}\`);
-    await sleep(2000);
-    const afterRemove = mcpManager.list().find((v) => v.name === '${DEAD_NAME}');
-    emit(\`${DEAD_NAME} after remove: \${afterRemove ? 'LISTED state=' + afterRemove.status.state : 'GONE'}\`);
+    const afterRemove = await waitFor(
+      () => {
+        const view = mcpManager.list().find((v) => v.name === '${DEAD_NAME}');
+        return { matched: !view, view: view ?? null };
+      },
+      { what: '${DEAD_NAME} removed (GONE)', timeoutMs: 30000 },
+    );
+    emit(\`${DEAD_NAME} after remove: \${afterRemove.matched ? 'GONE' : 'LISTED state=' + afterRemove.view.status.state}\`);
 
     // 启停语义（mutate set enabled：禁用卸载保条目，重新启用重建连接）
     const disableResult = await commandDef.handler({ agent: AGENT, rawInput: 'disable ${SERVER_NAME}' });
     emit(\`disable ${SERVER_NAME}: kind=\${disableResult.kind}\`);
-    await sleep(4000);
-    const disabledView = mcpManager.list().find((v) => v.name === '${SERVER_NAME}');
-    emit(\`${SERVER_NAME} after disable: state=\${disabledView?.status.state} configured=\${disabledView?.configured}\`);
+    const disabledView = await waitFor(
+      () => {
+        const view = mcpManager.list().find((v) => v.name === '${SERVER_NAME}');
+        return { matched: view?.status.state === 'disabled', view: view ?? null };
+      },
+      { what: '${SERVER_NAME} disabled', timeoutMs: 30000 },
+    );
+    emit(\`${SERVER_NAME} after disable: state=\${disabledView.view?.status.state} configured=\${disabledView.view?.configured}\`);
     const enableResult = await commandDef.handler({ agent: AGENT, rawInput: 'enable ${SERVER_NAME}' });
     emit(\`enable ${SERVER_NAME}: kind=\${enableResult.kind}\`);
-    await sleep(4000);
-    const enabledView = mcpManager.list().find((v) => v.name === '${SERVER_NAME}');
-    emit(\`${SERVER_NAME} after enable: state=\${enabledView?.status.state}\`);
+    const enabledView = await waitFor(
+      () => {
+        const view = mcpManager.list().find((v) => v.name === '${SERVER_NAME}');
+        return { matched: view?.status.state === 'connected', view: view ?? null };
+      },
+      { what: '${SERVER_NAME} re-enabled (connected)', timeoutMs: 60000 },
+    );
+    emit(\`${SERVER_NAME} after enable: state=\${enabledView.view?.status.state}\`);
 
     emit('${RESULT_MARKER_DONE_1}');
     setTimeout(() => process.exit(0), 2000);
@@ -456,7 +479,7 @@ async function main({ commands, mcpManager, tools }) {
 
 export const name = 'dsh-mcp-e2e-observer';
 export function apply(ctx) {
-  const services = { commands: ctx.commands, mcpManager: ctx.mcpManager, tools: ctx.tools, settings: ctx.settings };
+  const services = { commands: ctx.commands, mcpManager: ctx.mcpManager, tools: ctx.tools };
   setTimeout(() => {
     main(services).catch((err) => {
       emit(\`PROBE-CRASH: \${err.stack ?? err}\`);
@@ -592,11 +615,18 @@ test(`[FR-8|集成级] ${PKG} 真跑官方 dsh 端到端：装插件 → /mcp ad
   assert.ok(toolCountMatch && Number(toolCountMatch[1]) >= 1, `connected 投影的 toolCount 应 ≥ 1（实际 ${toolCountMatch?.[1] ?? '缺失'}）`);
   // mcp__<名>__<工具> 出现
   assert.match(stage1.result, /tools\.get\(mcp__probeecho__echo\): FOUND/, 'mcp__probeecho__echo 应出现在宿主工具面');
+  // 宿主 mcp__ 工具 execute 直返 MCP tools/call 原形态（{content:[{type:'text',text}]}）——
+  // content 含回显文本即同时证明真实调用成功与回显语义（FR-8「可调用」实证，评审 Spec F1）。
+  assert.match(
+    stage1.result,
+    new RegExp(`mcp tool call echo: content=.*${'probe-e2e-echo-975b'}`),
+    'mcp__ 工具应可真实调用且 echo 回显输入文本（宿主 tools/call 全链路）',
+  );
   // 异常流：连不上的 server → failed + 原因线索
   assert.match(stage1.result, new RegExp(`tool add ${DEAD_NAME}: ok=true`), `mcp_manage 工具入口添加 ${DEAD_NAME} 应成功提交（写通道）`);
   assert.match(
     stage1.result,
-    new RegExp(`${DEAD_NAME} final: \\{"state":"failed","reason":"[a-z-]+","lastError":"[^"]+"\\}`),
+    new RegExp(`${DEAD_NAME} final: state=failed reason=[a-z-]+ lastError=[^\\s]+`),
     `${DEAD_NAME} 应投影 failed 状态且带 lastError 原因线索`,
   );
   assert.match(
@@ -614,12 +644,32 @@ test(`[FR-8|集成级] ${PKG} 真跑官方 dsh 端到端：装插件 → /mcp ad
   // —— 落盘断言：profile cordis.patch.yml 出现持久化条目（官方 Settings→ConfigEditor 写盘）——
   // 官方写入的 YAML 格式不作钉字面断言（替身保真纪律），只断言语义（条目名 + 关键字段齐备）
   const profilePatch = fs.readFileSync(path.join(dshHome, 'profiles', PROFILE, 'cordis.patch.yml'), 'utf8');
-  assert.match(profilePatch, new RegExp(`${SERVER_NAME}:`), `profile cordis.patch.yml 应含 ${SERVER_NAME} 持久化条目：\n${profilePatch}`);
-  assert.match(profilePatch, /transport: stdio/, '持久化条目应含 transport 字段');
-  assert.match(profilePatch, /command: node/, '持久化条目应含 command 字段');
-  assert.match(profilePatch, new RegExp(ECHO_SERVER_FILE.replace(/\./g, '\\.').replace(/\//g, '\\/')), '持久化条目应含 echo server 说明符');
-  assert.match(profilePatch, /enabled: true/, '持久化条目应含 enabled 持久意图字段');
-  assert.doesNotMatch(profilePatch, new RegExp(`${DEAD_NAME}:`), `已移除的 ${DEAD_NAME} 不应残留在落盘条目`);
+  const patchDoc = loadYaml(profilePatch) as unknown;
+  // 官方写入的 YAML 结构不作钉形断言（替身保真纪律）——真解析后深找条目对象按字段断言
+  const findEntry = (node: unknown, key: string): Record<string, unknown> | null => {
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const hit = findEntry(item, key);
+        if (hit) return hit;
+      }
+      return null;
+    }
+    if (node && typeof node === 'object') {
+      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+        if (k === key && v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
+        const hit = findEntry(v, key);
+        if (hit) return hit;
+      }
+    }
+    return null;
+  };
+  const entry = findEntry(patchDoc, SERVER_NAME);
+  assert.ok(entry, `profile cordis.patch.yml 应含 ${SERVER_NAME} 持久化条目（js-yaml 真解析）：\n${profilePatch}`);
+  assert.equal(entry['transport'], 'stdio', `持久化条目 transport 应为 stdio：${JSON.stringify(entry)}`);
+  assert.equal(entry['command'], 'node', `持久化条目 command 应为 node：${JSON.stringify(entry)}`);
+  assert.match(JSON.stringify(entry['args']), new RegExp(ECHO_SERVER_FILE.replace(/\./g, '\\.')), `持久化条目 args 应含 echo server 说明符：${JSON.stringify(entry)}`);
+  assert.equal(entry['enabled'], true, `持久化条目 enabled 应为 true（持久意图）：${JSON.stringify(entry)}`);
+  assert.equal(findEntry(patchDoc, DEAD_NAME), null, `已移除的 ${DEAD_NAME} 不应残留在落盘条目`);
 
   // —— stage2：重启 dsh 后 server 仍在并自动连接（官方持久化落盘 + 重载）——
   const stage2 = await bootStage(t, { dir: workDir, dshHome, stage: '2', marker: RESULT_MARKER_DONE_2 });
