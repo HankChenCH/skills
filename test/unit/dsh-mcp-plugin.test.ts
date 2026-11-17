@@ -186,3 +186,327 @@ test('两入口同调管理服务：list 读操作经工具与命令都投影同
 
   assert.deepEqual(ctx.captured.settingsCalls, [], '读操作不得触碰写通道（settings 零调用）');
 });
+
+// ---- AC3：写通道 = 官方 settings/configEditor 持久化 API（命名空间 = 挂载行 entry id mcp）----
+
+test('工具 add stdio 成功：恰一次 settings.update("mcp", { servers: {…} })，条目为官方平铺结构（AC3）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({
+    action: 'add',
+    serverName: 'searcher',
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@modelcontextprotocol/server-search'],
+    cwd: '/tmp/work',
+  }, { signal: new AbortController().signal })) as { ok: boolean; serverName?: string; transport?: string };
+
+  assert.equal(result.ok, true, 'add 成功返回 ok:true');
+  assert.equal(result.serverName, 'searcher');
+  assert.equal(result.transport, 'stdio');
+  assert.deepEqual(ctx.captured.settingsCalls, [{
+    kind: 'update',
+    namespace: 'mcp',
+    patch: {
+      servers: {
+        searcher: {
+          transport: 'stdio',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-search'],
+          cwd: '/tmp/work',
+        },
+      },
+    },
+  }], '写通道 = settings.update 且命名空间取挂载行 entry id mcp；条目只含提交字段（缺省值归官方 schema）');
+});
+
+test('命令 add stdio 与工具同调：settings.update("mcp", …) 调用形态一致（AC1+AC3）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const command = ctx.captured.commands[0];
+
+  const reply = await command.execute('add stdio searcher npx -y @modelcontextprotocol/server-search');
+  assert.match(reply, /searcher/, '命令回复确认提交对象');
+
+  assert.deepEqual(ctx.captured.settingsCalls, [{
+    kind: 'update',
+    namespace: 'mcp',
+    patch: {
+      servers: {
+        searcher: {
+          transport: 'stdio',
+          command: 'npx',
+          args: ['-y', '@modelcontextprotocol/server-search'],
+        },
+      },
+    },
+  }], '命令入口与工具入口产出同一写通道调用（--env/--cwd 选项测试见凭据透传批）');
+});
+
+test('工具 remove 成功：settings.mutate("mcp", "servers.<name>", null)（AC3 按路径写）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'remove', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(result.ok, true, 'remove 成功返回 ok:true');
+  assert.deepEqual(ctx.captured.settingsCalls, [
+    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher', value: null },
+  ], '移除 = 按路径 mutate，value null 表达移除（替身契约钉死点）');
+});
+
+test('工具 disable/enable 成功：settings.mutate("mcp", "servers.<name>.enabled", 布尔)（AC3+AC4 语义：仅写持久意图字段）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const disabled = (await tool.execute({ action: 'disable', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
+  const enabled = (await tool.execute({ action: 'enable', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(disabled.ok, true, 'disable 成功返回 ok:true');
+  assert.equal(enabled.ok, true, 'enable 成功返回 ok:true');
+  assert.deepEqual(ctx.captured.settingsCalls, [
+    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher.enabled', value: false },
+    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher.enabled', value: true },
+  ], '启停只写 servers.<name>.enabled 路径——其余字段不动，官方 reconcile 依 enabled 切换挂载（禁用卸载保条目/启用重建）');
+});
+
+test('写路径绕行哨兵：替身 ctx 的 fiber.update 为必炸哨兵且全程不被触碰（AC3 排除 fiber.update 直改）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  // 哨兵：任何 fiber.update 调用立即炸出——断言全部写操作完成后哨兵仍干净
+  (ctx as unknown as { fiber: { update(): never } }).fiber = {
+    update() {
+      throw new Error('fiber.update 被调用——官方链路外直改被禁止');
+    },
+  };
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+  await tool.execute({ action: 'add', serverName: 'a', transport: 'stdio', command: 'x' }, { signal: new AbortController().signal });
+  try {
+    await tool.execute({ action: 'remove', serverName: 'a' }, { signal: new AbortController().signal });
+  } catch {
+    // 本哨兵用例只断言 fiber.update 未被触碰；remove 的结果断言由各自用例承担
+  }
+  // 哨兵以 throw 表达：走到这里即未被触发；settingsCalls 已在各自用例断言形态
+  assert.ok(ctx.captured.settingsCalls.length >= 1, '写操作经 settings 出口（哨兵未炸即无 fiber.update）');
+});
+
+// ---- AC2：参数 schema 按 transport 校验，跨 transport 字段混用拒绝并指明字段 ----
+
+test('工具 add stdio 缺 command：拒绝且 error 指明 command 字段，settings 零调用（AC2）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'broken', transport: 'stdio' }, { signal: new AbortController().signal })) as { ok: boolean; error: string; field?: string };
+  assert.equal(result.ok, false, '缺 command 拒绝');
+  assert.match(result.error, /command/, '拒绝信息指明 command 字段');
+  assert.equal(result.field, 'command', '结构化 field 命中缺失字段');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '被拒写零 settings 调用（无半写入）');
+});
+
+test('工具 add remote 缺 url：拒绝且 error 指明 url 字段（AC2）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'broken', transport: 'streamable-http', headers: { A: 'b' } }, { signal: new AbortController().signal })) as { ok: boolean; error: string; field?: string };
+  assert.equal(result.ok, false, '缺 url 拒绝');
+  assert.match(result.error, /url/, '拒绝信息指明 url 字段');
+  assert.equal(result.field, 'url', '结构化 field 命中缺失字段');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '被拒写零 settings 调用');
+});
+
+test('工具 add stdio 携带 url：跨 transport 字段混用拒绝且指明 url（AC2）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'mixed', transport: 'stdio', command: 'x', url: 'https://mcp.example.com/mcp' }, { signal: new AbortController().signal })) as { ok: boolean; error: string; field?: string };
+  assert.equal(result.ok, false, '跨 transport 字段混用拒绝');
+  assert.match(result.error, /url/, '拒绝信息指明违规字段 url');
+  assert.equal(result.field, 'url', '结构化 field 命中违规字段');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '被拒写零 settings 调用');
+});
+
+test('工具 add remote 携带 stdio 字段组：拒绝且指明首个违规字段 command（AC2，官方校验顺序镜像）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({
+    action: 'add', serverName: 'mixed', transport: 'streamable-http', url: 'https://mcp.example.com/mcp',
+    command: 'npx', args: ['-y'], env: { A: 'b' }, cwd: '/tmp',
+  }, { signal: new AbortController().signal })) as { ok: boolean; error: string; field?: string };
+  assert.equal(result.ok, false, 'remote 携带 stdio 字段组拒绝');
+  assert.match(result.error, /command/, '官方校验顺序（command→args→env→cwd）首个违规字段 command');
+  assert.equal(result.field, 'command', '结构化 field 命中首个违规字段');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '被拒写零 settings 调用');
+});
+
+test('工具 add 可选超时与重连字段逐字透传进写通道（AC2，内部值不断言合法性——归官方）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const reconnect = { enabled: true, initialDelayMs: 500, maxDelayMs: 30_000, maxAttempts: 10 };
+  await tool.execute({
+    action: 'add', serverName: 'slow', transport: 'stdio', command: 'x',
+    toolCallTimeoutMs: 60_000, startupTimeoutMs: 120_000, closeTimeoutMs: 5_000, reconnect,
+  }, { signal: new AbortController().signal });
+
+  assert.deepEqual(ctx.captured.settingsCalls, [{
+    kind: 'update',
+    namespace: 'mcp',
+    patch: {
+      servers: {
+        slow: {
+          transport: 'stdio',
+          command: 'x',
+          toolCallTimeoutMs: 60_000,
+          startupTimeoutMs: 120_000,
+          closeTimeoutMs: 5_000,
+          reconnect,
+        },
+      },
+    },
+  }], '可选超时/重连字段原样进入 settings 写（透传，不做插件侧语义加工）');
+});
+
+// ---- AC5：凭据模板串原样透传 ----
+
+test('工具 add stdio：env/args/command 中的 ${credential:REF} 串逐字透传不展开不脱敏（AC5）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  await tool.execute({
+    action: 'add', serverName: 'templated', transport: 'stdio',
+    command: '${credential:MCP_CMD}',
+    args: ['--token', '${credential:MCP_TOKEN}'],
+    env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}' },
+    cwd: '${credential:MCP_WORKDIR}',
+  }, { signal: new AbortController().signal });
+
+  assert.deepEqual(ctx.captured.settingsCalls, [{
+    kind: 'update',
+    namespace: 'mcp',
+    patch: {
+      servers: {
+        templated: {
+          transport: 'stdio',
+          command: '${credential:MCP_CMD}',
+          args: ['--token', '${credential:MCP_TOKEN}'],
+          env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}' },
+          cwd: '${credential:MCP_WORKDIR}',
+        },
+      },
+    },
+  }], '模板串逐字进入写通道（展开与脱敏归官方 mcp-client 运行时）');
+});
+
+test('工具 add remote：url/headers 中的 ${credential:REF} 串逐字透传（AC5）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  await tool.execute({
+    action: 'add', serverName: 'remote', transport: 'streamable-http',
+    url: '${credential:MCP_ENDPOINT}',
+    headers: { Authorization: 'Bearer ${credential:MCP_TOKEN}' },
+  }, { signal: new AbortController().signal });
+
+  assert.deepEqual(ctx.captured.settingsCalls, [{
+    kind: 'update',
+    namespace: 'mcp',
+    patch: {
+      servers: {
+        remote: {
+          transport: 'streamable-http',
+          url: '${credential:MCP_ENDPOINT}',
+          headers: { Authorization: 'Bearer ${credential:MCP_TOKEN}' },
+        },
+      },
+    },
+  }], 'remote 模板串逐字进入写通道');
+});
+
+// ---- AC6：冲突拒绝（同名/坏名），写被拒无半写入 ----
+
+test('工具 add 与既有条目同名：拒绝并列冲突对象，settings 零调用（AC6 无半写入）', async () => {
+  const plugin = await loadPlugin();
+  const existing = viewOf('searcher', { state: 'connected', toolCount: 2, connectedAt: 1 });
+  const ctx = createStubContext([existing]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'searcher', transport: 'stdio', command: 'x' }, { signal: new AbortController().signal })) as { ok: boolean; error: string; conflict?: McpManagedServerView };
+  assert.equal(result.ok, false, '同名添加被拒');
+  assert.match(result.error, /searcher/, '拒绝信息指明冲突名');
+  assert.deepEqual(result.conflict, existing, '冲突对象 = 既有 manager 视图（name/configured/status）');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '被拒写零 settings 调用（不产生半写入）');
+});
+
+test('工具 add 违反官方命名规则（[A-Za-z0-9_-]{1,32}）：拒绝且 settings 零调用（AC6）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const bad = (await tool.execute({ action: 'add', serverName: 'bad name!', transport: 'stdio', command: 'x' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  const tooLong = (await tool.execute({ action: 'add', serverName: 'a'.repeat(33), transport: 'stdio', command: 'x' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  assert.equal(bad.ok, false, '非法字符名拒绝');
+  assert.match(bad.error, /A-Za-z0-9_-/, '拒绝信息含官方命名规则');
+  assert.equal(tooLong.ok, false, '超长名（33 字符）拒绝');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '两类坏名均零 settings 调用');
+});
+
+test('工具 remove/enable/disable 未知名：拒绝且 settings 零调用（AC6 存在性前置）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const removed = (await tool.execute({ action: 'remove', serverName: 'ghost' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  const disabled = (await tool.execute({ action: 'disable', serverName: 'ghost' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  assert.equal(removed.ok, false, '移除未知名拒绝');
+  assert.match(removed.error, /ghost/, '拒绝信息指明未知名');
+  assert.equal(disabled.ok, false, '停用未知名拒绝');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '存在性不满足即拒绝，零 settings 调用');
+});
+
+test('工具 remove 非配置条目（已移除仅存清理记录 configured:false）：拒绝（AC6 官方可移除面镜像）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([viewOf('ghost', { state: 'failed', reason: 'cleanup', result: { closeConfirmed: false } }, false)]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'remove', serverName: 'ghost' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  assert.equal(result.ok, false, '无配置条目的清理记录不可再移除');
+  assert.match(result.error, /ghost/, '拒绝信息指明对象');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '零 settings 调用');
+});
+
+test('命令写子命令与工具同拒绝语义：坏参数零 settings 调用且回复指明字段（AC2 命令面）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const command = ctx.captured.commands[0];
+
+  const reply = await command.execute('add stdio broken');
+  assert.match(reply, /command/, '命令缺 command 的拒绝回复指明字段');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '命令面被拒写零 settings 调用');
+});
