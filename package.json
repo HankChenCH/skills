@@ -18,7 +18,7 @@
   },
   "packageManager": "pnpm@12.15.0",
   "scripts": {
-    "test": "node --test test/unit/*.test.ts test/e2e/*.test.ts",
+    "test": "pnpm run test:unit && pnpm run test:e2e",
     "test:unit": "node --test test/unit/*.test.ts",
     "test:e2e": "node --test test/e2e/*.test.ts",
     "typecheck": "tsc --noEmit",
