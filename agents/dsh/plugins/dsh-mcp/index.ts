@@ -30,8 +30,8 @@ interface McpManagerService {
 
 /**
  * 官方 settings 持久化写面（调研 ced7 F1.4 一手引文形态：update 合并 / mutate 按路径；
-* 官方 settings 包不在本包依赖树，签名以报告引文为界，集成票复核）。value = null 表示移除该
- * 路径（替身契约钉死点，测试文件头有标注）。
+ * 官方 settings 包不在本包依赖树，签名以报告引文为界，集成票复核）。value = null 表示
+ * 移除该路径（替身契约钉死点，测试文件头有标注）。
  */
 interface SettingsService {
   update(namespace: string, patch: Record<string, unknown>): Promise<void> | void;
@@ -250,7 +250,9 @@ export function createManagementService(ctx: PluginContext): ManagementService {
         return { ok: false, field: 'serverName', error: `serverName "${name}" 违反官方命名规则 [A-Za-z0-9_-]{1,32}` };
       }
       const validation = validateAndNormalizeEntry(name, input);
-      if (!validation.ok) return validation;
+      // 判别联合一律等值判别收窄（truthiness 收窄在本包 prepack 的非 strict 选项集下失效——
+      // 发布面编译实测发现，等值形态两套选项集皆可靠）
+      if (validation.ok === false) return validation;
       const existing = requireMcpManager(ctx).list().find((view) => view.name === name);
       if (existing !== undefined) {
         return {
@@ -425,7 +427,7 @@ async function executeAdd(service: ManagementService, tokens: string[]): Promise
 
 /** 写结果 → 命令回复文本：成功带状态查询指引，拒绝带原因（冲突/字段/官方拒写）。 */
 function formatWriteOutcome(outcome: WriteOutcome, successLine: string): string {
-  if (outcome.ok) {
+  if (outcome.ok === true) {
     return `${successLine}——已写官方 settings（命名空间 ${SETTINGS_NAMESPACE}），官方 reconcile 即时生效；/mcp list 查看状态。`;
   }
   const conflictNote = outcome.conflict === undefined
@@ -549,7 +551,7 @@ function createManageTool(service: ManagementService): ToolDefinition {
           closeTimeoutMs: request.closeTimeoutMs,
           reconnect: request.reconnect,
         });
-        return outcome.ok ? { ...outcome, action } : { ...outcome };
+        return outcome.ok === true ? { ...outcome, action } : { ...outcome };
       }
       if (action === 'remove' || action === 'enable' || action === 'disable') {
         if (typeof request.serverName !== 'string') {
@@ -558,7 +560,7 @@ function createManageTool(service: ManagementService): ToolDefinition {
         const outcome = action === 'remove'
           ? await service.removeServer(request.serverName)
           : await service.setServerEnabled(request.serverName, action === 'enable');
-        return outcome.ok ? { ...outcome, action } : { ...outcome };
+        return outcome.ok === true ? { ...outcome, action } : { ...outcome };
       }
       return { ok: false, error: `未知 action "${action}"——支持：list/add/remove/enable/disable` };
     },
