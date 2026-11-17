@@ -9,7 +9,7 @@
 ```
 ai-infra/
 ├── skills/                  # 31 个技能正源，安装器原样拷入目标项目
-├── agents/<宿主>/plugins/   # 插件资产（两级布局：宿主/插件目录）；当前 dsh 宿主 + dsh-demo 插件
+├── agents/<宿主>/plugins/   # 插件资产（两级布局：宿主/插件目录）；当前 dsh 宿主 + dsh-demo、dsh-mcp 插件
 ├── src/ + bin/infra.ts      # 安装器 CLI 源码（TypeScript ESM，仓库内零构建直跑：node 直接执行 .ts）
 ├── scripts/                 # 发布面：prepack/postpack（打包编译与还原）、verify-pack（发布对账）、verify-bundle（插件 bundle 校验）
 ├── test/unit、test/e2e      # node:test；e2e 含 expect 驱动的交互安装测试
