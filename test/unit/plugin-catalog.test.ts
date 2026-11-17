@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { listPlugins } from '../../src/kernel/catalog.ts';
 import { ASSET_MAP, findRow } from '../../src/kernel/asset-map.ts';
@@ -91,4 +92,36 @@ test('package.json 缺 name：报错并列出该缺陷（正名无从得出）',
       err.message.includes('name')
     );
   });
+});
+
+// ---- 真实仓库编目确认（spec 20261117-34d4 FR-6，票 20261117-218b：第二款插件包）----
+// 来源目录事实与编目行为分离：前者钉 agents/ 两级布局下新包的存在性（编目为目录派生，
+// 包在即编目在），后者钉 listPlugins 对新包的正名/提示提取。期望值独立来源 =
+// agents/dsh/plugins/dsh-mcp/package.json 文件本身（不从实现推导）。
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+test('真实来源目录 agents/dsh/plugins/ 含 dsh-mcp 包目录（新包随包分发的来源事实）', () => {
+  const pluginDirs = fs
+    .readdirSync(path.join(REPO_ROOT, 'agents', 'dsh', 'plugins'), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+  assert.ok(
+    pluginDirs.includes('dsh-mcp'),
+    `agents/dsh/plugins/ 应含 dsh-mcp 包目录（编目为目录派生），实际：${pluginDirs.join('、')}`,
+  );
+});
+
+test('编目收录 dsh-mcp：条目正名 = 包 name、菜单提示 = 包 description（FR-6）', () => {
+  const entries = listPlugins(REPO_ROOT, PLUGIN_ROW);
+  const mcpPkg = JSON.parse(
+    fs.readFileSync(path.join(REPO_ROOT, 'agents', 'dsh', 'plugins', 'dsh-mcp', 'package.json'), 'utf8'),
+  ) as { name: string; description: string };
+  const entry = entries.find((e) => e.name === mcpPkg.name);
+  assert.ok(entry, `编目应含 ${mcpPkg.name}，实际：${entries.map((e) => e.name).join('、')}`);
+  assert.equal(
+    entry.description,
+    mcpPkg.description,
+    '菜单提示应逐字取包 package.json 的 description',
+  );
 });
