@@ -510,3 +510,73 @@ test('命令写子命令与工具同拒绝语义：坏参数零 settings 调用�
   assert.match(reply, /command/, '命令缺 command 的拒绝回复指明字段');
   assert.deepEqual(ctx.captured.settingsCalls, [], '命令面被拒写零 settings 调用');
 });
+
+// ---- AC4：读通道 list/watch 状态投影（失败线索可查询；生效语义 = 官方 reconcile，写侧调用形态已在 AC3 批断言）----
+// seam ②（spec 测试决策：管理服务读通道契约）经模块导出的 createManagementService 直测——
+// apply 用同一工厂组合双入口（AC1 已钉同调），导出工厂是模块公共面而非测试后门。
+
+interface ManagementServiceShape {
+  listServers(): McpManagedServerView[];
+  watchServers(signal: AbortSignal): AsyncIterable<McpManagedServerView[]>;
+  addServer(name: string, input: unknown): Promise<unknown>;
+  removeServer(name: string): Promise<unknown>;
+  setServerEnabled(name: string, enabled: boolean): Promise<unknown>;
+}
+
+test('管理服务 watchServers 直通官方 watch 流：视图原样投影（AC4 读通道 watch）', async () => {
+  const mod = await loadPlugin() as unknown as { name: string; apply(ctx: StubContext): void; createManagementService(ctx: StubContext): ManagementServiceShape };
+  const views = [viewOf('watched', { state: 'connected', toolCount: 5, connectedAt: 1 })];
+  const ctx = createStubContext(views);
+  const service = mod.createManagementService(ctx);
+
+  const collected: McpManagedServerView[][] = [];
+  const controller = new AbortController();
+  for await (const batch of service.watchServers(controller.signal)) {
+    collected.push(batch);
+    break; // 替身 watch 一次性 yield 后结束（替身契约，见文件头）；真实常驻流归集成票
+  }
+  assert.deepEqual(collected, [[viewOf('watched', { state: 'connected', toolCount: 5, connectedAt: 1 })]],
+    'watch 读通道投影 = manager watch 流的完整视图批次（原样、不加工）');
+});
+
+test('list 投影保留 failed 原因线索：工具与命令均可查询（AC4，load.lastError / cleanup）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([
+    viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' }),
+    viewOf('dirty', { state: 'failed', reason: 'cleanup', result: { closeConfirmed: false } }),
+  ]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+  const command = ctx.captured.commands[0];
+
+  const toolResult = (await tool.execute({ action: 'list' }, { signal: new AbortController().signal })) as {
+    servers: Array<{ name: string; status: { state: string; lastError?: string; reason?: string } }>;
+  };
+  assert.equal(toolResult.servers[0].status.state, 'failed', 'failed 状态经投影可查询');
+  assert.equal(toolResult.servers[0].status.reason, 'load', '失败原因线索 reason 可查询');
+  assert.equal(toolResult.servers[0].status.lastError, 'spawn ENOENT', 'load.lastError 原因线索逐字可查询');
+
+  const reply = await command.execute('list');
+  assert.match(reply, /failed\(load\)：spawn ENOENT/, '命令投影含 failed 原因与 lastError');
+  assert.match(reply, /failed\(cleanup\).*closeConfirmed=false/, 'cleanup 失败线索（closeConfirmed）可查询');
+});
+
+test('list 投影含 waiting-credentials 状态（AC5+AC4：凭据引用缺失的官方状态经投影可查询）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([
+    viewOf('credless', { state: 'waiting-credentials', lastError: 'credential GITHUB_TOKEN 未配置' }),
+  ]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+  const command = ctx.captured.commands[0];
+
+  const toolResult = (await tool.execute({ action: 'list' }, { signal: new AbortController().signal })) as {
+    servers: Array<{ name: string; status: { state: string; lastError: string } }>;
+  };
+  assert.equal(toolResult.servers[0].status.state, 'waiting-credentials', 'waiting-credentials 状态经投影可查询');
+  assert.equal(toolResult.servers[0].status.lastError, 'credential GITHUB_TOKEN 未配置', '凭据缺失线索逐字可查询');
+
+  const reply = await command.execute('list');
+  assert.match(reply, /waiting-credentials/, '命令投影含 waiting-credentials 状态');
+  assert.match(reply, /GITHUB_TOKEN/, '命令投影含凭据缺失线索');
+});

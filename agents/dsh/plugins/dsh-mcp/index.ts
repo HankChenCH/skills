@@ -196,6 +196,8 @@ function validateAndNormalizeEntry(name: string, input: ServerEntryInput): Entry
 
 interface ManagementService {
   listServers(): McpManagedServerView[];
+  /** 读通道 watch 面（spec 管理服务契约）：直通官方 watch 流的完整视图批次。 */
+  watchServers(signal: AbortSignal): AsyncIterable<McpManagedServerView[]>;
   addServer(name: string, input: ServerEntryInput): Promise<WriteOutcome>;
   removeServer(name: string): Promise<WriteOutcome>;
   setServerEnabled(name: string, enabled: boolean): Promise<WriteOutcome>;
@@ -231,11 +233,16 @@ async function commitSettings(ctx: PluginContext, write: (settings: SettingsServ
  * 插件不加工）；写通道 = 官方 settings 持久化 API（add = update 合并写一条；remove =
  * mutate 路径置 null；启停 = mutate 只写 enabled 持久意图字段），提交后官方 reconcile
  * 承担生效语义（新增挂载/移除卸载/禁用卸载保条目/字段变化重建），插件不做实例管理。
+ * 工厂导出 = spec 测试决策 seam ②（管理服务读通道契约的直测面）；apply 用同一工厂组合双入口。
  */
-function createManagementService(ctx: PluginContext): ManagementService {
+export function createManagementService(ctx: PluginContext): ManagementService {
   return {
     listServers() {
       return requireMcpManager(ctx).list();
+    },
+
+    async *watchServers(signal) {
+      yield* requireMcpManager(ctx).watch(signal);
     },
 
     async addServer(name, input) {
