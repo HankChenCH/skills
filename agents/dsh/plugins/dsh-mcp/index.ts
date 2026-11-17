@@ -38,7 +38,11 @@ interface SettingsService {
   mutate(namespace: string, path: string, value: unknown): Promise<void> | void;
 }
 
-/** 官方 commands 服务注册面（替身契约：插件侧注册签名无一手来源，集成票复核——见测试文件头）。 */
+/**
+ * 官方 commands 服务注册面（@deepseek-ai/dsh-commands@0.2.2-rc.1 lib/types/index.d.ts
+ * CommandDefinition 一手来源，票 20261118-2d72 探针 2A/2B 取证：handler 形态注册成功、
+ * execute(line) 形态 register 同步抛 `command "mcp" handler must be a function`）。
+ */
 interface CommandsService {
   register(definition: CommandDefinition): unknown;
 }
@@ -48,10 +52,28 @@ interface ToolsService {
   register(definition: ToolDefinition): unknown;
 }
 
+/**
+ * 官方命令调用参数（@deepseek-ai/dsh-commands@0.2.2-rc.1 lib/types/index.d.ts
+ * CommandInvocation 一手来源）：rawInput = 命令名之后的原文、含分隔空白；agent = 命令所达
+ * agent。官方全形态另含 commandId/attachments/signal，本插件不消费（结构子类型：真实
+ * 调用对象满足本局部形态；消费面扩展须先扩本形态并回测试替身契约）。
+ */
+interface CommandInvocation {
+  agent: unknown;
+  rawInput: string;
+}
+
+/**
+ * 官方命令结果（@deepseek-ai/dsh-commands@0.2.2-rc.1 lib/types/types.d.ts CommandResult
+ * 一手来源）：预期失败以 kind:'error' 显式返回（error 必带 text）；抛出异常由官方运行时
+ * 兜底为 error，但预期拒绝不走抛出通道。
+ */
+type CommandResult = { kind: 'success'; text?: string } | { kind: 'error'; text: string };
+
 interface CommandDefinition {
   name: string;
   description: string;
-  execute(line: string): string | Promise<string>;
+  handler(invocation: CommandInvocation): CommandResult | Promise<CommandResult>;
 }
 
 interface ToolDefinition {
@@ -388,23 +410,26 @@ function parseAddOptions(tokens: string[], allowedKeys: ReadonlySet<string>): Pa
   return parsed;
 }
 
-/** add 子命令执行体：解析 → 管理服务 → 回复文本。tokens 已剥去 "add"（tokens[0] = transport）。 */
-async function executeAdd(service: ManagementService, tokens: string[]): Promise<string> {
+/** add 子命令执行体：解析 → 管理服务 → 官方 CommandResult。tokens 已剥去 "add"（tokens[0] = transport）。 */
+async function executeAdd(service: ManagementService, tokens: string[]): Promise<CommandResult> {
   const transport = tokens[0];
   if (transport !== 'stdio' && transport !== 'remote' && transport !== 'streamable-http') {
-    return `add 需要 stdio 或 remote 传输类型：/mcp add stdio <name> <command> … 或 /mcp add remote <name> <url> …`;
+    return { kind: 'error', text: `add 需要 stdio 或 remote 传输类型：/mcp add stdio <name> <command> … 或 /mcp add remote <name> <url> …` };
   }
   const name = tokens[1];
   const firstField = tokens[2];
   if (name === undefined || firstField === undefined) {
-    return transport === 'stdio'
-      ? '用法：/mcp add stdio <name> <command> [参数…] [--cwd=<目录>] [--env=<K=V>]…'
-      : '用法：/mcp add remote <name> <url> [--header=<K=V>]…';
+    return {
+      kind: 'error',
+      text: transport === 'stdio'
+        ? '用法：/mcp add stdio <name> <command> [参数…] [--cwd=<目录>] [--env=<K=V>]…'
+        : '用法：/mcp add remote <name> <url> [--header=<K=V>]…',
+    };
   }
   const rest = tokens.slice(3);
   if (transport === 'stdio') {
     const parsed = parseAddOptions(rest, new Set(['cwd', 'env']));
-    if (typeof parsed === 'string') return parsed;
+    if (typeof parsed === 'string') return { kind: 'error', text: parsed };
     const outcome = await service.addServer(name, {
       transport: 'stdio',
       command: firstField,
@@ -415,8 +440,8 @@ async function executeAdd(service: ManagementService, tokens: string[]): Promise
     return formatWriteOutcome(outcome, `已提交 server "${name}"（stdio）`);
   }
   const parsed = parseAddOptions(rest, new Set(['header']));
-  if (typeof parsed === 'string') return parsed;
-  if (parsed.positional.length > 0) return `remote 传输只有 url 一个位置参数，多余的 "${parsed.positional[0]}" 无法解析`;
+  if (typeof parsed === 'string') return { kind: 'error', text: parsed };
+  if (parsed.positional.length > 0) return { kind: 'error', text: `remote 传输只有 url 一个位置参数，多余的 "${parsed.positional[0]}" 无法解析` };
   const outcome = await service.addServer(name, {
     transport: 'streamable-http',
     url: firstField,
@@ -425,39 +450,44 @@ async function executeAdd(service: ManagementService, tokens: string[]): Promise
   return formatWriteOutcome(outcome, `已提交 server "${name}"（streamable-http）`);
 }
 
-/** 写结果 → 命令回复文本：成功带状态查询指引，拒绝带原因（冲突/字段/官方拒写）。 */
-function formatWriteOutcome(outcome: WriteOutcome, successLine: string): string {
+/** 写结果 → 命令回复（官方 CommandResult）：成功带状态查询指引，拒绝带原因（冲突/字段/官方拒写）。 */
+function formatWriteOutcome(outcome: WriteOutcome, successLine: string): CommandResult {
   if (outcome.ok === true) {
-    return `${successLine}——已写官方 settings（命名空间 ${SETTINGS_NAMESPACE}），官方 reconcile 即时生效；/mcp list 查看状态。`;
+    return { kind: 'success', text: `${successLine}——已写官方 settings（命名空间 ${SETTINGS_NAMESPACE}），官方 reconcile 即时生效；/mcp list 查看状态。` };
   }
   const conflictNote = outcome.conflict === undefined
     ? ''
     : `（冲突对象：${outcome.conflict.name}，当前状态 ${describeStatus(outcome.conflict.status)}${outcome.conflict.configured ? '' : '，非配置条目'}）`;
-  return `写被拒：${outcome.error}${conflictNote}`;
+  return { kind: 'error', text: `写被拒：${outcome.error}${conflictNote}` };
 }
 
+/**
+ * /mcp 命令定义（官方 CommandDefinition 一手形态）：handler 从 rawInput 解析子命令——
+ * rawInput 是命令名之后的原文（含分隔空白），先 trim 再按空白切分；信息性回复（help/list）
+ * = success，预期拒绝（用法缺失/未知子命令/写被拒）= error 显式返回。
+ */
 function createMcpCommand(service: ManagementService): CommandDefinition {
   return {
     name: MCP_COMMAND_NAME,
     description: '管理 MCP server：列出（含连接状态）、添加 stdio/远程、移除、启停；无需手写 Cordis patch。',
-    execute(line) {
-      const tokens = line.trim().split(/\s+/).filter((token) => token.length > 0);
+    handler({ rawInput }) {
+      const tokens = rawInput.trim().split(/\s+/).filter((token) => token.length > 0);
       const subcommand = tokens[0] ?? 'help';
-      if (subcommand === 'help') return MCP_USAGE;
-      if (subcommand === 'list') return formatServerViews(service.listServers());
+      if (subcommand === 'help') return { kind: 'success', text: MCP_USAGE };
+      if (subcommand === 'list') return { kind: 'success', text: formatServerViews(service.listServers()) };
       if (subcommand === 'add') return executeAdd(service, tokens.slice(1));
       const name = tokens[1];
       if (subcommand === 'remove' || subcommand === 'enable' || subcommand === 'disable') {
-        if (name === undefined) return `用法：/mcp ${subcommand} <name>`;
+        if (name === undefined) return { kind: 'error', text: `用法：/mcp ${subcommand} <name>` };
         return executeToggle(service, subcommand, name);
       }
-      return `未知子命令 "${subcommand}"——可用子命令：\n${MCP_USAGE}`;
+      return { kind: 'error', text: `未知子命令 "${subcommand}"——可用子命令：\n${MCP_USAGE}` };
     },
   };
 }
 
 /** remove/enable/disable 共用执行体（启停 = 只写 enabled 持久意图字段）。 */
-async function executeToggle(service: ManagementService, action: 'remove' | 'enable' | 'disable', name: string): Promise<string> {
+async function executeToggle(service: ManagementService, action: 'remove' | 'enable' | 'disable', name: string): Promise<CommandResult> {
   const outcome = action === 'remove'
     ? await service.removeServer(name)
     : await service.setServerEnabled(name, action === 'enable');
