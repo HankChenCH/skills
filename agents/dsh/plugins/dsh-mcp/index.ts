@@ -33,15 +33,14 @@ interface McpManagerService {
 /**
  * 官方 settings 持久化写面（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts
  * SettingsForms 一手来源，票 20261118-2d72 取证）：update 深合并（实证兼容，add 走它）；
- * mutate(ns, ops, expectedRevision?) 的 ops = SettingsPathOp 数组——字符串三参旧调用即
- * TypeError（官方实现经 ops.reduce 消费，975b 探针 1 实证）；value:null 是写 null 不是
- * 删键，删键 = {op:'unset'}（替身契约钉死点，测试文件头有标注）。
+ * mutate(ns, ops, expectedRevision?) 的 ops = SettingsPathOp 数组——字符串三参旧调用在
+ * 实参求值阶段即抛 `ops.map is not a function`（官方实参表 ops.map(op=>op.path) 先于
+ * write 回调的 ops.reduce 消费，评审标准轴 F1 对一手源码实证）；value:null 是写 null
+ * 不是删键，删键 = {op:'unset'}（替身契约钉死点，测试文件头有标注）。
  */
-interface SettingsPathOp {
-  op: 'set' | 'unset';
-  path: readonly string[];
-  value?: unknown;
-}
+type SettingsPathOp =
+  | { op: 'set'; path: readonly string[]; value: unknown }
+  | { op: 'unset'; path: readonly string[] };
 
 interface SettingsService {
   update(namespace: string, patch: Record<string, unknown>): Promise<void> | void;

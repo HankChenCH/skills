@@ -13,8 +13,9 @@
 //    SettingsForms，票 20261118-2d72 取证）：update(ns, patch, expectedRevision?) 深合并
 //    （实现实证兼容，不动）；mutate(ns, ops, expectedRevision?) 的 ops = SettingsPathOp[]
 //    = {op:'set', path:string[], value} | {op:'unset', path:string[]}——字符串三参旧调用
-//    即 TypeError ops.reduce is not a function（官方实现经 ops.reduce 消费，975b 探针 1
-//    实证）；value:null 是写 null 不是删键，删键 = {op:'unset'}（官方 unset 语义：对象
+//    在实参求值阶段即抛 `ops.map is not a function`（官方实参表 ops.map(op=>op.path) 先于
+//    write 回调的 ops.reduce 消费，评审标准轴 F1 对一手源码实证）；value:null 是写 null
+//    不是删键，删键 = {op:'unset'}（官方 unset 语义：对象
 //    parent 删键、数组 parent 删元素）。替身 mutate 镜像该证伪形态（ops 非数组即抛同款
 //    TypeError），记录调用不落盘；expectedRevision 本插件不传，替身签名保留形参位。
 // 3. ctx.commands.register({ name, description, handler })——官方一手来源
@@ -75,12 +76,10 @@ interface CapturedTool {
   output: { schema: unknown; render(args: unknown, value: unknown): unknown[] };
 }
 
-/** 官方 SettingsPathOp 镜像（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts 一手来源）。 */
-interface SettingsOpStub {
-  op: 'set' | 'unset';
-  path: string[];
-  value?: unknown;
-}
+/** 官方 SettingsPathOp 镜像（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts 一手来源，判别联合同形：set 必带 value，缺 value 官方运行时语义为删键）。 */
+type SettingsOpStub =
+  | { op: 'set'; path: string[]; value: unknown }
+  | { op: 'unset'; path: string[] };
 
 interface SettingsCall {
   kind: 'update' | 'mutate';
@@ -139,9 +138,10 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
       },
       async mutate(namespace, ops, _expectedRevision) {
         // 官方 mutate 证伪形态镜像（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.js：
-        // 实现经 ops.reduce 消费 ops 数组，票 20261118-2d72）——字符串三参旧形态在此抛同款
-        // TypeError（975b 探针 1 实证的失败）。
-        if (!Array.isArray(ops)) throw new TypeError('ops.reduce is not a function');
+        // 第 4 实参 ops.map(op=>op.path) 在调用 write 前即求值，字符串三参旧形态抛
+        // `ops.map is not a function`——评审标准轴 F1 对一手源码实证，非 975b 探针
+        // 引述的 ops.reduce 文案）。
+        if (!Array.isArray(ops)) throw new TypeError('ops.map is not a function');
         captured.settingsCalls.push({ kind: 'mutate', namespace, ops: [...ops] });
       },
     },
