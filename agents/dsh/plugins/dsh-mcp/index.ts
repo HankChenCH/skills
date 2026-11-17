@@ -4,10 +4,12 @@
 //
 // 契约边界（spec 实现决策「管理服务契约/配置字段契约/人类命令契约/模型工具契约/即时生效契约/
 // 凭据契约」）：
-// - 写通道 = 官方 Settings→ConfigEditor 持久化链路（调研 ced7 F1.4：settings `update` 合并 /
-//   `mutate` 按路径，每次写全量校验并拒过期 revision；映射要点 update('mcp', { servers: … })）。
-//   命名空间 = 本包 patch 中 mcp-manager 行 entry id `mcp`（0ea9 定稿）。全程不自管配置文件、
-//   不直改 patch 文件、不调 fiber.update。
+// - 写通道 = 官方 Settings→ConfigEditor 持久化链路（@deepseek-ai/dsh-settings@0.2.2-rc.1
+//   一手来源，票 20261118-2d72 对齐：update 深合并——add 走它；mutate(ns, ops[]) 路径算子
+//   数组——remove = {op:'unset'} 删键、启停 = {op:'set'} 只写 enabled；每次写全量校验并拒
+//   过期 revision。映射要点 add = update('mcp', { servers: … })）。命名空间 = 本包 patch 中
+//   mcp-manager 行 entry id `mcp`（0ea9 定稿）。全程不自管配置文件、不直改 patch 文件、
+//   不调 fiber.update。
 // - 读通道 = ctx.mcpManager 的 list()/watch()（状态聚合 McpManagedServerStatus 含
 //   failed/load.lastError/cleanup/waiting-credentials），插件原样投影不加工。
 // - 生效语义 = 官方 reconcile（写通道提交后官方承担：新增挂载/移除卸载/禁用卸载保条目/
@@ -29,13 +31,21 @@ interface McpManagerService {
 }
 
 /**
- * 官方 settings 持久化写面（调研 ced7 F1.4 一手引文形态：update 合并 / mutate 按路径；
- * 官方 settings 包不在本包依赖树，签名以报告引文为界，集成票复核）。value = null 表示
- * 移除该路径（替身契约钉死点，测试文件头有标注）。
+ * 官方 settings 持久化写面（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts
+ * SettingsForms 一手来源，票 20261118-2d72 取证）：update 深合并（实证兼容，add 走它）；
+ * mutate(ns, ops, expectedRevision?) 的 ops = SettingsPathOp 数组——字符串三参旧调用即
+ * TypeError（官方实现经 ops.reduce 消费，975b 探针 1 实证）；value:null 是写 null 不是
+ * 删键，删键 = {op:'unset'}（替身契约钉死点，测试文件头有标注）。
  */
+interface SettingsPathOp {
+  op: 'set' | 'unset';
+  path: readonly string[];
+  value?: unknown;
+}
+
 interface SettingsService {
   update(namespace: string, patch: Record<string, unknown>): Promise<void> | void;
-  mutate(namespace: string, path: string, value: unknown): Promise<void> | void;
+  mutate(namespace: string, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void> | void;
 }
 
 /**
@@ -253,7 +263,8 @@ async function commitSettings(ctx: PluginContext, write: (settings: SettingsServ
 /**
  * 管理服务：双入口唯一共调面。读通道直通官方 list()（原样投影——状态语义归官方，
  * 插件不加工）；写通道 = 官方 settings 持久化 API（add = update 合并写一条；remove =
- * mutate 路径置 null；启停 = mutate 只写 enabled 持久意图字段），提交后官方 reconcile
+ * mutate unset 删键；启停 = mutate set 只写 enabled 持久意图字段——均 SettingsPathOp
+ * 数组形态，@deepseek-ai/dsh-settings@0.2.2-rc.1 一手来源），提交后官方 reconcile
  * 承担生效语义（新增挂载/移除卸载/禁用卸载保条目/字段变化重建），插件不做实例管理。
  * 工厂导出 = spec 测试决策 seam ②（管理服务读通道契约的直测面）；apply 用同一工厂组合双入口。
  */
@@ -297,7 +308,7 @@ export function createManagementService(ctx: PluginContext): ManagementService {
         return { ok: false, error: `server "${name}"：无配置条目（已移除但清理未完成，重启宿主方可清账）` };
       }
       const refused = await commitSettings(ctx, (settings) =>
-        settings.mutate(SETTINGS_NAMESPACE, `servers.${name}`, null));
+        settings.mutate(SETTINGS_NAMESPACE, [{ op: 'unset', path: ['servers', name] }]));
       return refused ?? { ok: true, serverName: name };
     },
 
@@ -307,7 +318,7 @@ export function createManagementService(ctx: PluginContext): ManagementService {
         return { ok: false, error: `server "${name}"：无配置条目——/mcp list 查看现存 server` };
       }
       const refused = await commitSettings(ctx, (settings) =>
-        settings.mutate(SETTINGS_NAMESPACE, `servers.${name}.enabled`, enabled));
+        settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['servers', name, 'enabled'], value: enabled }]));
       return refused ?? { ok: true, serverName: name };
     },
   };

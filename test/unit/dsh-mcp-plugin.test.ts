@@ -8,12 +8,15 @@
 //    ——官方一手来源（@deepseek-ai/dsh-mcp-manager@0.2.2-rc.2 src/index.ts list/watch，
 //    types.ts McpManagedServerView/McpManagedServerStatus）。替身 watch 一次性 yield 当前
 //    列表后结束；官方为常驻流直至 abort——替身简化点，钉替身契约。
-// 2. ctx.settings.update(namespace, patch) / mutate(namespace, path, value)
-//    ——调研报告 F1.4 一手引文形态（「update 合并 / replace 重置继承 / mutate 按路径」
-//    「Every write validates the complete Config and refuses stale revisions before
-//    persistence」，映射要点 update('mcp', { servers: … })）。mutate 的 value = null =
-//    移除该路径是替身契约钉死点（官方 settings 包不在依赖树，方法级签名以报告引文为界；
-//    集成票复核）。替身记录调用不落盘。
+// 2. ctx.settings.update(namespace, patch) / mutate(namespace, ops)
+//    ——官方一手来源（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts
+//    SettingsForms，票 20261118-2d72 取证）：update(ns, patch, expectedRevision?) 深合并
+//    （实现实证兼容，不动）；mutate(ns, ops, expectedRevision?) 的 ops = SettingsPathOp[]
+//    = {op:'set', path:string[], value} | {op:'unset', path:string[]}——字符串三参旧调用
+//    即 TypeError ops.reduce is not a function（官方实现经 ops.reduce 消费，975b 探针 1
+//    实证）；value:null 是写 null 不是删键，删键 = {op:'unset'}（官方 unset 语义：对象
+//    parent 删键、数组 parent 删元素）。替身 mutate 镜像该证伪形态（ops 非数组即抛同款
+//    TypeError），记录调用不落盘；expectedRevision 本插件不传，替身签名保留形参位。
 // 3. ctx.commands.register({ name, description, handler })——官方一手来源
 //    （@deepseek-ai/dsh-commands@0.2.2-rc.1 lib/types/index.d.ts CommandDefinition +
 //    lib/types/index.js normalizeDefinition 校验，票 20261118-2d72 探针 2A/2B 取证）：
@@ -72,12 +75,18 @@ interface CapturedTool {
   output: { schema: unknown; render(args: unknown, value: unknown): unknown[] };
 }
 
+/** 官方 SettingsPathOp 镜像（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts 一手来源）。 */
+interface SettingsOpStub {
+  op: 'set' | 'unset';
+  path: string[];
+  value?: unknown;
+}
+
 interface SettingsCall {
   kind: 'update' | 'mutate';
   namespace: string;
   patch?: Record<string, unknown>;
-  path?: string;
-  value?: unknown;
+  ops?: SettingsOpStub[];
 }
 
 interface StubContext {
@@ -86,7 +95,7 @@ interface StubContext {
   tools: { register(definition: CapturedTool): () => void };
   settings: {
     update(namespace: string, patch: Record<string, unknown>): Promise<void>;
-    mutate(namespace: string, path: string, value: unknown): Promise<void>;
+    mutate(namespace: string, ops: readonly SettingsOpStub[], expectedRevision?: number): Promise<void>;
   };
   mcpManager: {
     list(): McpManagedServerView[];
@@ -128,8 +137,12 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
       async update(namespace, patch) {
         captured.settingsCalls.push({ kind: 'update', namespace, patch });
       },
-      async mutate(namespace, path, value) {
-        captured.settingsCalls.push({ kind: 'mutate', namespace, path, value });
+      async mutate(namespace, ops, _expectedRevision) {
+        // 官方 mutate 证伪形态镜像（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.js：
+        // 实现经 ops.reduce 消费 ops 数组，票 20261118-2d72）——字符串三参旧形态在此抛同款
+        // TypeError（975b 探针 1 实证的失败）。
+        if (!Array.isArray(ops)) throw new TypeError('ops.reduce is not a function');
+        captured.settingsCalls.push({ kind: 'mutate', namespace, ops: [...ops] });
       },
     },
     mcpManager: {
@@ -312,7 +325,7 @@ test('命令 add stdio 与工具同调：settings.update("mcp", …) 调用形�
   }], '命令入口与工具入口产出同一写通道调用（--env/--cwd 选项测试见凭据透传批）');
 });
 
-test('工具 remove 成功：settings.mutate("mcp", "servers.<name>", null)（AC3 按路径写）', async () => {
+test('工具 remove 成功：settings.mutate("mcp", [{op:"unset", path:["servers", 名]}])（AC3 官方 ops 数组形态）', async () => {
   const plugin = await loadPlugin();
   const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
   plugin.apply(ctx);
@@ -321,11 +334,11 @@ test('工具 remove 成功：settings.mutate("mcp", "servers.<name>", null)（AC
   const result = (await tool.execute({ action: 'remove', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
   assert.equal(result.ok, true, 'remove 成功返回 ok:true');
   assert.deepEqual(ctx.captured.settingsCalls, [
-    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher', value: null },
-  ], '移除 = 按路径 mutate，value null 表达移除（替身契约钉死点）');
+    { kind: 'mutate', namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'searcher'] }] },
+  ], '移除 = 官方 SettingsPathOp unset 删键（value:null 是写 null 非删键——替身契约钉死点，票 20261118-2d72）');
 });
 
-test('工具 disable/enable 成功：settings.mutate("mcp", "servers.<name>.enabled", 布尔)（AC3+AC4 语义：仅写持久意图字段）', async () => {
+test('工具 disable/enable 成功：settings.mutate("mcp", [{op:"set", path:["servers",名,"enabled"], value:布尔}])（AC3+AC4 语义：仅写持久意图字段）', async () => {
   const plugin = await loadPlugin();
   const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
   plugin.apply(ctx);
@@ -336,9 +349,9 @@ test('工具 disable/enable 成功：settings.mutate("mcp", "servers.<name>.enab
   assert.equal(disabled.ok, true, 'disable 成功返回 ok:true');
   assert.equal(enabled.ok, true, 'enable 成功返回 ok:true');
   assert.deepEqual(ctx.captured.settingsCalls, [
-    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher.enabled', value: false },
-    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher.enabled', value: true },
-  ], '启停只写 servers.<name>.enabled 路径——其余字段不动，官方 reconcile 依 enabled 切换挂载（禁用卸载保条目/启用重建）');
+    { kind: 'mutate', namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: false }] },
+    { kind: 'mutate', namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: true }] },
+  ], '启停 = 官方 SettingsPathOp set 只写 servers.<name>.enabled——其余字段不动，官方 reconcile 依 enabled 切换挂载（禁用卸载保条目/启用重建）');
 });
 
 test('写路径绕行哨兵：替身 ctx 的 fiber.update 为必炸哨兵且全程不被触碰（AC3 排除 fiber.update 直改）', async () => {
