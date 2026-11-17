@@ -7,10 +7,17 @@
 #      自定义 profile 不含，故本插件自带挂载行；inject: [credentials] 支持凭据模板展开
 #      （F2.3：含凭据模板时组合行需 inject: [credentials]）。行 id 取 mcp，对齐官方 Settings
 #      命名空间口径（F2.3：Settings 用条目 id 作命名空间，web 上为 mcp）。
-#   2. @hankchen/dsh-mcp——本插件模块行，id dsh-mcp-manage（demo 先例命名法：<包名简写>-<用途>）。
+#   2. @hankchen/dsh-mcp——本插件模块行，id dsh-mcp-manage（demo 先例命名法：<包名简写>-<用途>）；
+#      inject 声明 apply 前必须存在的四个服务（票 20261117-dd1f 裁决）：apply 期注册面
+#      ctx.commands/ctx.tools、执行期读写通道 ctx.mcpManager/ctx.settings——cordis 语义
+#      「inject tells Cordis which services must exist before the plugin runs」，loader 将
+#      EntryOptions.inject 并入 fiber 要求集（Inject.resolve）后才激活插件；credentials 不在
+#      插件行：插件只透传 ${credential:REF} 模板串，展开归官方运行时（manager 行已带
+#      inject: [credentials]）。
 - insert:
     - id: mcp
       name: '@deepseek-ai/dsh-mcp-manager'
       inject: [credentials]
     - id: dsh-mcp-manage
       name: '@hankchen/dsh-mcp'
+      inject: [mcpManager, commands, tools, settings]
