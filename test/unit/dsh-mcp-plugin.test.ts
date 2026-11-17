@@ -8,15 +8,26 @@
 //    ——官方一手来源（@deepseek-ai/dsh-mcp-manager@0.2.2-rc.2 src/index.ts list/watch，
 //    types.ts McpManagedServerView/McpManagedServerStatus）。替身 watch 一次性 yield 当前
 //    列表后结束；官方为常驻流直至 abort——替身简化点，钉替身契约。
-// 2. ctx.settings.update(namespace, patch) / mutate(namespace, path, value)
-//    ——调研报告 F1.4 一手引文形态（「update 合并 / replace 重置继承 / mutate 按路径」
-//    「Every write validates the complete Config and refuses stale revisions before
-//    persistence」，映射要点 update('mcp', { servers: … })）。mutate 的 value = null =
-//    移除该路径是替身契约钉死点（官方 settings 包不在依赖树，方法级签名以报告引文为界；
-//    集成票复核）。替身记录调用不落盘。
-// 3. ctx.commands.register({ name, description, execute(line) })——替身契约：官方命令
-//    插件侧注册签名无一手来源（调研报告 F2.1 只核消费面 Remote list/execute），definition
-//    形态与「execute 返回回复文本、预期拒绝不抛异常」为替身钉死契约，集成票复核。
+// 2. ctx.settings.update(namespace, patch) / mutate(namespace, ops)
+//    ——官方一手来源（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts
+//    SettingsForms，票 20261118-2d72 取证）：update(ns, patch, expectedRevision?) 深合并
+//    （实现实证兼容，不动）；mutate(ns, ops, expectedRevision?) 的 ops = SettingsPathOp[]
+//    = {op:'set', path:string[], value} | {op:'unset', path:string[]}——字符串三参旧调用
+//    在实参求值阶段即抛 `ops.map is not a function`（官方实参表 ops.map(op=>op.path) 先于
+//    write 回调的 ops.reduce 消费，评审标准轴 F1 对一手源码实证）；value:null 是写 null
+//    不是删键，删键 = {op:'unset'}（官方 unset 语义：对象
+//    parent 删键、数组 parent 删元素）。替身 mutate 镜像该证伪形态（ops 非数组即抛同款
+//    TypeError），记录调用不落盘；expectedRevision 本插件不传，替身签名保留形参位。
+// 3. ctx.commands.register({ name, description, handler })——官方一手来源
+//    （@deepseek-ai/dsh-commands@0.2.2-rc.1 lib/types/index.d.ts CommandDefinition +
+//    lib/types/index.js normalizeDefinition 校验，票 20261118-2d72 探针 2A/2B 取证）：
+//    name 须 /^[a-z][a-z0-9_-]*$/、description 须非空字符串、handler 须函数——handler
+//    缺失即同步抛 `command "<名>" handler must be a function`（探针 2A 实证的旧形态失败）。
+//    handler 收 CommandInvocation（官方全形态含 commandId/agent/rawInput/attachments/signal；
+//    本插件只消费 rawInput = 命令名之后的原文、含分隔空白），须返回 CommandResult =
+//    {kind:'success', text?} | {kind:'error', text}（预期拒绝显式返回 error，不抛）。
+//    替身 register 镜像 handler 校验这一证伪形态（旧 execute(line) 形态注册即红），
+//    记录注册不做官方 insert；name/description 为常量字段、形态由 AC1 断言覆盖。
 // 4. ctx.tools.register(definition)——官方一手来源（@deepseek-ai/dsh-tools@0.2.2-rc.2
 //    src/index.ts register + src/contracts.ts ToolDefinition/ToolSchema/ToolOutputDefinition）：
 //    definition = { name, description, parameters, execute(args, exec), output: { schema,
@@ -39,10 +50,22 @@ interface McpManagedServerView {
 
 // ---- 替身 ctx（每个测试独立实例；记录注册与 settings 调用供断言）----
 
+/** 官方 CommandInvocation 的插件消费面镜像（@deepseek-ai/dsh-commands@0.2.2-rc.1 一手来源）。 */
+interface CommandInvocationStub {
+  agent: unknown;
+  rawInput: string;
+}
+
+/** 官方 CommandResult 镜像（@deepseek-ai/dsh-commands@0.2.2-rc.1 lib/types/types.d.ts）。 */
+interface CommandResultStub {
+  kind: 'success' | 'error';
+  text?: string;
+}
+
 interface CapturedCommand {
   name: string;
   description: string;
-  execute(line: string): string | Promise<string>;
+  handler(invocation: CommandInvocationStub): CommandResultStub | Promise<CommandResultStub>;
 }
 
 interface CapturedTool {
@@ -53,12 +76,16 @@ interface CapturedTool {
   output: { schema: unknown; render(args: unknown, value: unknown): unknown[] };
 }
 
+/** 官方 SettingsPathOp 镜像（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.d.ts 一手来源，判别联合同形：set 必带 value，缺 value 官方运行时语义为删键）。 */
+type SettingsOpStub =
+  | { op: 'set'; path: string[]; value: unknown }
+  | { op: 'unset'; path: string[] };
+
 interface SettingsCall {
   kind: 'update' | 'mutate';
   namespace: string;
   patch?: Record<string, unknown>;
-  path?: string;
-  value?: unknown;
+  ops?: SettingsOpStub[];
 }
 
 interface StubContext {
@@ -67,7 +94,7 @@ interface StubContext {
   tools: { register(definition: CapturedTool): () => void };
   settings: {
     update(namespace: string, patch: Record<string, unknown>): Promise<void>;
-    mutate(namespace: string, path: string, value: unknown): Promise<void>;
+    mutate(namespace: string, ops: readonly SettingsOpStub[], expectedRevision?: number): Promise<void>;
   };
   mcpManager: {
     list(): McpManagedServerView[];
@@ -89,6 +116,12 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
     commands: {
       register(definition) {
+        // 官方 normalizeDefinition 注册期校验的证伪形态镜像（@deepseek-ai/dsh-commands@0.2.2-rc.1
+        // lib/types/index.js，票 20261118-2d72 探针 2A 一手实证）：handler 非函数同步抛——
+        // 旧 execute(line) 形态在此红；name/description 校验项为常量字段，形态由 AC1 断言覆盖。
+        if (typeof definition.handler !== 'function') {
+          throw new TypeError(`command "${definition.name}" handler must be a function`);
+        }
         captured.commands.push(definition);
         return () => undefined;
       },
@@ -103,8 +136,13 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
       async update(namespace, patch) {
         captured.settingsCalls.push({ kind: 'update', namespace, patch });
       },
-      async mutate(namespace, path, value) {
-        captured.settingsCalls.push({ kind: 'mutate', namespace, path, value });
+      async mutate(namespace, ops, _expectedRevision) {
+        // 官方 mutate 证伪形态镜像（@deepseek-ai/dsh-settings@0.2.2-rc.1 lib/types/index.js：
+        // 第 4 实参 ops.map(op=>op.path) 在调用 write 前即求值，字符串三参旧形态抛
+        // `ops.map is not a function`——评审标准轴 F1 对一手源码实证，非 975b 探针
+        // 引述的 ops.reduce 文案）。
+        if (!Array.isArray(ops)) throw new TypeError('ops.map is not a function');
+        captured.settingsCalls.push({ kind: 'mutate', namespace, ops: [...ops] });
       },
     },
     mcpManager: {
@@ -127,6 +165,16 @@ function viewOf(name: string, status: unknown, configured = true): McpManagedSer
   return { name, configured, status };
 }
 
+/**
+ * 官方 CommandInvocation 测试构形（@deepseek-ai/dsh-commands@0.2.2-rc.1 lib/types/index.d.ts
+ * 一手镜像）：rawInput = 命令名之后的原文、含分隔空白（官方 parseCommand 切分口径），故调用侧
+ * 传入带前导空格的原文；agent 为命令所达 agent 的占位。官方全形态另含 commandId/attachments/
+ * signal，本插件不消费、不给占位——插件若开始消费即红（替身契约钉死点）。
+ */
+function mcpInvocation(rawInput: string): CommandInvocationStub {
+  return { agent: {}, rawInput: ` ${rawInput}` };
+}
+
 async function loadPlugin(): Promise<{
   name: string;
   apply(ctx: StubContext): void;
@@ -146,7 +194,9 @@ test('apply 即注册 /mcp 人类命令与 mcp_manage 模型工具（AC1 双入�
   plugin.apply(ctx);
   assert.equal(ctx.captured.commands.length, 1, 'ctx.commands 恰注册一条命令');
   assert.equal(ctx.captured.commands[0].name, 'mcp', '命令名 = mcp（/mcp 由交互适配器加斜杠前缀）');
-  assert.equal(typeof ctx.captured.commands[0].execute, 'function', '命令带 execute 执行体');
+  assert.equal(typeof ctx.captured.commands[0].description, 'string', '注册形态：description 为字符串（官方 normalizeDefinition 要求）');
+  assert.ok(ctx.captured.commands[0].description.length > 0, '注册形态：description 非空（官方 normalizeDefinition 要求）');
+  assert.equal(typeof ctx.captured.commands[0].handler, 'function', '注册形态：handler 为函数（官方 CommandDefinition 一手形态，票 20261118-2d72）');
   assert.equal(ctx.captured.tools.length, 1, 'ctx.tools.register 恰注册一个管理工具');
   assert.equal(ctx.captured.tools[0].name, 'mcp_manage', '工具名 design 定稿 = mcp_manage');
   assert.equal(typeof ctx.captured.tools[0].execute, 'function', '工具带 execute 执行体');
@@ -179,12 +229,39 @@ test('两入口同调管理服务：list 读操作经工具与命令都投影同
     '工具 list 投影逐字保留官方状态对象（connected 含 toolCount）',
   );
 
-  const commandReply = await command.execute('list');
-  assert.match(commandReply, /github/, '命令 list 回复含 server 名 github');
-  assert.match(commandReply, /docs/, '命令 list 回复含 server 名 docs');
-  assert.match(commandReply, /connected/, '命令 list 回复含连接状态投影');
+  const commandReply = await command.handler(mcpInvocation('list'));
+  assert.equal(commandReply.kind, 'success', '命令 list 返回官方 success 形态');
+  assert.match(commandReply.text ?? '', /github/, '命令 list 回复含 server 名 github');
+  assert.match(commandReply.text ?? '', /docs/, '命令 list 回复含 server 名 docs');
+  assert.match(commandReply.text ?? '', /connected/, '命令 list 回复含连接状态投影');
 
   assert.deepEqual(ctx.captured.settingsCalls, [], '读操作不得触碰写通道（settings 零调用）');
+});
+
+test('命令 handler 子命令分发返回官方 CommandResult 形态：help/list success、未知子命令与缺参 error 必带 text（AC1 形态面）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([viewOf('a', { state: 'connected', toolCount: 0, connectedAt: 1 })]);
+  plugin.apply(ctx);
+  const command = ctx.captured.commands[0];
+
+  const help = await command.handler(mcpInvocation('help'));
+  const bare = await command.handler(mcpInvocation(''));
+  for (const reply of [help, bare]) {
+    assert.equal(reply.kind, 'success', 'help（含裸 /mcp）= success 信息性回复');
+    assert.match(reply.text ?? '', /\/mcp list/, 'help 回复含子命令清单');
+  }
+  const listed = await command.handler(mcpInvocation('list'));
+  assert.equal(listed.kind, 'success', 'list 子命令分发 = success');
+  assert.match(listed.text ?? '', /a：/, 'list 分发读到替身视图');
+
+  const unknown = await command.handler(mcpInvocation('wat'));
+  assert.equal(unknown.kind, 'error', '未知子命令 = error（预期拒绝显式返回）');
+  assert.match(unknown.text ?? '', /未知子命令 "wat"/, 'error 回复指明未知子命令');
+  assert.ok((unknown.text ?? '').length > 0, '官方 CommandResult：error 必带 text（success 才可缺省）');
+
+  const nameless = await command.handler(mcpInvocation('remove'));
+  assert.equal(nameless.kind, 'error', 'remove 缺参 = error');
+  assert.match(nameless.text ?? '', /用法：\/mcp remove <name>/, '缺参回复带用法');
 });
 
 // ---- AC3：写通道 = 官方 settings/configEditor 持久化 API（命名空间 = 挂载行 entry id mcp）----
@@ -229,8 +306,9 @@ test('命令 add stdio 与工具同调：settings.update("mcp", …) 调用形�
   plugin.apply(ctx);
   const command = ctx.captured.commands[0];
 
-  const reply = await command.execute('add stdio searcher npx -y @modelcontextprotocol/server-search');
-  assert.match(reply, /searcher/, '命令回复确认提交对象');
+  const reply = await command.handler(mcpInvocation('add stdio searcher npx -y @modelcontextprotocol/server-search'));
+  assert.equal(reply.kind, 'success', '命令 add 成功返回官方 success 形态');
+  assert.match(reply.text ?? '', /searcher/, '命令回复确认提交对象');
 
   assert.deepEqual(ctx.captured.settingsCalls, [{
     kind: 'update',
@@ -247,7 +325,7 @@ test('命令 add stdio 与工具同调：settings.update("mcp", …) 调用形�
   }], '命令入口与工具入口产出同一写通道调用（--env/--cwd 选项测试见凭据透传批）');
 });
 
-test('工具 remove 成功：settings.mutate("mcp", "servers.<name>", null)（AC3 按路径写）', async () => {
+test('工具 remove 成功：settings.mutate("mcp", [{op:"unset", path:["servers", 名]}])（AC3 官方 ops 数组形态）', async () => {
   const plugin = await loadPlugin();
   const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
   plugin.apply(ctx);
@@ -256,11 +334,11 @@ test('工具 remove 成功：settings.mutate("mcp", "servers.<name>", null)（AC
   const result = (await tool.execute({ action: 'remove', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
   assert.equal(result.ok, true, 'remove 成功返回 ok:true');
   assert.deepEqual(ctx.captured.settingsCalls, [
-    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher', value: null },
-  ], '移除 = 按路径 mutate，value null 表达移除（替身契约钉死点）');
+    { kind: 'mutate', namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'searcher'] }] },
+  ], '移除 = 官方 SettingsPathOp unset 删键（value:null 是写 null 非删键——替身契约钉死点，票 20261118-2d72）');
 });
 
-test('工具 disable/enable 成功：settings.mutate("mcp", "servers.<name>.enabled", 布尔)（AC3+AC4 语义：仅写持久意图字段）', async () => {
+test('工具 disable/enable 成功：settings.mutate("mcp", [{op:"set", path:["servers",名,"enabled"], value:布尔}])（AC3+AC4 语义：仅写持久意图字段）', async () => {
   const plugin = await loadPlugin();
   const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
   plugin.apply(ctx);
@@ -271,9 +349,9 @@ test('工具 disable/enable 成功：settings.mutate("mcp", "servers.<name>.enab
   assert.equal(disabled.ok, true, 'disable 成功返回 ok:true');
   assert.equal(enabled.ok, true, 'enable 成功返回 ok:true');
   assert.deepEqual(ctx.captured.settingsCalls, [
-    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher.enabled', value: false },
-    { kind: 'mutate', namespace: 'mcp', path: 'servers.searcher.enabled', value: true },
-  ], '启停只写 servers.<name>.enabled 路径——其余字段不动，官方 reconcile 依 enabled 切换挂载（禁用卸载保条目/启用重建）');
+    { kind: 'mutate', namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: false }] },
+    { kind: 'mutate', namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: true }] },
+  ], '启停 = 官方 SettingsPathOp set 只写 servers.<name>.enabled——其余字段不动，官方 reconcile 依 enabled 切换挂载（禁用卸载保条目/启用重建）');
 });
 
 test('写路径绕行哨兵：替身 ctx 的 fiber.update 为必炸哨兵且全程不被触碰（AC3 排除 fiber.update 直改）', async () => {
@@ -506,8 +584,9 @@ test('命令写子命令与工具同拒绝语义：坏参数零 settings 调用�
   plugin.apply(ctx);
   const command = ctx.captured.commands[0];
 
-  const reply = await command.execute('add stdio broken');
-  assert.match(reply, /command/, '命令缺 command 的拒绝回复指明字段');
+  const reply = await command.handler(mcpInvocation('add stdio broken'));
+  assert.equal(reply.kind, 'error', '命令写被拒返回官方 error 形态（预期拒绝显式 error，不抛）');
+  assert.match(reply.text ?? '', /command/, '命令缺 command 的拒绝回复指明字段');
   assert.deepEqual(ctx.captured.settingsCalls, [], '命令面被拒写零 settings 调用');
 });
 
@@ -556,9 +635,10 @@ test('list 投影保留 failed 原因线索：工具与命令均可查询（AC4�
   assert.equal(toolResult.servers[0].status.reason, 'load', '失败原因线索 reason 可查询');
   assert.equal(toolResult.servers[0].status.lastError, 'spawn ENOENT', 'load.lastError 原因线索逐字可查询');
 
-  const reply = await command.execute('list');
-  assert.match(reply, /failed\(load\)：spawn ENOENT/, '命令投影含 failed 原因与 lastError');
-  assert.match(reply, /failed\(cleanup\).*closeConfirmed=false/, 'cleanup 失败线索（closeConfirmed）可查询');
+  const reply = await command.handler(mcpInvocation('list'));
+  assert.equal(reply.kind, 'success', '命令 list 返回官方 success 形态');
+  assert.match(reply.text ?? '', /failed\(load\)：spawn ENOENT/, '命令投影含 failed 原因与 lastError');
+  assert.match(reply.text ?? '', /failed\(cleanup\).*closeConfirmed=false/, 'cleanup 失败线索（closeConfirmed）可查询');
 });
 
 test('list 投影含 waiting-credentials 状态（AC5+AC4：凭据引用缺失的官方状态经投影可查询）', async () => {
@@ -576,7 +656,8 @@ test('list 投影含 waiting-credentials 状态（AC5+AC4：凭据引用缺失�
   assert.equal(toolResult.servers[0].status.state, 'waiting-credentials', 'waiting-credentials 状态经投影可查询');
   assert.equal(toolResult.servers[0].status.lastError, 'credential GITHUB_TOKEN 未配置', '凭据缺失线索逐字可查询');
 
-  const reply = await command.execute('list');
-  assert.match(reply, /waiting-credentials/, '命令投影含 waiting-credentials 状态');
-  assert.match(reply, /GITHUB_TOKEN/, '命令投影含凭据缺失线索');
+  const reply = await command.handler(mcpInvocation('list'));
+  assert.equal(reply.kind, 'success', '命令 list 返回官方 success 形态');
+  assert.match(reply.text ?? '', /waiting-credentials/, '命令投影含 waiting-credentials 状态');
+  assert.match(reply.text ?? '', /GITHUB_TOKEN/, '命令投影含凭据缺失线索');
 });
