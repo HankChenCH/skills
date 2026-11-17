@@ -30,6 +30,7 @@ server 条目的 `env` / `headers` / `command` / `args` / `cwd` / `url` 值支�
 
 ## 已知边界
 
+- **官方兼容星座未定（2026-11-18 核验，票 20261118-2d72）**：官方 `@deepseek-ai/dsh-mcp-manager` 0.2.2-rc.2+ 的 peer 精确钉同 rc 兄弟套件，要求宿主 dsh ≥ `0.2.2-rc.2`；官方 npm `latest` 标签仍是 `0.2.2-rc.1`（rc.2+ 在 `next` 下未升级）。本插件因此声明 `engines.dsh >=0.2.2-rc.2`——装进 latest（rc.1）宿主 profile 会被版本声明显式拒绝，属预期 fail-loud 而非缺陷；官方发布兼容星座后无需改插件即可直装。
 - **`desktop` profile 装不了**：`desktop` 是官方保留 profile 名，官方 CLI 拒绝对其做插件管理；套件安装器同样在执行官方命令前拒装并说明。
 - **registry 访问受限**：插件安装链路比技能安装多三处 npm registry 访问（npx 拉官方 CLI `@deepseek-ai/dsh`、装本插件包、profile 依赖经 pnpm 安装）。内网、公司代理环境先配镜像或代理再安装：
 
