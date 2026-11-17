@@ -282,7 +282,12 @@ test('[FR-4] plugin add 不存在的插件名：报错列可用插件清单、�
   });
   assert.equal(code, 1, '未知插件名应失败退出');
   assert.equal(stdout, '');
-  assert.equal(stderr, `✗ 以下插件不在套件包内：@hankchen/no-such；可用插件：${PKG}\n`);
+  // 期望字面为编目快照（独立来源 = 仓库 agents/dsh/plugins/ 目录事实）：新插件包入编目后
+  // 快照随之更新（票 20261117-0ea9：dsh-mcp 入包，可用清单两项，按编目 sort 序）。
+  assert.equal(
+    stderr,
+    `✗ 以下插件不在套件包内：@hankchen/no-such；可用插件：${PKG}、@hankchen/dsh-mcp\n`,
+  );
   assert.equal(fs.existsSync(shimLog), false, '未知插件名不得执行官方命令');
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
 });
