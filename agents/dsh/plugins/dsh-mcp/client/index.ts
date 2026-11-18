@@ -85,10 +85,15 @@ interface RemoteStreamHandle<Out> extends AsyncIterable<Out> {
 /** 官方 Remote 结果（@deepseek-ai/dsh-typert-protocol types.d.ts RemoteResult 一手来源）。 */
 type RemoteResult<T> = { ok: true; value: T } | { ok: false; error: { message?: string } };
 
-/** 官方 settings 命名空间视图（dsh-settings types.d.ts SettingsNamespaceView 一手来源；value 恒 redact）。 */
+/**
+ * 官方 settings 命名空间视图（dsh-settings types.d.ts SettingsNamespaceView 一手来源；
+ * value 恒 redact）。revision = 官方视图 required 字段（dsh-settings src/index.ts 一手：
+ * monotonic，写入即 +1，describe/写后视图均带）——写面回传作 expectedRevision（票 1dc4）。
+ */
 interface SettingsNamespaceView {
   ns: string;
   value: unknown;
+  revision: number;
 }
 
 /** 官方 settings describe 答复（dsh-settings types.d.ts SettingsDescribeValue 一手来源）。 */
@@ -130,8 +135,12 @@ interface ClientContext {
     };
     settings: {
       describe(): Promise<RemoteResult<SettingsDescribeValue>>;
-      update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResult<unknown>>;
-      mutate(namespace: string, ops: readonly SettingsPathOp[]): Promise<RemoteResult<unknown>>;
+      // 官方 remote 写面三参形态（票 1dc4 探针实证：dsh-api-settings-controller
+      // lib/typert.remote-client.d.ts——expectedRevision 为 TS 必传位（无 ? 标记），
+      // number | undefined；gateway prepareInvocation 参数个数校验在 codec 之前，
+      // acceptsUndefined 不豁免传参个数——undefined 亦须显式传位）
+      update(namespace: string, patch: Record<string, unknown>, expectedRevision: number | undefined): Promise<RemoteResult<unknown>>;
+      mutate(namespace: string, ops: readonly SettingsPathOp[], expectedRevision: number | undefined): Promise<RemoteResult<unknown>>;
     };
   };
 }
@@ -156,13 +165,21 @@ type SettingsPathOp =
 
 /**
  * 官方 settings Remote 写面消费子集（@deepseek-ai/dsh-api-settings-controller
- * lib/typert.remote-client.d.ts 一手来源）：update 拒写经 {ok:false, error} 显式返回非抛出；
- * expectedRevision 官方形参可省（round 1 双入口同形态——本面板不传）。
+ * lib/typert.remote-client.d.ts 一手来源）：update/mutate 拒写经 {ok:false, error} 显式
+ * 返回非抛出。三参形态（票 1dc4 探针实证，round 1「expectedRevision 可省」假设被真机
+ * 证伪——gateway prepareInvocation 严格按 descriptor.parameters.length 数参）：第三参
+ * expectedRevision: number | undefined 为必传位（契约声明 acceptsUndefined: true +
+ * description「revision the caller read; undefined writes unconditionally.」）；语义 =
+ * describe 读到的 revision 回传，stale 编辑被官方拒（SettingsRevisionConflict）而非静默
+ * 覆写并发改动。官方消费方先例（三处一手源码）均传视图读值：dsh-client-ui-settings
+ * src/client/config-form.ts:134（mutate(ns, ops, revision)）、dsh-client-ui-agent-preset
+ * src/client/settings-store.ts:35（update(ns, patch, expectedRevision)）、
+ * dsh-client-ui-settings-models src/client/operations.ts:87（mutate(ns, ops, expectedRevision)）。
  */
 interface SettingsWriteFace {
   describe(): Promise<RemoteResult<SettingsDescribeValue>>;
-  update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResult<unknown>>;
-  mutate(namespace: string, ops: readonly SettingsPathOp[]): Promise<RemoteResult<unknown>>;
+  update(namespace: string, patch: Record<string, unknown>, expectedRevision: number | undefined): Promise<RemoteResult<unknown>>;
+  mutate(namespace: string, ops: readonly SettingsPathOp[], expectedRevision: number | undefined): Promise<RemoteResult<unknown>>;
 }
 
 /** 官方 SERVER_NAME_PATTERN（@deepseek-ai/dsh-mcp-client src/index.ts 一手来源，与 Host 面 index.ts 逐字同值）。 */
@@ -186,9 +203,11 @@ function isMcpConfigValue(value: unknown): boolean {
  * ns 写即拒 `No configurable plugin entry`），行 id 随组合变化——web/desktop 为官方预挂行
  * id mcp-manager（dsh-web-app patch 一手），补位组合为插件行 id mcp。写/读时经 describe
  * 派生实际生效域：value.servers 在场的唯一 ns；describe 被拒、零在场或多于一个在场即拒绝
- * （fail loud 不猜测）。
+ * （fail loud 不猜测）。revision 随派生带出（票 1dc4）：写目标域视图的 revision 供写面
+ * expectedRevision 用——每个写路径都紧邻写前经本函数 describe，读值即写前最新 revision，
+ * 零额外读且并发改动被官方 stale 拒绝保护。
  */
-async function deriveMcpNamespace(settings: SettingsWriteFace): Promise<{ namespace: string } | { refusal: string }> {
+async function deriveMcpNamespace(settings: SettingsWriteFace): Promise<{ namespace: string; revision: number } | { refusal: string }> {
   let described: RemoteResult<SettingsDescribeValue>;
   try {
     described = await settings.describe();
@@ -205,7 +224,7 @@ async function deriveMcpNamespace(settings: SettingsWriteFace): Promise<{ namesp
   if (candidates.length > 1) {
     return { refusal: `settings describe 有 ${String(candidates.length)} 个 servers 配置域（${candidates.map((row) => row.ns).join('、')}）：manager 提供者不唯一，拒绝猜测写目标` };
   }
-  return { namespace: candidates[0].ns };
+  return { namespace: candidates[0].ns, revision: candidates[0].revision };
 }
 
 /**
@@ -332,8 +351,9 @@ function editOps(name: string, current: Record<string, unknown>, draft: EditForm
 /**
  * 面板写面工厂（add 通道语义与 round 1 createManagementService.addServer 同源：命名规则
  * 镜像官方 SERVER_NAME_PATTERN、冲突守卫查当前 watch 视图（update 深合并会静默覆写同名
- * 条目）、写形态 = update('mcp', {servers:{…}}) 只含非空字段；轻校验 + 官方写时校验后盾，
- * 拒绝与官方拒写均显式内联不吞）。快照持有者由 apply 建立并随 watch 批刷新。
+ * 条目）、写形态 = update(ns, {servers:{…}}, expectedRevision) 只含非空字段——expectedRevision
+ * 由紧邻写前的 describe 派生带出（票 1dc4，官方消费方 config-form 先例同形态）；轻校验 +
+ * 官方写时校验后盾，拒绝与官方拒写均显式内联不吞）。快照持有者由 apply 建立并随 watch 批刷新。
  */
 function createMcpPanelWrites(
   channels: { settings: SettingsWriteFace; mcpManager: McpManagerRetryFace },
@@ -374,11 +394,12 @@ function createMcpPanelWrites(
           if (Object.keys(headers).length > 0) entry.headers = headers;
         }
       }
-      // ns 写前派生（票 08f8）：派生拒绝与官方拒写同走内联报错，零猜测零旁路
+      // ns/revision 写前派生（票 08f8 + 1dc4）：派生拒绝与官方拒写同走内联报错，零猜测零旁路
       const derived = await deriveMcpNamespace(channels.settings);
       if ('refusal' in derived) return { ok: false, error: derived.refusal };
       try {
-        const refused = writeRefused(await channels.settings.update(derived.namespace, { servers: { [name]: entry } }));
+        const refused = writeRefused(await channels.settings.update(derived.namespace,
+          { servers: { [name]: entry } }, derived.revision));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交 server "${name}"（${draft.transport}）——官方 reconcile 即时生效` };
       } catch (error) {
@@ -406,6 +427,9 @@ function createMcpPanelWrites(
           : `settings describe 有 ${String(domains.length)} 个 servers 配置域（${domains.map((row) => row.ns).join('、')}）：manager 提供者不唯一，拒绝猜测写目标` };
       }
       const namespace = domains[0].ns;
+      // revision 与 ops 基线同源（票 1dc4）：同一次 describe 的视图 revision 回传作
+      // expectedRevision——diff 基线与乐观锁读值严格同刻，无窗口
+      const revision = domains[0].revision;
       const servers = (domains[0].value as { servers?: Record<string, Record<string, unknown>> } | undefined)?.servers;
       const current = servers?.[name];
       if (current === undefined) return { ok: false, error: `server "${name}"：无配置条目可编辑（/mcp list 查看现存 server）` };
@@ -413,7 +437,7 @@ function createMcpPanelWrites(
       if (typeof ops === 'string') return { ok: false, error: ops };
       if (ops.length === 0) return { ok: true, message: '无变更——未改任何字段，官方配置保持原样' };
       try {
-        const refused = writeRefused(await channels.settings.mutate(namespace, ops));
+        const refused = writeRefused(await channels.settings.mutate(namespace, ops, revision));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交 server "${name}" 的编辑（${String(ops.length)} 项变更）——官方 reconcile 即时生效（字段变化重建单实例）` };
       } catch (error) {
@@ -433,7 +457,7 @@ function createMcpPanelWrites(
       if ('refusal' in derived) return { ok: false, error: derived.refusal };
       try {
         const refused = writeRefused(await channels.settings.mutate(derived.namespace,
-          [{ op: 'set', path: ['servers', name, 'enabled'], value: enabled }]));
+          [{ op: 'set', path: ['servers', name, 'enabled'], value: enabled }], derived.revision));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交 server "${name}" ${enabled ? '启用' : '停用'}——官方 reconcile 即时生效（禁用卸载保条目/启用重建）` };
       } catch (error) {
@@ -453,7 +477,7 @@ function createMcpPanelWrites(
       if ('refusal' in derived) return { ok: false, error: derived.refusal };
       try {
         const refused = writeRefused(await channels.settings.mutate(derived.namespace,
-          [{ op: 'unset', path: ['servers', name] }]));
+          [{ op: 'unset', path: ['servers', name] }], derived.revision));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交移除 server "${name}"——官方 reconcile 即时生效（条目卸载并消失）` };
       } catch (error) {
