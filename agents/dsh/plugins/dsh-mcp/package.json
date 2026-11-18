@@ -1,6 +1,6 @@
 {
   "name": "@hankchen/dsh-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "dsh MCP 对话内管理插件：装进 profile 即获得对话内增删启停 MCP server 的能力，全程不手写 YAML",
   "type": "module",
   "main": "index.ts",
