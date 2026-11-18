@@ -3,10 +3,18 @@
 # （@deepseek-ai/cordis-plugin-include）；insert 元素 = EntryOptions（@deepseek-ai/cordis-plugin-loader），
 # 须 id + name——name 是宿主从 profile 的 node_modules 解析的模块说明符。
 # 恰两 insert 行（need 20261117-ea73 FR-7，调研 20261117-ced7 F2.3）：
-#   1. @deepseek-ai/dsh-mcp-manager——官方只在 Web/Desktop profile 挂载该管理器，headless/sdk/acp
-#      自定义 profile 不含，故本插件自带挂载行；inject: [credentials] 支持凭据模板展开
-#      （F2.3：含凭据模板时组合行需 inject: [credentials]）。行 id 取 mcp，对齐官方 Settings
-#      命名空间口径（F2.3：Settings 用条目 id 作命名空间，web 上为 mcp）。
+#   1. @deepseek-ai/dsh-mcp-manager——补位行：官方只在 web/desktop 组合经官方 bundle 预挂
+#      该管理器（rc.4 一手：dsh-web-app cordis.patch.yml 自带 id: mcp-manager 行，官方注释
+#      明言它是 installed plugins 注册 server 的官方载体），sdk/headless/acp 自定义 profile
+#      不含。本行因此条件化（票 20261118-08f8）：disabled: !!js 表达式按官方先例
+#      （web-app preset 同款形态；求值 = cordis-plugin-loader with(ctx) eval，ctx 为 cordis
+#      Context，get 对缺失服务返回 undefined；boot 先 provide profileContext 后挂载条目）
+#      判 profileContext.startedBundles 含官方预挂 bundle（@deepseek-ai/dsh-web-app，rc.4
+#      星座唯一自带 mcp-manager 行者）——含则本行禁用（官方行独供，无 duplicate），不含则
+#      本行在场（补位独供）。行 id 取 mcp（补位组合 Settings ns 派生自本行 id——官方 Settings
+#      以 Loader entry id 为命名空间，dsh-settings write/describe 一手）；插件写面 ns 不
+#      硬编码、写时经 settings describe 派生实际生效行 id（见 index.ts resolveSettingsNamespace）。
+#      inject: [credentials] 支持凭据模板展开（F2.3：含凭据模板时组合行需 inject: [credentials]）。
 #   2. @hankchen/dsh-mcp——本插件模块行，id dsh-mcp-manage（demo 先例命名法：<包名简写>-<用途>）；
 #      inject 声明 apply 前必须存在的四个服务（票 20261117-dd1f 裁决）：apply 期注册面
 #      ctx.commands/ctx.tools、执行期读写通道 ctx.mcpManager/ctx.settings——cordis 语义
@@ -18,6 +26,7 @@
     - id: mcp
       name: '@deepseek-ai/dsh-mcp-manager'
       inject: [credentials]
+      disabled: !!js "ctx.get('profileContext')?.startedBundles?.includes('@deepseek-ai/dsh-web-app')"
     - id: dsh-mcp-manage
       name: '@hankchen/dsh-mcp'
       inject: [mcpManager, commands, tools, settings]

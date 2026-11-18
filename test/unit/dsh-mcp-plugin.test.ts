@@ -36,9 +36,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { load as loadYaml, JSON_SCHEMA, defineScalarTag } from 'js-yaml';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PLUGIN_URL = new URL('../../agents/dsh/plugins/dsh-mcp/index.ts', import.meta.url);
 const PLUGIN_NAME = '@hankchen/dsh-mcp';
+const PLUGIN_DIR = path.dirname(fileURLToPath(PLUGIN_URL));
 
 // ---- 官方形状（@deepseek-ai/dsh-mcp-manager@0.2.2-rc.2 types.ts 一手来源的结构镜像）----
 
@@ -660,4 +665,69 @@ test('list 投影含 waiting-credentials 状态（AC5+AC4：凭据引用缺失�
   assert.equal(reply.kind, 'success', '命令 list 返回官方 success 形态');
   assert.match(reply.text ?? '', /waiting-credentials/, '命令投影含 waiting-credentials 状态');
   assert.match(reply.text ?? '', /GITHUB_TOKEN/, '命令投影含凭据缺失线索');
+});
+
+// ---- 组合契约（票 20261118-08f8）：manager 行条件化——官方预挂在场即复用、补位组合保留插件行 ----
+// 期望值独立来源 = rc.4 星座一手探针（工票 Progress 留痕）：官方 web 形态 dsh-web-app
+// cordis.patch.yml 自带 `id: mcp-manager` 的 mcp-manager 行（installed plugins 注册 server
+// 的官方载体）；条件行机制官方先例 = web-app preset 的 `disabled: !!js "<表达式>"`（求值 =
+// cordis-plugin-loader lib/index.js：with(ctx){return eval(expr)}，ctx 为 cordis Context、
+// get 对缺失服务返回 undefined；boot 先 provide profileContext 后挂载条目——dsh-app-boot
+// lib/index.js boot 函数一手时序）。profileContext.startedBundles = profile bundle 包名序
+// 列（dsh-app-boot lib/types/profile-context.d.ts 一手），已装插件包声明 dsh.bundle 者亦入
+// 序列（dsh-app-boot reconcileProfilePlugins 一手）。
+
+/** 官方 patch 文件解析 schema 镜像（cordis-plugin-include entryListSchema：!!js 节点构 {__jsExpr}）。 */
+const jsExprTag = defineScalarTag('tag:yaml.org,2002:js', {
+  resolve: (source: string) => ({ __jsExpr: source }),
+  identify: () => false,
+});
+const patchSchema = JSON_SCHEMA.withTags(jsExprTag);
+
+/** 官方 loader 的 !!js 求值形态逐字镜像（cordis-plugin-loader lib/index.js：evaluate =
+ * with(ctx){return eval(expr)}；_resolveDisabled 以 Boolean 包裹求值结果——缺失服务路径
+ * 得 undefined 亦归 false）。 */
+function resolveDisabled(expression: string, services: Record<string, unknown>): boolean {
+  const evaluated = new Function('ctx', 'expr', 'with (ctx) {\n    return eval(expr)\n  }')({ get: (name: string) => services[name] }, expression);
+  return Boolean(evaluated);
+}
+
+test('patch 契约：manager 行条件化（官方预挂 bundle 在场禁用插件行、否则补位）且插件行无条件（票 08f8）', () => {
+  const patchText = fs.readFileSync(path.join(PLUGIN_DIR, 'cordis.patch.yml'), 'utf8');
+  const patch = loadYaml(patchText, { schema: patchSchema }) as Array<Record<string, unknown>>;
+  assert.equal(Array.isArray(patch), true, 'patch 文件 = 顶层 YAML 数组（官方 PatchOptions 形态，round 1 契约不变）');
+  assert.equal(patch.length, 1, '恰一个 patch 元素（以包名引用自己——round 1 契约不变）');
+  const inserts = patch[0].insert as Array<Record<string, unknown>>;
+  assert.equal(inserts.length, 2, '恰两 insert 行（round 1 need FR-7 契约不变）');
+
+  const managerRow = inserts[0];
+  assert.equal(managerRow.id, 'mcp', 'manager 行 id = mcp（补位组合 ns 派生自本行 id——round 1 契约不变）');
+  assert.equal(managerRow.name, '@deepseek-ai/dsh-mcp-manager', 'manager 行挂官方 mcp-manager 模块');
+  assert.deepEqual(managerRow.inject, ['credentials'], 'manager 行 inject credentials（凭据模板展开归官方，round 1 契约不变）');
+  const disabled = managerRow.disabled as { __jsExpr?: string } | undefined;
+  assert.notEqual(disabled, undefined, 'manager 行必须带 disabled 条件（无条件挂载在 web 组合与官方预挂行 duplicate——票 08f8 缺陷）');
+  assert.equal(typeof disabled?.__jsExpr, 'string', 'disabled 为 !!js 表达式节点（官方条件行先例形态）');
+  const expression = disabled?.__jsExpr ?? '';
+  assert.match(expression, /profileContext/, '判据读 profileContext（官方 preset 同款作用域先例）');
+  assert.match(expression, /startedBundles/, '判据读 startedBundles（bundle 包名序列 = 组合的启动面事实）');
+  assert.match(expression, /@deepseek-ai\/dsh-web-app/, '判据点名官方预挂 bundle（rc.4 星座唯一自带 mcp-manager 行的官方 bundle）');
+
+  // 表达式按官方求值形态在三种组合下成立：web（禁用→官方行独供）、headless（启用→插件行补位）、
+  // 非 dsh 启动（get 缺 profileContext 返回 undefined→Boolean 归假→启用，round 1 行为保持）
+  const web = resolveDisabled(expression, {
+    profileContext: { startedBundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@hankchen/dsh-mcp'] },
+  });
+  assert.equal(web, true, 'web 组合（startedBundles 含 dsh-web-app）→ 行禁用，官方 mcp-manager 行独供');
+  const headless = resolveDisabled(expression, {
+    profileContext: { startedBundles: ['@hankchen/dsh-mcp'] },
+  });
+  assert.equal(headless, false, 'headless 补位组合（无官方预挂）→ 行在场，恰一个提供者');
+  const nonDsh = resolveDisabled(expression, {});
+  assert.equal(nonDsh, false, '非 dsh 启动（无 profileContext 服务）→ 行在场（round 1 行为不变）');
+
+  const pluginRow = inserts[1];
+  assert.equal(pluginRow.id, 'dsh-mcp-manage', '插件行 id = dsh-mcp-manage（round 1 契约不变）');
+  assert.equal(pluginRow.name, '@hankchen/dsh-mcp', '插件行挂本包模块（round 1 契约不变）');
+  assert.equal(pluginRow.disabled, undefined, '插件行不条件化——本插件自身功能全组合在场（只有 manager 补位行需条件）');
+  assert.deepEqual(pluginRow.inject, ['mcpManager', 'commands', 'tools', 'settings'], '插件行 inject 四服务（round 1 契约不变）');
 });
