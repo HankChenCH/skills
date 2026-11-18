@@ -123,7 +123,132 @@ interface ClientContext {
   };
   remote: {
     mcpManager: { watch(signal?: AbortSignal): RemoteStreamHandle<McpManagedServerView[]> };
-    settings: { describe(): Promise<RemoteResult<SettingsDescribeValue>> };
+    settings: {
+      describe(): Promise<RemoteResult<SettingsDescribeValue>>;
+      update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResult<unknown>>;
+    };
+  };
+}
+
+// ---- 写操作面（官方 client remote 写通道；写通道语义与 round 1 管理服务同源——
+// spec 实现决策「添加/启停/移除语义」：UI 不绕过管理服务另起写路径，双入口与 UI 三面
+// 共调同一官方 settings 写链路 ns='mcp'）----
+
+/** DOM 输入事件的消费子集（受控组件 onChange 惯例形态；替身测试以同形字面量驱动）。 */
+interface InputEventLike {
+  target: { value: string };
+}
+
+/**
+ * 官方 SettingsPathOpView 镜像（@deepseek-ai/dsh-settings lib/types/types.d.ts 一手来源；
+ * Host 面 SettingsPathOp 同源同形：set 必带 value、删键 = unset 非 value:null）。
+ */
+type SettingsPathOp =
+  | { op: 'set'; path: string[]; value: unknown }
+  | { op: 'unset'; path: string[] };
+
+/**
+ * 官方 settings Remote 写面消费子集（@deepseek-ai/dsh-api-settings-controller
+ * lib/typert.remote-client.d.ts 一手来源）：update 拒写经 {ok:false, error} 显式返回非抛出；
+ * expectedRevision 官方形参可省（round 1 双入口同形态——本面板不传）。
+ */
+interface SettingsWriteFace {
+  describe(): Promise<RemoteResult<SettingsDescribeValue>>;
+  update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResult<unknown>>;
+}
+
+/** 官方 SERVER_NAME_PATTERN（@deepseek-ai/dsh-mcp-client src/index.ts 一手来源，与 Host 面 index.ts 逐字同值）。 */
+const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
+
+/** 写操作反馈（面板内联呈现；拒绝 = 本地轻校验或官方拒写，官方写时校验仍是后盾——round 1 纪律）。 */
+type WriteFeedback = { ok: true; message: string } | { ok: false; error: string };
+
+/** 添加表单提交草稿（组件归集的字符串原文；解析归一在写面单点——「ops 组装位置」归写面）。 */
+interface AddFormDraft {
+  transport: 'stdio' | 'streamable-http';
+  name: string;
+  command: string;
+  argsText: string;
+  cwd: string;
+  envText: string;
+  url: string;
+  headersText: string;
+}
+
+/** 面板写面（UI 唯一写通道：与 round 1 双入口共调同一官方 settings 写链路，无旁路写路径）。 */
+interface McpPanelWrites {
+  addServer(draft: AddFormDraft): Promise<WriteFeedback>;
+}
+
+/**
+ * K=V 每行一行的字典文本解析（/mcp add --env=<K=V> 同语义：键 trim、值取首个 = 之后
+ * trim 原样、重键后者胜；空行跳过、无 = 的行即解析错误）。
+ */
+function parseDictText(text: string): Record<string, string> | string {
+  const dict: Record<string, string> = {};
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed === '') continue;
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0) return `字典行 "${trimmed}" 必须形如 键=值`;
+    dict[trimmed.slice(0, separator).trim()] = trimmed.slice(separator + 1).trim();
+  }
+  return dict;
+}
+
+/**
+ * 面板写面工厂（add 通道语义与 round 1 createManagementService.addServer 同源：命名规则
+ * 镜像官方 SERVER_NAME_PATTERN、冲突守卫查当前 watch 视图（update 深合并会静默覆写同名
+ * 条目）、写形态 = update('mcp', {servers:{…}}) 只含非空字段；轻校验 + 官方写时校验后盾，
+ * 拒绝与官方拒写均显式内联不吞）。快照持有者由 apply 建立并随 watch 批刷新。
+ */
+function createMcpPanelWrites(
+  channels: { settings: SettingsWriteFace },
+  snapshot: { views: readonly McpManagedServerView[] },
+): McpPanelWrites {
+  const writeRefused = (result: RemoteResult<unknown>): string =>
+    result.ok === true ? '' : `settings 写被拒（官方校验/revision 校验）：${result.error.message ?? '未知原因'}`;
+  return {
+    async addServer(draft) {
+      const name = draft.name.trim();
+      if (SERVER_NAME_PATTERN.test(name) === false) {
+        return { ok: false, error: `serverName "${draft.name}" 违反官方命名规则 [A-Za-z0-9_-]{1,32}` };
+      }
+      if (snapshot.views.some((view) => view.name === name)) {
+        return { ok: false, error: `server "${name}"：名称已被既有条目或插件注册占用——先移除同名条目或换名` };
+      }
+      const entry: Record<string, unknown> = { transport: draft.transport };
+      if (draft.transport === 'stdio') {
+        const command = draft.command.trim();
+        if (command === '') return { ok: false, error: `server "${name}"：stdio 必填 "command"（非空字符串）` };
+        entry.command = command;
+        const args = draft.argsText.trim().split(/\s+/).filter((token) => token.length > 0);
+        if (args.length > 0) entry.args = args;
+        if (draft.envText.trim() !== '') {
+          const env = parseDictText(draft.envText);
+          if (typeof env === 'string') return { ok: false, error: `server "${name}"：${env}` };
+          if (Object.keys(env).length > 0) entry.env = env;
+        }
+        const cwd = draft.cwd.trim();
+        if (cwd !== '') entry.cwd = cwd;
+      } else {
+        const url = draft.url.trim();
+        if (url === '') return { ok: false, error: `server "${name}"：streamable-http 必填 "url"（非空字符串）` };
+        entry.url = url;
+        if (draft.headersText.trim() !== '') {
+          const headers = parseDictText(draft.headersText);
+          if (typeof headers === 'string') return { ok: false, error: `server "${name}"：${headers}` };
+          if (Object.keys(headers).length > 0) entry.headers = headers;
+        }
+      }
+      try {
+        const refused = writeRefused(await channels.settings.update('mcp', { servers: { [name]: entry } }));
+        if (refused !== '') return { ok: false, error: refused };
+        return { ok: true, message: `已提交 server "${name}"（${draft.transport}）——官方 reconcile 即时生效` };
+      } catch (error) {
+        return { ok: false, error: `settings 写失败：${error instanceof Error ? error.message : String(error)}` };
+      }
+    },
   };
 }
 
@@ -182,44 +307,53 @@ function transportsOf(describeValue: SettingsDescribeValue): Map<string, string>
   return transports;
 }
 
-// ---- 面板 body（只读投影：watch 订阅 → 列表/空态/失败内联）----
+// ---- 面板 body（watch 订阅投影 → 列表/空态/失败内联 + 写操作面：添加/行内编辑/启停移除重试）----
 
-/** body 的数据面（apply 期从 ctx.remote 投影；组件不持 ctx——官方 faces 先例的闭包捕获形态）。 */
-interface McpServersData {
+/**
+ * body 的数据与写面（apply 期从 ctx.remote 投影 + 写面闭包；组件不持 ctx——官方 faces
+ * 先例的闭包捕获形态）。snapshot 由 apply 建立、applyBatch 随批刷新，写面冲突守卫读。
+ */
+interface McpServersIo {
   watch(signal?: AbortSignal): RemoteStreamHandle<McpManagedServerView[]>;
   describe(): Promise<RemoteResult<SettingsDescribeValue>>;
+  writes: McpPanelWrites;
+  snapshot: { views: readonly McpManagedServerView[] };
 }
 
 /**
- * body 组件工厂：apply 期闭包捕获数据面（官方 client-ui faces 形态——组件函数不持 ctx）。
- * 框架按 keyed slot 注入 props（useTabInfo 由 slot 的 hookContext 提供——contract/slots.ts
- * SidebarRightTabInjected 一手形态；本组件只消费 useTabInfo，列表是 Host 全局数据不随
- * Session 变）。零写操作、零按钮。
+ * body 组件工厂：apply 期闭包捕获数据与写面（官方 client-ui faces 形态——组件函数不持
+ * ctx）。框架按 keyed slot 注入 props（useTabInfo 由 slot 的 hookContext 提供——
+ * contract/slots.ts SidebarRightTabInjected 一手形态；本组件只消费 useTabInfo，列表是
+ * Host 全局数据不随 Session 变）。写操作全部经 io.writes 单点，组件零旁路调用。
  */
-function createMcpServersBody(data: McpServersData): (props: { useTabInfo(): SidebarRightTabInfo }) => unknown {
+function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): SidebarRightTabInfo }) => unknown {
   return function McpServersBody(props) {
     const { useTabInfo } = props;
     const { tab } = useTabInfo();
     const [views, setViews] = useState<McpManagedServerView[]>([]);
     const [transports, setTransports] = useState<Map<string, string>>(new Map());
     const [streamError, setStreamError] = useState<string | undefined>(undefined);
+    const [addTransport, setAddTransport] = useState<'stdio' | 'streamable-http'>('stdio');
+    const [addDraft, setAddDraft] = useState<Record<string, string>>({});
+    const [addNote, setAddNote] = useState<WriteFeedback | undefined>(undefined);
     const applyBatch = useCallback((batch: McpManagedServerView[]): void => {
       setViews(batch);
+      io.snapshot.views = batch;
       // transport 列随批刷新：describe 一次性读（官方生成面无流形态）；读取失败列降级 '—'
       // （辅助列显式降级，主列状态照常投影）。
-      void data.describe().then((answer) => {
+      void io.describe().then((answer) => {
         setTransports(answer.ok ? transportsOf(answer.value) : new Map());
       }).catch(() => {
         setTransports(new Map());
       });
-    }, []);
+    }, [io]);
 
     // 订阅生命周期对齐 tab 记录（官方 tab.signal 语义：record 消失或插件卸载才 abort，
     // 隐藏/切 Session 不断流——回来时数据已热）；组件卸载时 dispose 兜底（官方 handle 语义：
     // break 出 for await 同效取消，dispose 幂等）。
     useEffect(() => {
       let live = true;
-      const stream = data.watch(tab.signal);
+      const stream = io.watch(tab.signal);
       void (async () => {
         try {
           for await (const batch of stream) {
@@ -239,6 +373,24 @@ function createMcpServersBody(data: McpServersData): (props: { useTabInfo(): Sid
       };
     }, [tab.signal, applyBatch]);
 
+    const changeAddField = (field: string): ((event: InputEventLike) => void) =>
+      // 官方函数式更新语义：排队更新合并时各 onChange 都见最新草稿（官方 useState 契约）
+      (event) => setAddDraft((previous) => ({ ...previous, [field]: event.target.value }));
+    const submitAdd = useCallback(async (): Promise<void> => {
+      const feedback = await io.writes.addServer({
+        transport: addTransport,
+        name: addDraft.name ?? '',
+        command: addDraft.command ?? '',
+        argsText: addDraft.args ?? '',
+        cwd: addDraft.cwd ?? '',
+        envText: addDraft.env ?? '',
+        url: addDraft.url ?? '',
+        headersText: addDraft.headers ?? '',
+      });
+      setAddNote(feedback);
+      if (feedback.ok === true) setAddDraft({});
+    }, [io, addTransport, addDraft]);
+
     if (streamError !== undefined) {
       return createElement('div', { 'data-mcp-servers': 'error', 'data-mcp-tab-id': tab.id },
         createElement('p', null, `MCP server 列表暂不可读：${streamError}`),
@@ -246,6 +398,7 @@ function createMcpServersBody(data: McpServersData): (props: { useTabInfo(): Sid
     }
     if (views.length === 0) {
       // 空态契约（spec FR-5 / 拍板 D4）：只渲染引导文案，无按钮无表单入口
+      //（添加表单只在非空清单态渲染——D4 只约束空态，见工票 Progress 决策）
       return createElement('div', { 'data-mcp-servers': 'empty', 'data-mcp-tab-id': tab.id },
         createElement('p', null, '还没有配置任何 MCP server。'),
         createElement('p', null, '在会话里输入 /mcp add 添加（支持 stdio 命令与远程端点，敏感值用 ${credential:REF} 模板引用），或直接用自然语言让助手接入（它会调用 mcp_manage 工具）。'));
@@ -255,7 +408,49 @@ function createMcpServersBody(data: McpServersData): (props: { useTabInfo(): Sid
         createElement('span', { 'data-mcp-server-name': view.name }, view.name),
         createElement('span', { 'data-mcp-server-transport': view.name }, transports.get(view.name) ?? '—'),
         createElement('span', { 'data-mcp-server-status': view.name }, describeStatus(view.status)),
-        view.configured ? null : createElement('span', null, '（非配置条目：已移除但清理未完成）')))));
+        view.configured ? null : createElement('span', null, '（非配置条目：已移除但清理未完成）')))),
+      createElement('div', { 'data-mcp-add-form': 'form' },
+        createElement('select', {
+          'data-mcp-add-transport': addTransport,
+          value: addTransport,
+          onChange: (event: InputEventLike) => setAddTransport(event.target.value === 'streamable-http' ? 'streamable-http' : 'stdio'),
+        },
+          createElement('option', { value: 'stdio' }, 'stdio'),
+          createElement('option', { value: 'streamable-http' }, 'streamable-http')),
+        createElement('input', {
+          'data-mcp-add-field': 'name', value: addDraft.name ?? '', placeholder: 'server 名（[A-Za-z0-9_-]{1,32}）',
+          onChange: changeAddField('name'),
+        }),
+        addTransport === 'stdio' ? [
+          createElement('input', {
+            'data-mcp-add-field': 'command', value: addDraft.command ?? '', placeholder: 'command（如 npx）',
+            onChange: changeAddField('command'),
+          }),
+          createElement('input', {
+            'data-mcp-add-field': 'args', value: addDraft.args ?? '', placeholder: '参数（空白分隔，可选）',
+            onChange: changeAddField('args'),
+          }),
+          createElement('input', {
+            'data-mcp-add-field': 'cwd', value: addDraft.cwd ?? '', placeholder: '工作目录（可选）',
+            onChange: changeAddField('cwd'),
+          }),
+          createElement('textarea', {
+            'data-mcp-add-field': 'env', value: addDraft.env ?? '', placeholder: '环境变量，每行 K=V（可选；值可用 ${credential:REF} 模板引用）',
+            onChange: changeAddField('env'),
+          }),
+        ] : [
+          createElement('input', {
+            'data-mcp-add-field': 'url', value: addDraft.url ?? '', placeholder: 'MCP 端点 URL',
+            onChange: changeAddField('url'),
+          }),
+          createElement('textarea', {
+            'data-mcp-add-field': 'headers', value: addDraft.headers ?? '', placeholder: '请求头，每行 K=V（可选；值可用 ${credential:REF} 模板引用）',
+            onChange: changeAddField('headers'),
+          }),
+        ],
+        createElement('button', { 'data-mcp-add-submit': 'submit', onClick: () => void submitAdd() }, '添加 server'),
+        addNote === undefined ? null : createElement('p', { 'data-mcp-add-note': 'note' },
+          addNote.ok === true ? addNote.message : addNote.error)));
   };
 }
 
@@ -281,9 +476,12 @@ function mcpServersTabDefinition(): SidebarRightTabDefinition {
 export const inject = ['sidebarRightTabs', 'slots', 'remote', 'remote.mcpManager', 'remote.settings'];
 
 export function apply(ctx: ClientContext): void {
+  const snapshot = { views: [] as readonly McpManagedServerView[] };
   const body = createMcpServersBody({
     watch: (signal) => ctx.remote.mcpManager.watch(signal),
     describe: () => ctx.remote.settings.describe(),
+    writes: createMcpPanelWrites({ settings: ctx.remote.settings }, snapshot),
+    snapshot,
   });
   ctx.effect(() => ctx.sidebarRightTabs.register(mcpServersTabDefinition()), 'dsh-mcp: mcp-servers tab type');
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register(
