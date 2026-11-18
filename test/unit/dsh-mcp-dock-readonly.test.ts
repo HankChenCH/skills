@@ -27,8 +27,9 @@
 //    来源）：`describe() => Promise<RemoteResult<SettingsDescribeValue>>`；视图 value 恒经
 //    redactSecrets（dsh-settings types.d.ts 一手来源）。替身按给定清单构 ns='mcp' 视图。
 // 6. react 运行时替身——useState/useEffect/useCallback/createElement 的最小驱动模型：
-//    hook 槽位按调用序编号（官方 hook 顺序语义）、setter 入队微任务重渲、effect 在渲染后收集、
-//    卸载跑 cleanup；依赖数组比较不镜像（每次渲染收集 effect——替身简化点，钉替身契约）。
+//    hook 槽位按调用序编号（官方 hook 顺序语义）、setter 入队微任务重渲；useEffect 镜像官方
+//    依赖数组语义（deps 浅比较，依赖变化先跑旧 cleanup 再跑新 effect——首轮必跑）；不镜像的
+//    只有官方批处理合并（一次 setter 一次重渲，替身同此；跨 setter 合并不做——替身简化点）。
 //    元素树为普通对象（type/props/children），断言打在其上。
 
 import { test } from 'node:test';
@@ -126,17 +127,27 @@ interface RenderedView {
 }
 
 /**
- * react 替身驱动器：mount 一轮渲染（收集 effect → 运行 → 记 cleanup），setter 触发微任务重渲。
- * hook 槽位按调用序编号（官方 hook 顺序语义）；依赖数组不比较（替身契约，文件头第 6 条）。
+ * react 替身运行时：先造 stub（物化客户端模块时经模块表 require 注入），再 bind 组件得驱动器
+ * （物化与渲染共用同一实例——组件闭包绑定物化期的模块级 react 绑定，跨实例即槽位错位）。
+ * mount 一轮渲染，setter 触发微任务重渲。
+ * hook 槽位按调用序编号（官方 hook 顺序语义）；useEffect 镜像官方依赖数组语义（deps 浅比较，
+ * 依赖变化先跑旧 cleanup 再跑新 effect——官方 useEffect 契约；不镜像的只有批处理合并，钉替身契约）。
  */
-function createReactDriver(component: (props: never) => unknown, props: never) {
+function createReactRuntime() {
   let slots: unknown[] = [];
   let hookCursor = 0;
-  let cleanups: Array<() => void> = [];
-  const collectedEffects: Array<() => void | (() => void)> = [];
+  let effectDeps: Array<readonly unknown[] | undefined> = [];
+  const effectCleanups: Array<(() => void) | undefined> = [];
+  let memoDeps: Array<readonly unknown[] | undefined> = [];
+  const memoValues: Array<unknown> = [];
   let pending = false;
   let latest: RenderedView = { tree: null, effectCount: 0 };
   let renderListeners: Array<() => void> = [];
+  void latest.effectCount;
+
+  /** 官方依赖数组浅比较（Object.is 逐位）。 */
+  const shallowEqual = (left: readonly unknown[], right: readonly unknown[]): boolean =>
+    left.length === right.length && left.every((value, index) => Object.is(value, right[index]));
 
   const reactStub = {
     createElement(
@@ -163,69 +174,88 @@ function createReactDriver(component: (props: never) => unknown, props: never) {
         scheduleRender();
       }];
     },
-    useEffect(effect: () => void | (() => void)): void {
-      collectedEffects.push(effect);
+    useEffect(effect: () => void | (() => void), deps?: readonly unknown[]): void {
+      const index = hookCursor;
+      hookCursor += 1;
+      const previous = effectDeps[index];
+      // 官方语义：首渲必跑；deps 缺省每次跑；浅比较不变即跳过；变化先 cleanup 旧再跑新
+      if (previous !== undefined && deps !== undefined && shallowEqual(previous, deps)) return;
+      effectDeps[index] = deps;
+      const oldCleanup = effectCleanups[index];
+      if (typeof oldCleanup === 'function') oldCleanup();
+      const cleanup = effect();
+      effectCleanups[index] = typeof cleanup === 'function' ? cleanup : undefined;
     },
-    useCallback<T>(callback: T): T {
+    /** 官方 useCallback 记忆语义：deps 浅比较不变即返回上次缓存值（组件每轮渲染新建闭包，不记忆即 effect 永动机）。 */
+    useCallback<T>(callback: T, deps?: readonly unknown[]): T {
+      const index = hookCursor;
+      hookCursor += 1;
+      const previous = memoDeps[index];
+      if (previous !== undefined && deps !== undefined && shallowEqual(previous, deps)) {
+        return memoValues[index] as T;
+      }
+      memoDeps[index] = deps;
+      memoValues[index] = callback;
       return callback;
     },
   };
+
+  /** bind 后登记的带 props 渲染闭包（scheduleRender 与 mount 共用同一路径）；unmount 置空。 */
+  let renderBound: (() => RenderedView) | undefined;
 
   function scheduleRender(): void {
     if (pending) return;
     pending = true;
     queueMicrotask(() => {
       pending = false;
-      rerender();
-      for (const listener of renderListeners) listener();
+      renderBound?.();
+      for (const listener of renderListeners.splice(0)) listener();
     });
-  }
-
-  function rerender(): void {
-    hookCursor = 0;
-    collectedEffects.length = 0;
-    latest = { tree: (component as (p: never) => unknown)(props) as ElementChild, effectCount: collectedEffects.length };
-    for (const effect of collectedEffects) {
-      const cleanup = effect();
-      if (typeof cleanup === 'function') cleanups.push(cleanup);
-    }
   }
 
   return {
     react: reactStub,
-    /** 首轮渲染：重置槽位与 cleanup、渲染、flush effects。 */
-    mount(): RenderedView {
-      slots = [];
-      cleanups.forEach((cleanup) => cleanup());
-      cleanups = [];
-      rerender();
-      return latest;
-    },
-    /** 最近一轮渲染树。 */
-    view(): RenderedView {
-      return latest;
-    },
-    /** 等待已调度的微任务重渲与流批处理链排空（无 pending 且连续两轮空闲即稳定）。 */
-    async settle(): Promise<void> {
-      const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
-      for (let round = 0; round < 50; round += 1) {
-        const wasPending = pending;
-        await tick();
-        await tick();
-        if (!pending && !wasPending) return;
-      }
-    },
-    /** 卸载：按官方 Destructor 语义运行全部收集的 cleanup。 */
-    unmount(): void {
-      for (const cleanup of cleanups) cleanup();
-      cleanups = [];
-    },
-    /** 等待下一轮重渲完成（setter 调度后由流测试显式等待）。 */
-    onceRendered(): Promise<void> {
-      return new Promise((resolve) => {
-        renderListeners.push(resolve);
-        if (latest.effectCount >= 0 && renderListeners.length === 1 && !pending) resolve();
-      });
+    /** 绑定被渲染组件（驱动器宿主；props 由测试经闭包直接给——组件 props 是框架注入面替身）。 */
+    bind(component: (p: never) => unknown, props: never) {
+      const renderWith = (): RenderedView => {
+        hookCursor = 0;
+        latest = { tree: component(props) as ElementChild, effectCount: 0 };
+        return latest;
+      };
+      return {
+        /** 首轮渲染：重置槽位与 effect/memo 记录（首渲 effect 必跑）、渲染。 */
+        mount(): RenderedView {
+          slots = [];
+          effectDeps = [];
+          memoDeps = [];
+          for (const cleanup of effectCleanups.splice(0)) {
+            if (typeof cleanup === 'function') cleanup();
+          }
+          renderBound = renderWith;
+          return renderWith();
+        },
+        /** 最近一轮渲染树。 */
+        view(): RenderedView {
+          return latest;
+        },
+        /** 等待已调度的微任务重渲与流批处理链排空（连续两轮空闲即稳定）。 */
+        async settle(): Promise<void> {
+          const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+          for (let round = 0; round < 50; round += 1) {
+            const wasPending = pending;
+            await tick();
+            await tick();
+            if (!pending && !wasPending) return;
+          }
+        },
+        /** 卸载：按官方 Destructor 语义运行全部 effect cleanup；此后渲染闭包失效（跨测试防误渲）。 */
+        unmount(): void {
+          renderBound = undefined;
+          for (const cleanup of effectCleanups.splice(0)) {
+            if (typeof cleanup === 'function') cleanup();
+          }
+        },
+      };
     },
   };
 }
@@ -473,27 +503,39 @@ function tabInfoOf(signal: AbortSignal): () => {
   });
 }
 
-// ---- 物化 + apply 组合替身（每个测试独立实例）----
+// ---- 测试 harness（物化 + apply + body 挂载；每个测试独立实例）----
 
-function moduleRequireOf(driver: { react: unknown }): (specifier: string) => unknown {
+function moduleRequireOf(runtime: { react: unknown }): (specifier: string) => unknown {
   return (specifier) => {
-    if (specifier === 'react') return driver.react;
+    if (specifier === 'react') return runtime.react;
     // 官方物化哨兵的镜像（carrier 测试先例）：非 react 的外部请求即构建泄漏
     throw new Error(`客户端模块请求了未预期的外部模块 "${specifier}"（模块表替身只供 react）`);
   };
 }
 
-async function loadClientModule(driver: { react: unknown }) {
-  return materializeClientModule(moduleRequireOf(driver));
+function createHarness() {
+  const runtime = createReactRuntime();
+  const plugin = materializeClientModule(moduleRequireOf(runtime));
+  return {
+    /** apply 到替身 ctx。 */
+    apply(ctx: ClientStubContext): void {
+      plugin.apply(ctx as never);
+    },
+    /** 从 ctx 注册面取 body 组件并以 tabInfo 替身挂载（驱动器与物化共用同一 react 运行时）。 */
+    mountBody(ctx: ClientStubContext, tabSignal: AbortSignal) {
+      const body = ctx.captured.slotRegisters[0].component as (p: never) => unknown;
+      return runtime.bind(body, { useTabInfo: tabInfoOf(tabSignal) } as never);
+    },
+    inject: plugin.inject,
+  };
 }
 
 // ---- AC1：Host 侧注册契约 ----
 
 test('apply 经 ctx.effect 注册 tab 类型：id = 包名、kind 自定义、title 与 guide 入口盒齐备（AC1）', async (t) => {
-  const driver = createReactDriver(() => null, null as never);
-  const plugin = await loadClientModule(driver);
+  const harness = createHarness();
   const ctx = createClientStubContext();
-  plugin.apply(ctx);
+  harness.apply(ctx);
 
   assert.equal(ctx.captured.tabDefinitions.length, 1, 'ctx.sidebarRightTabs.register 恰收到一个定义');
   const definition = ctx.captured.tabDefinitions[0];
@@ -525,10 +567,9 @@ test('apply 经 ctx.effect 注册 tab 类型：id = 包名、kind 自定义、ti
 });
 
 test('注册 disposer 由 ctx.effect 持有：effect 收集的两个注册 disposer 可将注册面清空（AC1 disposer 生命周期）', async (t) => {
-  const driver = createReactDriver(() => null, null as never);
-  const plugin = await loadClientModule(driver);
+  const harness = createHarness();
   const ctx = createClientStubContext();
-  plugin.apply(ctx);
+  harness.apply(ctx);
 
   assert.equal(ctx.captured.effects.length, 2, '两个注册各由一个 ctx.effect 持有（tab 类型 + keyed slot body）');
   for (const held of ctx.captured.effects) {
@@ -550,10 +591,9 @@ test('注册 disposer 由 ctx.effect 持有：effect 收集的两个注册 dispo
 });
 
 test('keyed slot body 经 ctx.slots.inject 按定义 id 注册，且同样由 ctx.effect 持有（AC1+AC2 注册面）', async (t) => {
-  const driver = createReactDriver(() => null, null as never);
-  const plugin = await loadClientModule(driver);
+  const harness = createHarness();
   const ctx = createClientStubContext();
-  plugin.apply(ctx);
+  harness.apply(ctx);
 
   assert.equal(ctx.captured.slotInjects.length, 1, 'ctx.slots.inject 恰一次');
   const slotInject = ctx.captured.slotInjects[0];
@@ -567,13 +607,38 @@ test('keyed slot body 经 ctx.slots.inject 按定义 id 注册，且同样由 ct
 });
 
 test('客户端模块 inject 面声明注册所需服务（AC1 inject 面扩展声明）', async (t) => {
-  const driver = createReactDriver(() => null, null as never);
-  const plugin = await loadClientModule(driver);
-  assert.ok(Array.isArray(plugin.inject), 'inject 为数组（官方 client-ui-* 先例：export const inject = [...]）');
+  const harness = createHarness();
+  assert.ok(Array.isArray(harness.inject), 'inject 为数组（官方 client-ui-* 先例：export const inject = [...]）');
   for (const service of ['sidebarRightTabs', 'slots'] as const) {
-    assert.ok(plugin.inject.includes(service), `inject 面声明 ${service}（官方文档示例形态）`);
+    assert.ok(harness.inject.includes(service), `inject 面声明 ${service}（官方文档示例形态）`);
   }
   for (const service of ['remote', 'remote.mcpManager', 'remote.settings'] as const) {
-    assert.ok(plugin.inject.includes(service), `inject 面声明 ${service}（官方 files 先例的 remote 命名空间子键形态）`);
+    assert.ok(harness.inject.includes(service), `inject 面声明 ${service}（官方 files 先例的 remote 命名空间子键形态）`);
   }
+});
+
+// ---- AC2：客户端面板注册契约（body 内 useTabInfo 接线）----
+
+test('body 激活即开 watch 流且订阅 signal = tab.signal，渲染树携带 tab id（AC2 useTabInfo 接线）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext();
+  harness.apply(ctx);
+  const controller = new AbortController();
+  const view = harness.mountBody(ctx, controller.signal);
+  view.mount();
+  await view.settle();
+
+  assert.equal(ctx.captured.watchCalls.length, 1, 'body 激活恰开一条 mcpManager.watch 流');
+  assert.equal(
+    ctx.captured.watchCalls[0].signal,
+    controller.signal,
+    '订阅 signal = useTabInfo 给的 tab.signal（官方 record 生命周期：record 消失/插件卸载才 abort）',
+  );
+  const tree = view.view().tree as ElementNode;
+  assert.equal(
+    tree.props?.['data-mcp-tab-id'],
+    'tab-7',
+    '渲染树接线 useTabInfo 的 tab.id（接线证据）',
+  );
+  view.unmount();
 });
