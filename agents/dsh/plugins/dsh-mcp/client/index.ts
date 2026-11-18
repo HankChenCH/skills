@@ -197,6 +197,8 @@ interface EditFormDraft {
 interface McpPanelWrites {
   addServer(draft: AddFormDraft): Promise<WriteFeedback>;
   editServer(name: string, draft: EditFormDraft): Promise<WriteFeedback>;
+  setServerEnabled(name: string, enabled: boolean): Promise<WriteFeedback>;
+  removeServer(name: string): Promise<WriteFeedback>;
 }
 
 /**
@@ -345,6 +347,42 @@ function createMcpPanelWrites(
         return { ok: false, error: `settings 写失败：${error instanceof Error ? error.message : String(error)}` };
       }
     },
+
+    // 启停/移除前置守卫与 round 1 管理服务同源（configured=false = 已移除清理未完成，
+    // 无配置可写）；ops 形态 = 官方 {op:'set', enabled} / {op:'unset'}（生效语义归官方
+    // reconcile：禁用卸载保条目、移除卸载并消失）
+    async setServerEnabled(name, enabled) {
+      const existing = snapshot.views.find((view) => view.name === name);
+      if (existing === undefined || existing.configured === false) {
+        return { ok: false, error: `server "${name}"：无配置条目——/mcp list 查看现存 server` };
+      }
+      try {
+        const refused = writeRefused(await channels.settings.mutate('mcp',
+          [{ op: 'set', path: ['servers', name, 'enabled'], value: enabled }]));
+        if (refused !== '') return { ok: false, error: refused };
+        return { ok: true, message: `已提交 server "${name}" ${enabled ? '启用' : '停用'}——官方 reconcile 即时生效（禁用卸载保条目/启用重建）` };
+      } catch (error) {
+        return { ok: false, error: `settings 写失败：${error instanceof Error ? error.message : String(error)}` };
+      }
+    },
+
+    async removeServer(name) {
+      const existing = snapshot.views.find((view) => view.name === name);
+      if (existing === undefined) {
+        return { ok: false, error: `server "${name}"：无此条目——/mcp list 查看现存 server` };
+      }
+      if (existing.configured === false) {
+        return { ok: false, error: `server "${name}"：无配置条目（已移除但清理未完成，重启宿主方可清账）` };
+      }
+      try {
+        const refused = writeRefused(await channels.settings.mutate('mcp',
+          [{ op: 'unset', path: ['servers', name] }]));
+        if (refused !== '') return { ok: false, error: refused };
+        return { ok: true, message: `已提交移除 server "${name}"——官方 reconcile 即时生效（条目卸载并消失）` };
+      } catch (error) {
+        return { ok: false, error: `settings 写失败：${error instanceof Error ? error.message : String(error)}` };
+      }
+    },
   };
 }
 
@@ -436,6 +474,7 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
     const [editDraft, setEditDraft] = useState<Record<string, string>>({});
     const [editCurrent, setEditCurrent] = useState<Record<string, unknown> | undefined>(undefined);
     const [editNote, setEditNote] = useState<WriteFeedback | undefined>(undefined);
+    const [rowNote, setRowNote] = useState<WriteFeedback | undefined>(undefined);
     const applyBatch = useCallback((batch: McpManagedServerView[]): void => {
       setViews(batch);
       io.snapshot.views = batch;
@@ -530,6 +569,13 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
       setEditNote(feedback);
     }, [io, editingName, editDraft]);
 
+    const setEnabled = (name: string, enabled: boolean): void => {
+      void io.writes.setServerEnabled(name, enabled).then(setRowNote);
+    };
+    const removeRow = (name: string): void => {
+      void io.writes.removeServer(name).then(setRowNote);
+    };
+
     /** 行内编辑表单（显示值 = describe 快照；被触字段覆盖显示）。 */
     const renderEditForm = (name: string, transport: string): ReactNode => {
       const entry = editCurrent ?? {};
@@ -595,10 +641,22 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
         createElement('span', { 'data-mcp-server-transport': view.name }, transports.get(view.name) ?? '—'),
         createElement('span', { 'data-mcp-server-status': view.name }, describeStatus(view.status)),
         view.configured ? null : createElement('span', null, '（非配置条目：已移除但清理未完成）'),
-        view.configured ? createElement('button', {
-          'data-mcp-action': 'edit', 'data-mcp-action-server': view.name, onClick: () => openEdit(view),
-        }, '编辑') : null,
+        view.configured ? [
+          createElement('button', {
+            'data-mcp-action': view.status.state === 'disabled' ? 'enable' : 'disable',
+            'data-mcp-action-server': view.name,
+            onClick: () => setEnabled(view.name, view.status.state === 'disabled'),
+          }, view.status.state === 'disabled' ? '启用' : '停用'),
+          createElement('button', {
+            'data-mcp-action': 'edit', 'data-mcp-action-server': view.name, onClick: () => openEdit(view),
+          }, '编辑'),
+          createElement('button', {
+            'data-mcp-action': 'remove', 'data-mcp-action-server': view.name, onClick: () => removeRow(view.name),
+          }, '移除'),
+        ] : null,
         editingName === view.name && view.configured ? renderEditForm(view.name, transports.get(view.name) ?? '') : null))),
+      rowNote === undefined ? null : createElement('p', { 'data-mcp-write-note': 'note' },
+        rowNote.ok === true ? rowNote.message : rowNote.error),
       createElement('div', { 'data-mcp-add-form': 'form' },
         createElement('select', {
           'data-mcp-add-transport': addTransport,

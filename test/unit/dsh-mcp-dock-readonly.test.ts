@@ -1205,3 +1205,67 @@ test('编辑 env 触碰：改值/新增行产 per-key set、删行产 unset，�
   ], '字典域 per-key ops：被改键 set、新增键 set、被删键 unset；凭据行同值保留 → 零凭据 op（不重传）');
   view.unmount();
 });
+
+// ---- 写AC3：启停/移除契约（官方 ops 形态 {op:'set', enabled} / {op:'unset'}；
+// 生效语义 = 官方 reconcile：禁用卸载保条目、移除消失——round 1 同源字面）----
+
+test('停用/启用：mutate [{op:"set", path:["servers",名,"enabled"], value:布尔}] 官方形态恰一次（写AC3）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], { docs: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'disable');
+  await view.settle();
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: false }] },
+  ], '停用 = 官方 set 只写 servers.<名>.enabled 持久意图字段（禁用卸载保条目语义的写形态）');
+
+  // 官方 reconcile 推送停用后状态 → 行操作切换为启用
+  ctx.pushViews([viewOf('docs', { state: 'disabled' })]);
+  await view.settle();
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'enable');
+  await view.settle();
+  assert.deepEqual(ctx.captured.mutateCalls[1], {
+    namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: true }],
+  }, '启用 = 同形 set op，value: true');
+  assert.equal(ctx.captured.mutateCalls.length, 2, '两次启停恰两次 mutate（写通道单点）');
+  view.unmount();
+});
+
+test('移除：mutate [{op:"unset", path:["servers",名]}] 官方删键形态恰一次（写AC3；value:null 是写 null 非删键——round 1 钉死点）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], { docs: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'remove');
+  await view.settle();
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'docs'] }] },
+  ], '移除 = 官方 SettingsPathOp unset 删键（生效语义 = 官方 reconcile 卸载并消失）');
+  assert.deepEqual(ctx.captured.updateCalls, [], '移除不经 update');
+  view.unmount();
+});
+
+test('非配置条目（configured=false，清理未完成）零写操作按钮（写AC3 生效语义守卫）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('ghost', { state: 'closed', result: { closeConfirmed: true } }, false)]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  const actions = collectNodes(tree, (node) => node.props?.['data-mcp-action'] !== undefined);
+  assert.deepEqual(
+    actions.map((node) => node.props?.['data-mcp-action-server']),
+    [],
+    '清理未完成的条目不得出现任何写操作按钮（编辑/启停/移除——round 1 removeServer 同守卫语义）',
+  );
+  view.unmount();
+});
