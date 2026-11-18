@@ -1,0 +1,76 @@
+<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><title>dsh MCP Dock 页述标原型（design 0004）</title><style>
+/* token 快照：实现时值来自宿主 ThemeSnapshot 注入（dsh-client-ui-theme --dsw-* 体系），此处内嵌仅供独立预览。
+   取值一手来源：@deepseek-ai/dsh-client-ui-theme@0.2.2-rc.4 lib/client.js（2026-11-18 取证）。 */
+:root{--bg-l1:#fff;--bg-l2:#fff;--label:#0f1115;--tert:#adb2b8;--bd:#0000001a;--err:#ec1313;--btn-ghost-h:#ebeef2;--btn-pri:#0f1115;--btn-pri-on:#fff}
+.dark{--bg-l1:#232324;--bg-l2:#2c2c2e;--label:#f9fafb;--tert:#81858c;--bd:#ffffff1f;--err:#f25a5a;--btn-ghost-h:#43454a;--btn-pri:#f9fafb;--btn-pri-on:#0f1115}
+*{box-sizing:border-box}body{font:14px/1.5 Montserrat,system-ui,sans-serif;margin:0;background:#f5f5f5;color:#222}
+.hdr{padding:10px 16px;background:#fff;border-bottom:1px solid #ddd}.hdr b{margin-right:10px}
+.hdr button,.panel button{cursor:pointer}
+.hdr button{margin-right:6px;padding:4px 10px}
+.wrap{display:flex;gap:12px;padding:16px;max-width:880px;margin:0 auto}
+.sess{flex:1;background:#fff;border:1px solid #e2e2e2;border-radius:28px;height:480px;color:#adb2b8;padding:16px;font-size:14px}
+.panel{width:360px;background:var(--bg-l1);border:1px solid var(--bd);border-radius:16px;padding:12px;color:var(--label)}
+.ph{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;border-bottom:1px solid var(--bd)}
+.ph b{font-size:14px}.ph span{color:var(--tert);font-size:12px}
+.ph .add{margin-left:auto;background:var(--btn-pri);color:var(--btn-pri-on);border:0;border-radius:8px;padding:4px 12px;font-size:12px}
+.row{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-top:8px}
+.r1{display:flex;align-items:center;gap:8px}
+.nm{font-weight:600;font-size:14px}.tr,.tools{color:var(--tert);font-size:12px}
+.badge{margin-left:auto;font-size:12px;padding:2px 10px;border-radius:999px}
+.connected{background:rgba(22,116,30,.12);color:#16741e}.disabled{background:rgba(129,133,140,.15);color:var(--tert)}
+.failed{background:rgba(236,19,19,.1);color:var(--err)}.waiting{background:rgba(138,109,0,.12);color:#8a6d00}
+.det{font-family:ui-monospace,monospace;font-size:12px;color:var(--err);background:var(--bg-l2);border-left:3px solid var(--err);padding:6px 8px;margin-top:8px;border-radius:4px}
+.ops{display:flex;gap:6px;margin-top:8px}
+.ops button{border:1px solid var(--bd);background:transparent;color:var(--label);border-radius:8px;padding:3px 10px;font-size:12px}
+.ops button:hover{background:var(--btn-ghost-h)}.ops button.pri{background:var(--btn-pri);color:var(--btn-pri-on);border:0}
+.mid{color:var(--tert);font-size:12px}
+.frm{border:1px solid var(--bd);border-radius:12px;padding:10px 12px;margin-top:8px;display:none}
+.frm label{display:block;font-size:12px;color:var(--tert);margin:8px 0 2px}
+.frm input,.frm textarea{width:100%;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;font-size:14px;background:var(--bg-l2);color:var(--label);font-family:inherit}
+.frm .mono{font-family:ui-monospace,monospace;font-size:12px}
+.sk{height:56px;border:1px solid var(--bd);border-radius:12px;margin-top:8px;background:linear-gradient(90deg,var(--bg-l2),var(--btn-ghost-h),var(--bg-l2));background-size:200% 100%;animation:s 1.2s infinite}
+@keyframes s{to{background-position:-200% 0}}
+.errbox{border:1px solid var(--bd);border-radius:12px;padding:14px;margin-top:8px;color:var(--label)}
+.errbox p{margin:4px 0}.errbox .mono{color:var(--err);font-family:ui-monospace,monospace;font-size:12px}
+.empty{color:var(--tert);text-align:center;padding:28px 10px;border:1px dashed var(--bd);border-radius:12px;margin-top:8px;font-size:14px}
+.note{color:#888;font-size:12px;padding:6px 4px 0}
+</style></head><body>
+<div class="hdr"><b>Dock 页述标原型 · design 0004</b><button onclick="setM(1)">浅色</button><button onclick="setM(0)">深色</button>｜态：<button onclick="setS('n')">正常</button><button onclick="setS('l')">加载</button><button onclick="setS('e')">空</button><button onclick="setS('x')">错误</button></div>
+<div class="wrap"><div class="sess">（会话区示意——面板从属不抢注意力）</div>
+<div class="panel" id="pk"><div class="ph"><b>MCP Servers</b><span id="cnt"></span><button class="add" onclick="openForm()">添加</button></div>
+<div id="body"></div>
+<div class="frm" id="frm"><b style="font-size:14px">添加 server</b>
+<label>transport</label><select id="ftr" style="width:100%;padding:6px;border:1px solid var(--bd);border-radius:8px;background:var(--bg-l2);color:var(--label)" onchange="rf()"><option>streamable-http</option><option>stdio</option></select>
+<div id="fh"><label>url</label><input class="mono" placeholder="https://example.com/mcp"><label>headers（凭据用 ${credential:REF}）</label><input class="mono" placeholder='Authorization: ${credential:mcp-token}'></div>
+<div id="fs" style="display:none"><label>command</label><input class="mono" placeholder="npx -y some-mcp-server"><label>args / env / cwd</label><input class="mono"></div>
+<label>serverName</label><input class="mono" id="fnm" placeholder="codeup">
+<div class="ops" style="margin-top:10px"><button class="pri" onclick="doAdd()">提交</button><button onclick="closeForm()">取消</button><span class="mid" id="fmsg"></span></div></div>
+<div class="note">官方限制：右栏 tab 需前台会话；所有取值经 --dsw-* token（本原型内嵌快照仅供预览）</div></div></div>
+<script>
+const D={n:[["codeup","streamable-http","connected",41],["memory","stdio","connected",9],["fs-local","stdio","disabled",0]],
+x:[["broken","stdio","failed",0,"spawn not-exist-cmd ENOENT"],["pending","stdio","waiting-credentials",0,"missing credential: mcp-token"],["codeup","streamable-http","connected",41]]};
+const L={connected:"connected",failed:"failed",disabled:"disabled","waiting-credentials":"waiting-credentials"};
+const bc={connected:"connected",failed:"failed",disabled:"disabled","waiting-credentials":"waiting"};
+const mid={connected:"",disabled:"",failed:"重试中…",waiting:"解析凭据中…"};
+function rows(st){return st.map(([n,t,s,c,d])=>`<div class="row"><div class="r1"><span class="nm">${n}</span><span class="tr">${t}</span><span class="badge ${bc[s]}" id="st-${n}">${L[s]}</span></div>
+${s==="failed"||s==="waiting-credentials"?`<div class="det">${d}</div>`:""}
+<div class="ops">${s==="connected"?`<button onclick="tg('${n}')">停用</button><button onclick="openEdit('${n}')">编辑</button>`:""}${s==="disabled"?`<button onclick="tg('${n}')">启用</button><button onclick="rm('${n}')">移除</button><button onclick="openEdit('${n}')">编辑</button>`:""}${(s==="failed"||s==="waiting-credentials")?`<button onclick="rs('${n}')">重试</button><button class="pri" onclick="rm2('${n}')">移除</button>`:""}${mid[s]?`<span class="mid">${mid[s]}</span>`:""}</div></div>`).join("")}
+function tg(n){const el=document.getElementById("st-"+n);const off=el.textContent==="disabled";el.textContent="connecting…";el.className="badge waiting";setTimeout(()=>{el.textContent=off?"connected":"disabled";el.className="badge "+(off?"connected":"disabled")},600)}
+function rs(n){const el=document.getElementById("st-"+n);el.textContent="probing…";el.className="badge waiting";setTimeout(()=>{el.textContent="failed";el.className="badge failed"},600)}
+function rm(n){render()}
+function rm2(n){if(confirm("移除 "+n+"？（一次确认）"))render()}
+function openEdit(n){closeForm();const f=document.getElementById("frm");f.style.display="block";f.querySelector("b").textContent="编辑 "+n;document.getElementById("fmsg").textContent="凭据字段脱敏显示，未重输即保留"}
+function openForm(){const f=document.getElementById("frm");f.style.display="block";f.querySelector("b").textContent="添加 server"}
+function closeForm(){document.getElementById("frm").style.display="none"}
+function rf(){const t=document.getElementById("ftr").value;document.getElementById("fh").style.display=t==="stdio"?"none":"block";document.getElementById("fs").style.display=t==="stdio"?"block":"none"}
+function doAdd(){const n=document.getElementById("fnm").value.trim();document.getElementById("fmsg").textContent=n?"（呈现样态：经管理服务 add 提交）":"填写 serverName"}
+let state="n";
+function render(){const pk=document.getElementById("body");document.getElementById("cnt").textContent=state==="l"?"":state==="e"?"0 项":(state==="n"?D.n:D.x).length+" 项";
+pk.innerHTML=state==="l"?`<div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="mid" style="text-align:center;padding:8px">正在读取 server 清单…</div>`
+:state==="e"?`<div class="empty">还没有配置任何 MCP server。<br><br>在会话里输入 <b>/mcp add</b>，或直接用自然语言让助手接入。</div>`
+:state==="x"?`<div class="errbox"><p>MCP server 列表暂不可读：</p><p class="mono">stream error: connection reset</p><p style="color:var(--tert);font-size:12px">可稍后切走再切回本页重试；/mcp list 命令始终可用。</p></div>`
+:rows(state==="n"?D.n:D.x)}
+function setS(s){state=s;closeForm();render()}
+function setM(d){document.getElementById("pk").classList.toggle("dark",!d)}
+render()
+</script></body></html>
