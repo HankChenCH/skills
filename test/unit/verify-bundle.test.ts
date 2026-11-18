@@ -16,12 +16,13 @@ import { collectBundleDefects } from '../../scripts/verify-bundle.ts';
 
 const PLUGIN_NAME = '@hankchen/dsh-demo';
 
-// fixture 插件包 package.json 的可变异切片（四要素相关字段；破坏测试逐字段删改）
+// fixture 插件包 package.json 的可变异切片（四要素 + 客户端载体相关字段；破坏测试逐字段删改）
 interface FixturePluginPackage {
   name?: string;
   type?: string;
   files?: string[];
-  dsh?: { bundle?: { patch?: string } };
+  exports?: Record<string, unknown>;
+  dsh?: { bundle?: { patch?: string }; client?: Record<string, unknown> };
 }
 
 // 官方形态的 patch 清单（ticket 20261115-f158 取证）：顶层 YAML 数组，元素 = PatchOptions；
@@ -242,4 +243,125 @@ test('裸 dash 后缩进键的合法块状形态放行且引用检查通过（�
     [],
     `合法块状形态不应报缺陷（含引用检查），实际：${JSON.stringify(defects)}`,
   );
+});
+
+// ---------- 客户端载体三查（spec 20261118-0de6 FR-7，票 20261118-7504；源码态口径）----------
+// 五查 = 四要素 + dsh.client 声明 + exports["./client"] + files 含 client 面。期望值独立来源 =
+// 官方 client-modules.md「The scan」契约与 dsh-client-modules@0.2.2-rc.4 探针（票 Progress 留痕）：
+// 声明 ⇔ 导出 ⇔ files 三元组必须齐备——声明无导出官方启动即抛 composition error；导出无声明
+// 是半配置面（官方扫描只认 dsh.client 声明包）；形态校验逐字段镜像官方 parseDshClient/
+// clientExportOf。源码态 files 查 = client 源码目录（suite 客户端面布局约定，构建输入契约）；
+// 发布态查产物文件本体（verify-bundle-publish.test.ts 承载）。
+
+// 带客户端面的合法插件包（独立 fixture）：四要素 + dsh.client + exports 两处 + client 源码目录。
+async function writeValidClientPlugin(root: string) {
+  const dir = path.join(root, 'dsh-mcp-like');
+  await mkdir(path.join(dir, 'client'), { recursive: true });
+  await writeFile(
+    path.join(dir, 'package.json'),
+    JSON.stringify(
+      {
+        name: PLUGIN_NAME,
+        version: '0.2.0',
+        type: 'module',
+        main: 'index.ts',
+        exports: { '.': './index.ts', './client': './client.js' },
+        files: ['index.ts', 'cordis.patch.yml', 'client'],
+        dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web', inject: [] } },
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(dir, 'index.ts'),
+    `export const name = '${PLUGIN_NAME}';\nexport function apply(ctx) { ctx.logger.info(name); }\n`,
+  );
+  await writeFile(path.join(dir, 'client', 'index.ts'), `export function apply(_ctx) {}\n`);
+  await writeFile(path.join(dir, 'cordis.patch.yml'), OFFICIAL_PATCH);
+  return dir;
+}
+
+test('客户端载体三元组齐备的插件包通过校验（源码态，缺陷清单为空）', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  assert.deepEqual(collectBundleDefects(dir), []);
+});
+
+test('声明 dsh.client 而 exports 缺 "./client" 即拒绝（官方启动即抛 composition error 的形态）', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    delete pkg.exports?.['./client'];
+  });
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 1, `应只报导出缺失一项，实际：${JSON.stringify(defects)}`);
+  assert.match(defects[0], /dsh\.client/);
+  assert.match(defects[0], /\.\/client/, '缺陷应点名缺失的 exports["./client"]');
+  // 官方同场景错误消息（clientExportOf 调用方 node 半区扫描：declares dsh.client but exports
+  // no "./client" bundle——composition error，fiber FAILED）逐字引用进缺陷
+  assert.match(defects[0], /declares dsh\.client but exports no "\.\/client" bundle/);
+});
+
+test('exports["./client"] 存在而缺 dsh.client 声明即拒绝（半配置面：官方扫描只认声明包）', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    delete pkg.dsh?.client;
+  });
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 1, `应只报声明缺失一项，实际：${JSON.stringify(defects)}`);
+  assert.match(defects[0], /dsh\.client/, '缺陷应点名缺 dsh.client 声明');
+});
+
+test('files 缺 client 源码目录即拒绝，缺陷点名 files 与 client', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    pkg.files = ['index.ts', 'cordis.patch.yml'];
+  });
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 1, `应只报 files 缺目录一项，实际：${JSON.stringify(defects)}`);
+  assert.match(defects[0], /files/);
+  assert.match(defects[0], /client/);
+});
+
+test('dsh.client.platform 非字符串即拒绝（官方 parseDshClient 镜像），缺陷点名 platform', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    pkg.dsh!.client = { platform: 42, inject: [] };
+  });
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 1, `应只报 platform 形态一项，实际：${JSON.stringify(defects)}`);
+  assert.match(defects[0], /platform/);
+});
+
+test('dsh.client.inject 非字符串数组即拒绝（官方 parseDshClient 镜像），缺陷点名 inject', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    pkg.dsh!.client = { platform: 'web', inject: 'not-array' };
+  });
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 1, `应只报 inject 形态一项，实际：${JSON.stringify(defects)}`);
+  assert.match(defects[0], /inject/);
+  assert.match(defects[0], /string array/);
+});
+
+test('platform 非 web 的合法字符串声明放行（官方扫描语义：仅 web 进表，非 web 是惰性声明非缺陷）', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    pkg.dsh!.client = { platform: 'desktop', inject: [] };
+  });
+  const defects = collectBundleDefects(dir);
+  assert.deepEqual(
+    defects,
+    [],
+    `合法字符串 platform 不应报缺陷（镜像官方 parseDshClient 只校形态），实际：${JSON.stringify(defects)}`,
+  );
+});
+
+test('exports["./client"] 非 string/default 对象形态即拒绝（官方 clientExportOf 镜像）', async (t) => {
+  const dir = await writeValidClientPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    pkg.exports!['./client'] = { node: './client.node.js' };
+  });
+  const defects = collectBundleDefects(dir);
+  assert.equal(defects.length, 1, `应只报导出形态一项，实际：${JSON.stringify(defects)}`);
+  assert.match(defects[0], /must be a string or an object with a string default/);
 });

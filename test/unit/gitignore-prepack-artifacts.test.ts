@@ -23,6 +23,11 @@ test('任意宿主/插件目录的 prepack 产物 index.js 均被 ignore 覆盖�
   assert.equal(ignored(path.join('agents', 'other-host', 'plugins', 'another-pkg', 'index.js')), true);
 });
 
+test('客户端面产物 client.js 同受两级布局通配覆盖（票 20261118-7504：prepack 客户端面编译兜底）', () => {
+  assert.equal(ignored(path.join('agents', 'dsh', 'plugins', 'dsh-mcp', 'client.js')), true);
+  assert.equal(ignored(path.join('agents', 'other-host', 'plugins', 'another-pkg', 'client.js')), true);
+});
+
 test('demo 插件既有产物路径仍被 ignore 覆盖', () => {
   assert.equal(ignored(path.join('agents', 'dsh', 'plugins', 'dsh-demo', 'index.js')), true);
 });

@@ -36,17 +36,25 @@ interface PluginFixture {
   dir: string;
   name: string;
   inserts: InsertRow[];
+  // dsh 字段全文档期望（deepEqual 钉住无多余无缺失）：demo = 纯 Host 插件（bundle 一键）；
+  // dsh-mcp = 双面插件（bundle + client——spec 20261118-0de6 FR-7 客户端载体，票 20261118-7504）
+  dsh: Record<string, unknown>;
 }
 
 // 两款插件包参数化 fixture：insert 行期望 = 各包 cordis.patch.yml 定稿（独立来源 =
 // spec/裁决文本，不从实现推导）。dsh-mcp 两行的语义：mcp-manager 官方只在 Web/Desktop
 // profile 自带，headless/sdk/acp 自定义 profile 不含，故插件自带挂载行（ced7 F2.3）；
 // credentials 在 manager 行、四服务在插件行（票 20261117-dd1f：插件只透传凭据模板串）。
+// dsh.client 期望 = 官方 client-modules.md 一手契约（client-modules.md「The scan」节）+
+// 官方 parseDshClient 校验形态（dsh-client-modules@0.2.2-rc.4 lib/client.js 探针，票
+// 20261118-7504 Progress 留痕）：platform 必带 'web'、inject 显式空数组（载体无包依赖边，
+// 照 dsh-client-modules 先例）、immediately 省略（application 相位，官方 UI 先例全不标）。
 const PLUGINS: PluginFixture[] = [
   {
     dir: 'dsh-demo',
     name: PLUGIN_NAME,
     inserts: [{ id: 'dsh-demo-load-log', name: PLUGIN_NAME }],
+    dsh: { bundle: { patch: './cordis.patch.yml' } },
   },
   {
     dir: 'dsh-mcp',
@@ -55,6 +63,10 @@ const PLUGINS: PluginFixture[] = [
       { id: 'mcp', name: '@deepseek-ai/dsh-mcp-manager', inject: ['credentials'] },
       { id: 'dsh-mcp-manage', name: '@hankchen/dsh-mcp', inject: ['mcpManager', 'commands', 'tools', 'settings'] },
     ],
+    dsh: {
+      bundle: { patch: './cordis.patch.yml' },
+      client: { platform: 'web', inject: [] },
+    },
   },
 ];
 
@@ -67,7 +79,7 @@ interface PluginPackageJson {
   scripts?: Record<string, unknown>;
   devDependencies?: Record<string, unknown>;
   engines?: Record<string, unknown>;
-  dsh?: unknown;
+  dsh?: { bundle?: unknown; client?: Record<string, unknown> };
 }
 
 async function readPackageJson(dir: string): Promise<PluginPackageJson> {
@@ -103,7 +115,7 @@ for (const plugin of PLUGINS) {
       pkg.files?.includes('cordis.patch.yml') && pkg.files?.includes('index.ts'),
       `源码态 files 须含 cordis.patch.yml 与 .ts 模块文件，实际：${JSON.stringify(pkg.files)}`,
     );
-    assert.deepEqual(pkg.dsh, { bundle: { patch: './cordis.patch.yml' } }, 'dsh 识别插件的凭据（plugin-assets §1.2）');
+    assert.deepEqual(pkg.dsh, plugin.dsh, 'dsh 凭据全文档等值（bundle + client 两面按包定稿）');
   });
 
   test(`${plugin.dir} 发布面预编译契约：prepack/postpack 钩子在位 + devDependencies 含 typescript（FR-7 证伪回退）`, async () => {
@@ -160,6 +172,34 @@ for (const plugin of PLUGINS) {
     assert.deepEqual(collectBundleDefects(path.join(PLUGINS_ROOT, plugin.dir)), []);
   });
 }
+
+// ---------- dsh-mcp 客户端载体契约（spec 20261118-0de6 FR-7，票 20261118-7504；不进参数化）----------
+// 期望值独立来源 = 官方 client-modules.md「The scan」一手契约 + dsh-client-modules@0.2.2-rc.4
+// 探针（票 Progress 留痕）：客户端载体两处齐备才进客户端路由表——package.json 声明 dsh.client
+// 与导出 exports["./client"]；产物路径约定 client.js（官方 combo 资源名硬编码 <包名>/client.js）。
+
+test('dsh-mcp 客户端声明齐备：dsh.client = {platform web, inject []}（官方 parseDshClient 校验形态）', async () => {
+  const pkg = await readPackageJson('dsh-mcp');
+  // 全文档等值钉住无多余键：官方 parseDshClient 只认 platform/inject/external/immediately，
+  // 平台非 web 的声明不进 web 插件表（官方 node 半区扫描 platform !== 'web' 即跳过）
+  assert.deepEqual(pkg.dsh?.client, { platform: 'web', inject: [] });
+});
+
+test('dsh-mcp exports 两处齐备："." 指源码态模块 + "./client" 指 client 构建产物路径（官方 clientExportOf 形态）', async () => {
+  const pkg = await readPackageJson('dsh-mcp') as PluginPackageJson & { exports?: Record<string, unknown> };
+  // 官方 clientExportOf 接受字符串或 {default} 对象——字符串是最窄合法形态；
+  // "." 必存（exports 存在即约束包根解析，缺 "." 条目宿主 import 插件即 ERR_PACKAGE_PATH_NOT_EXPORTED）
+  assert.equal(pkg.exports?.['.'], './index.ts', '源码态 exports["."] 与 main 同指源码模块');
+  assert.equal(pkg.exports?.['./client'], './client.js', 'exports["./client"] 指向构建产物 client.js（官方 combo 资源名约定）');
+});
+
+test('dsh-mcp 源码态 files 含客户端源码目录 client（发布态换载归 prepack）', async () => {
+  const pkg = await readPackageJson('dsh-mcp');
+  assert.ok(
+    pkg.files?.includes('client'),
+    `源码态 files 须含 client 源码目录，实际：${JSON.stringify(pkg.files)}`,
+  );
+});
 
 // ---------- demo 特例（包历史约束，不进参数化）----------
 
