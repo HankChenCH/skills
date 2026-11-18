@@ -4,11 +4,15 @@
 //
 // 契约边界（spec 实现决策「管理服务契约/配置字段契约/人类命令契约/模型工具契约/即时生效契约/
 // 凭据契约」）：
-// - 写通道 = 官方 Settings→ConfigEditor 持久化链路（@deepseek-ai/dsh-settings@0.2.2-rc.1
-//   一手来源，票 20261118-2d72 对齐：update 深合并——add 走它；mutate(ns, ops[]) 路径算子
-//   数组——remove = {op:'unset'} 删键、启停 = {op:'set'} 只写 enabled；每次写全量校验并拒
-//   过期 revision。映射要点 add = update('mcp', { servers: … })）。命名空间 = 本包 patch 中
-//   mcp-manager 行 entry id `mcp`（0ea9 定稿）。全程不自管配置文件、不直改 patch 文件、
+// - 写通道 = 官方 Settings→ConfigEditor 持久化链路（@deepseek-ai/dsh-settings 一手来源，
+//   票 20261118-2d72 对齐：update 深合并——add 走它；mutate(ns, ops[]) 路径算子数组——
+//   remove = {op:'unset'} 删键、启停 = {op:'set'} 只写 enabled；每次写全量校验并拒过期
+//   revision）。命名空间不硬编码（票 20261118-08f8 修订，round 1「= 本包 patch 行 id mcp」
+//   口径作废）：官方 Settings 以 Loader entry id 为 ns（write 一手：按 entry.options.id 定位，
+//   未知 ns 拒写 No configurable plugin entry），行 id 随组合变化——web/desktop 组合为官方
+//   预挂行 id mcp-manager（dsh-web-app patch 一手），补位组合为本包 patch 行 id mcp；写时经
+//   ctx.settings.describe 派生实际生效域（manager 配置域 = value.servers 在场的唯一 ns，
+//   零/多在场即拒绝写——resolveSettingsNamespace）。全程不自管配置文件、不直改 patch 文件、
 //   不调 fiber.update。
 // - 读通道 = ctx.mcpManager 的 list()/watch()（状态聚合 McpManagedServerStatus 含
 //   failed/load.lastError/cleanup/waiting-credentials），插件原样投影不加工。
@@ -42,7 +46,23 @@ type SettingsPathOp =
   | { op: 'set'; path: readonly string[]; value: unknown }
   | { op: 'unset'; path: readonly string[] };
 
+/**
+ * 官方 settings 命名空间视图（@deepseek-ai/dsh-settings lib/types/index.d.ts
+ * SettingsDescriptor 消费子集，票 20261118-08f8 取证）：ns = 拥有者 Loader entry id
+ * （describe 一手：`ns: entry.options.id`），value 为该条目 Config 的当前值（Host 面不传
+ * redactSecrets 即原样；manager Config default 经 resolveConfig→validate 恒解析在场）。
+ */
+interface SettingsNamespaceView {
+  ns: string;
+  value: unknown;
+}
+
 interface SettingsService {
+  /**
+   * 官方 describe（SettingsForms lib/types/index.d.ts describe 一手：列全部可配置条目的
+   * ns 与值，同步返回数组；await 兼容 promise 返回的替身/演进）。
+   */
+  describe(): SettingsNamespaceView[] | Promise<SettingsNamespaceView[]>;
   update(namespace: string, patch: Record<string, unknown>): Promise<void> | void;
   mutate(namespace: string, ops: readonly SettingsPathOp[], expectedRevision?: number): Promise<void> | void;
 }
@@ -104,8 +124,47 @@ export interface PluginContext {
 
 // ---- 管理服务 ----
 
-/** settings 命名空间 = patch 中 mcp-manager 行 entry id（0ea9 定稿；调研 ced7 F2.3 官方口径）。 */
-const SETTINGS_NAMESPACE = 'mcp';
+/**
+ * manager 配置域标记（票 20261118-08f8）：官方 manager Config 唯一 volatile 顶层字段
+ * servers（@deepseek-ai/dsh-mcp-manager lib/index.js static Config 一手；default {} 经
+ * cordis resolveConfig→Config validate 恒解析在场），且 rc.4 星座无第二服务暴露 servers
+ * 配置域（星座全量探针）——以 value.servers 在场判定 manager 配置域。
+ */
+function isMcpConfigValue(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const servers = (value as { servers?: unknown }).servers;
+  return typeof servers === 'object' && servers !== null && !Array.isArray(servers);
+}
+
+/**
+ * settings ns 解析（票 20261118-08f8，spec「settings 命名空间口径」决策）：官方 write 以
+ * entry.options.id === ns 定位可配置条目（dsh-settings lib/index.js write 一手，未知 ns
+ * 拒写 `No configurable plugin entry "<ns>"`），而 manager 行 id 随组合变化——web/desktop
+ * 为官方预挂行 id mcp-manager（dsh-web-app patch 一手），补位组合为本包 patch 行 id mcp。
+ * 写时经 describe 派生实际生效域：value.servers 在场的唯一 ns；零在场（组合缺 manager
+ * 提供者）或多于一个（提供者不唯一）即拒绝（refusal），fail loud 不猜测。
+ */
+async function resolveSettingsNamespace(ctx: PluginContext): Promise<string> {
+  const described = await requireSettings(ctx).describe();
+  const rows = Array.isArray(described) ? described : [];
+  const candidates = rows.filter((row) => isMcpConfigValue(row.value));
+  if (candidates.length === 0) {
+    throw new Error('settings.describe 无 servers 配置域：mcp-manager 提供者未在场或未激活（组合缺 manager 行，无法定位写目标）');
+  }
+  if (candidates.length > 1) {
+    throw new Error(`settings.describe 有 ${String(candidates.length)} 个 servers 配置域（${candidates.map((row) => row.ns).join('、')}）：manager 提供者不唯一，拒绝猜测写目标`);
+  }
+  return candidates[0].ns;
+}
+
+/** ns 派生失败与官方拒写同一归宿（WriteOutcome 拒绝，不向双入口调用方抛异常）。 */
+async function deriveSettingsNamespace(ctx: PluginContext): Promise<{ namespace: string } | { refusal: string }> {
+  try {
+    return { namespace: await resolveSettingsNamespace(ctx) };
+  } catch (error) {
+    return { refusal: error instanceof Error ? error.message : String(error) };
+  }
+}
 
 /**
  * 官方 serverName 命名规则（@deepseek-ai/dsh-mcp-client@0.2.2-rc.2 src/index.ts
@@ -129,9 +188,9 @@ interface ServerEntryInput {
   reconnect?: unknown;
 }
 
-/** 写操作结果：拒绝时带可定位信息（违规字段名 / 冲突对象）。 */
+/** 写操作结果：拒绝时带可定位信息（违规字段名 / 冲突对象）；成功带写入的 settings ns（票 08f8：ns 派生后随结果走，供命令文案与工具输出投影分流）。 */
 type WriteOutcome =
-  | { ok: true; serverName: string; transport?: 'stdio' | 'streamable-http' }
+  | { ok: true; serverName: string; transport?: 'stdio' | 'streamable-http'; namespace: string }
   | { ok: false; error: string; field?: string; conflict?: McpManagedServerView };
 
 type EntryValidation =
@@ -293,9 +352,15 @@ export function createManagementService(ctx: PluginContext): ManagementService {
           conflict: existing,
         };
       }
+      // ns 解析在写闭包内（commitSettings 统一归宿）：派生失败（组合缺 manager 提供者/
+      // 提供者不唯一）与官方拒写同走拒绝出口，fail loud 不猜测
+      // ns 在写前派生（票 08f8）：派生失败（组合缺 manager 提供者/提供者不唯一）与官方
+      // 拒写同走拒绝出口，fail loud 不猜测
+      const derived = await deriveSettingsNamespace(ctx);
+      if ('refusal' in derived) return { ok: false, error: derived.refusal };
       const refused = await commitSettings(ctx, (settings) =>
-        settings.update(SETTINGS_NAMESPACE, { servers: { [name]: validation.entry } }));
-      return refused ?? { ok: true, serverName: name, transport: input.transport };
+        settings.update(derived.namespace, { servers: { [name]: validation.entry } }));
+      return refused ?? { ok: true, serverName: name, transport: input.transport, namespace: derived.namespace };
     },
 
     async removeServer(name) {
@@ -306,9 +371,11 @@ export function createManagementService(ctx: PluginContext): ManagementService {
       if (!existing.configured) {
         return { ok: false, error: `server "${name}"：无配置条目（已移除但清理未完成，重启宿主方可清账）` };
       }
+      const derived = await deriveSettingsNamespace(ctx);
+      if ('refusal' in derived) return { ok: false, error: derived.refusal };
       const refused = await commitSettings(ctx, (settings) =>
-        settings.mutate(SETTINGS_NAMESPACE, [{ op: 'unset', path: ['servers', name] }]));
-      return refused ?? { ok: true, serverName: name };
+        settings.mutate(derived.namespace, [{ op: 'unset', path: ['servers', name] }]));
+      return refused ?? { ok: true, serverName: name, namespace: derived.namespace };
     },
 
     async setServerEnabled(name, enabled) {
@@ -316,9 +383,11 @@ export function createManagementService(ctx: PluginContext): ManagementService {
       if (existing === undefined || !existing.configured) {
         return { ok: false, error: `server "${name}"：无配置条目——/mcp list 查看现存 server` };
       }
+      const derived = await deriveSettingsNamespace(ctx);
+      if ('refusal' in derived) return { ok: false, error: derived.refusal };
       const refused = await commitSettings(ctx, (settings) =>
-        settings.mutate(SETTINGS_NAMESPACE, [{ op: 'set', path: ['servers', name, 'enabled'], value: enabled }]));
-      return refused ?? { ok: true, serverName: name };
+        settings.mutate(derived.namespace, [{ op: 'set', path: ['servers', name, 'enabled'], value: enabled }]));
+      return refused ?? { ok: true, serverName: name, namespace: derived.namespace };
     },
   };
 }
@@ -460,10 +529,10 @@ async function executeAdd(service: ManagementService, tokens: string[]): Promise
   return formatWriteOutcome(outcome, `已提交 server "${name}"（streamable-http）`);
 }
 
-/** 写结果 → 命令回复（官方 CommandResult）：成功带状态查询指引，拒绝带原因（冲突/字段/官方拒写）。 */
+/** 写结果 → 命令回复（官方 CommandResult）：成功带状态查询指引（ns = 实际写入域），拒绝带原因（冲突/字段/派生失败/官方拒写）。 */
 function formatWriteOutcome(outcome: WriteOutcome, successLine: string): CommandResult {
   if (outcome.ok === true) {
-    return { kind: 'success', text: `${successLine}——已写官方 settings（命名空间 ${SETTINGS_NAMESPACE}），官方 reconcile 即时生效；/mcp list 查看状态。` };
+    return { kind: 'success', text: `${successLine}——已写官方 settings（命名空间 ${outcome.namespace}），官方 reconcile 即时生效；/mcp list 查看状态。` };
   }
   const conflictNote = outcome.conflict === undefined
     ? ''
@@ -591,7 +660,10 @@ function createManageTool(service: ManagementService): ToolDefinition {
           closeTimeoutMs: request.closeTimeoutMs,
           reconnect: request.reconnect,
         });
-        return outcome.ok === true ? { ...outcome, action } : { ...outcome };
+        // namespace 是管理服务到命令文案的内部通道，不进工具输出（round 1 输出 schema 契约不变）
+        return outcome.ok === true
+          ? { ok: true, serverName: outcome.serverName, transport: outcome.transport, action }
+          : { ...outcome };
       }
       if (action === 'remove' || action === 'enable' || action === 'disable') {
         if (typeof request.serverName !== 'string') {
@@ -600,7 +672,7 @@ function createManageTool(service: ManagementService): ToolDefinition {
         const outcome = action === 'remove'
           ? await service.removeServer(request.serverName)
           : await service.setServerEnabled(request.serverName, action === 'enable');
-        return outcome.ok === true ? { ...outcome, action } : { ...outcome };
+        return outcome.ok === true ? { ok: true, serverName: outcome.serverName, action } : { ...outcome };
       }
       return { ok: false, error: `未知 action "${action}"——支持：list/add/remove/enable/disable` };
     },

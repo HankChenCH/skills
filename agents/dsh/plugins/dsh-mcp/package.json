@@ -1,12 +1,17 @@
 {
   "name": "@hankchen/dsh-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "dsh MCP 对话内管理插件：装进 profile 即获得对话内增删启停 MCP server 的能力，全程不手写 YAML",
   "type": "module",
   "main": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./client": "./client.js"
+  },
   "files": [
     "index.ts",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "client"
   ],
   "scripts": {
     "prepack": "node scripts/prepack.ts",
@@ -25,6 +30,13 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
+      ]
     }
   }
 }

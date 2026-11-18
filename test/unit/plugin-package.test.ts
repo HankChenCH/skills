@@ -7,11 +7,15 @@
 // .ts 零构建直发契约经 FR-7 端到端实测证伪后退役）。
 // 公共包契约参数化覆盖两款插件包（票 20261117-218b，承接评审 20261117-2188 建议 3 的
 // patch 契约无自动化断言缺口；spec 20261117-34d4 FR-7 兜底），不按包复制测试：
-// demo = 单 insert 行自挂载；dsh-mcp = 恰两 insert 行（mcp-manager 挂载行 id mcp 带
-// inject [credentials] + 本插件模块行 id dsh-mcp-manage 带 inject [mcpManager, commands,
+// demo = 单 insert 行自挂载；dsh-mcp = 恰两 insert 行（mcp-manager 补位行 id mcp 带
+// inject [credentials] 与 disabled !!js 条件化（票 20261118-08f8：官方 web/desktop 组合
+// 经官方 bundle 预挂 mcp-manager 行，插件行在场即 duplicate——判据 = startedBundles 含
+// 官方预挂 bundle）+ 本插件模块行 id dsh-mcp-manage 带 inject [mcpManager, commands,
 // tools, settings]——行契约与 inject 语义取 spec 实现决策与票 20261117-dd1f 裁决）。
 // patch 断言用真解析器（js-yaml，declarative-artifact-strict-parse 口径）替代 regex 行
-// 匹配，顶层数组与 insert 行 id/name/inject 逐字段等值。
+// 匹配，顶层数组与 insert 行 id/name/inject/disabled 逐字段等值；!!js 节点 = 官方
+// entryListSchema 形态镜像（cordis-plugin-include lib/index.js：tag:yaml.org,2002:js 构
+// {__jsExpr}，与 dsh-mcp-plugin.test.ts 同款）。
 // demo 特例保留两个包历史约束：版本高于已烧版 0.1.0、apply 打一条加载日志。
 
 import { test } from 'node:test';
@@ -20,41 +24,74 @@ import { readFile } from 'node:fs/promises';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { load as loadYaml } from 'js-yaml';
+import { load as loadYaml, JSON_SCHEMA, defineScalarTag } from 'js-yaml';
 
 const PLUGIN_NAME = '@hankchen/dsh-demo';
 const PLUGIN_DIR = new URL('../../agents/dsh/plugins/dsh-demo/', import.meta.url);
 const PLUGINS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'agents', 'dsh', 'plugins');
 
+// 官方 patch 解析 schema 镜像（cordis-plugin-include entryListSchema：!!js 节点构 {__jsExpr}，
+// 与 dsh-mcp-plugin.test.ts 同款——dsh-mcp 的 manager 补位行 disabled 用了该官方先例形态）
+const jsExprTag = defineScalarTag('tag:yaml.org,2002:js', {
+  resolve: (source: string) => ({ __jsExpr: source }),
+  identify: () => false,
+});
+const patchSchema = JSON_SCHEMA.withTags(jsExprTag);
+
 interface InsertRow {
   id: string;
   name: string;
   inject?: string[];
+  disabled?: { __jsExpr: string };
 }
 
 interface PluginFixture {
   dir: string;
   name: string;
   inserts: InsertRow[];
+  // dsh 字段全文档期望（deepEqual 钉住无多余无缺失）：demo = 纯 Host 插件（bundle 一键）；
+  // dsh-mcp = 双面插件（bundle + client——spec 20261118-0de6 FR-7 客户端载体，票 20261118-7504）
+  dsh: Record<string, unknown>;
 }
 
 // 两款插件包参数化 fixture：insert 行期望 = 各包 cordis.patch.yml 定稿（独立来源 =
-// spec/裁决文本，不从实现推导）。dsh-mcp 两行的语义：mcp-manager 官方只在 Web/Desktop
-// profile 自带，headless/sdk/acp 自定义 profile 不含，故插件自带挂载行（ced7 F2.3）；
-// credentials 在 manager 行、四服务在插件行（票 20261117-dd1f：插件只透传凭据模板串）。
+// spec/裁决文本，不从实现推导）。dsh-mcp 两行的语义：官方 web/desktop 组合经官方 bundle
+// 预挂 mcp-manager 行，sdk/headless/acp 自定义 profile 不含——manager 行条件化补位
+// （disabled !!js 判 startedBundles 含官方预挂 bundle，票 20261118-08f8；round 1 无条件
+// 挂载作废）；credentials 在 manager 行、四服务在插件行（票 20261117-dd1f：插件只透传
+// 凭据模板串）。
+// dsh.client 期望 = 官方 client-modules.md 一手契约（client-modules.md「The scan」节）+
+// 官方 parseDshClient 校验形态（dsh-client-modules@0.2.2-rc.4 lib/client.js 探针，票
+// 20261118-7504 Progress 留痕）：platform 必带 'web'、inject 显式空数组（载体无包依赖边，
+// 照 dsh-client-modules 先例）、immediately 省略（application 相位，官方 UI 先例全不标）。
 const PLUGINS: PluginFixture[] = [
   {
     dir: 'dsh-demo',
     name: PLUGIN_NAME,
     inserts: [{ id: 'dsh-demo-load-log', name: PLUGIN_NAME }],
+    dsh: { bundle: { patch: './cordis.patch.yml' } },
   },
   {
     dir: 'dsh-mcp',
     name: '@hankchen/dsh-mcp',
     inserts: [
-      { id: 'mcp', name: '@deepseek-ai/dsh-mcp-manager', inject: ['credentials'] },
+      {
+        id: 'mcp',
+        name: '@deepseek-ai/dsh-mcp-manager',
+        inject: ['credentials'],
+        // 判据字面 = spec 票 20261118-08f8「manager 行组合策略」决策：startedBundles 含
+        // 官方预挂 bundle（rc.4 一手：dsh-web-app 唯一自带 mcp-manager 行）即禁用插件行
+        disabled: { __jsExpr: "ctx.get('profileContext')?.startedBundles?.includes('@deepseek-ai/dsh-web-app')" },
+      },
       { id: 'dsh-mcp-manage', name: '@hankchen/dsh-mcp', inject: ['mcpManager', 'commands', 'tools', 'settings'] },
     ],
+    dsh: {
+      bundle: { patch: './cordis.patch.yml' },
+      client: {
+        platform: 'web',
+        inject: ['@deepseek-ai/dsh-api-remotes', '@deepseek-ai/dsh-client-ui-sidebar-right'],
+      },
+    },
   },
 ];
 
@@ -67,7 +104,7 @@ interface PluginPackageJson {
   scripts?: Record<string, unknown>;
   devDependencies?: Record<string, unknown>;
   engines?: Record<string, unknown>;
-  dsh?: unknown;
+  dsh?: { bundle?: unknown; client?: Record<string, unknown> };
 }
 
 async function readPackageJson(dir: string): Promise<PluginPackageJson> {
@@ -103,7 +140,7 @@ for (const plugin of PLUGINS) {
       pkg.files?.includes('cordis.patch.yml') && pkg.files?.includes('index.ts'),
       `源码态 files 须含 cordis.patch.yml 与 .ts 模块文件，实际：${JSON.stringify(pkg.files)}`,
     );
-    assert.deepEqual(pkg.dsh, { bundle: { patch: './cordis.patch.yml' } }, 'dsh 识别插件的凭据（plugin-assets §1.2）');
+    assert.deepEqual(pkg.dsh, plugin.dsh, 'dsh 凭据全文档等值（bundle + client 两面按包定稿）');
   });
 
   test(`${plugin.dir} 发布面预编译契约：prepack/postpack 钩子在位 + devDependencies 含 typescript（FR-7 证伪回退）`, async () => {
@@ -144,8 +181,9 @@ for (const plugin of PLUGINS) {
     // 官方 loader 只加载顶层数组（dsh 0.2.2-rc.1 取证，ticket 20261115-f158）：顶层 YAML 数组，
     // 元素 = PatchOptions；insert 元素 = EntryOptions，须 id + name——name 是宿主从 profile 的
     // node_modules 解析的模块说明符。deepEqual 全文档等值同时钉住：顶层数组、恰一 PatchOptions、
-    // insert 行无多余无缺失、id/name/inject 值与定稿一致（评审 20261117-2188 建议 3 缺口承接）。
-    const patch = loadYaml(fs.readFileSync(path.join(PLUGINS_ROOT, plugin.dir, 'cordis.patch.yml'), 'utf8'));
+    // insert 行无多余无缺失、id/name/inject/disabled 值与定稿一致（评审 20261117-2188 建议 3
+    // 缺口承接；disabled 条件字面 = 票 20261118-08f8 spec 决策文本）。
+    const patch = loadYaml(fs.readFileSync(path.join(PLUGINS_ROOT, plugin.dir, 'cordis.patch.yml'), 'utf8'), { schema: patchSchema });
     assert.deepEqual(patch, [{ insert: plugin.inserts }]);
   });
 
@@ -160,6 +198,40 @@ for (const plugin of PLUGINS) {
     assert.deepEqual(collectBundleDefects(path.join(PLUGINS_ROOT, plugin.dir)), []);
   });
 }
+
+// ---------- dsh-mcp 客户端载体契约（spec 20261118-0de6 FR-7，票 20261118-7504；不进参数化）----------
+// 期望值独立来源 = 官方 client-modules.md「The scan」一手契约 + dsh-client-modules@0.2.2-rc.4
+// 探针（票 Progress 留痕）：客户端载体两处齐备才进客户端路由表——package.json 声明 dsh.client
+// 与导出 exports["./client"]；产物路径约定 client.js（官方 combo 资源名硬编码 <包名>/client.js）。
+
+test('dsh-mcp 客户端声明齐备：dsh.client = {platform web, inject 服务提供者包边}（官方 parseDshClient 校验形态）', async () => {
+  const pkg = await readPackageJson('dsh-mcp');
+  // 全文档等值钉住无多余键：官方 parseDshClient 只认 platform/inject/external/immediately，
+  // 平台非 web 的声明不进 web 插件表（官方 node 半区扫描 platform !== 'web' 即跳过）。
+  // inject 边 = 客户端面板 apply 消费服务的提供者包（官方 files 先例形态）：
+  // api-remotes = remote/remote.mcpManager/remote.settings 命名空间，client-ui-sidebar-right =
+  // sidebarRightTabs 服务；slots 属平台层（官方 client-ui 先例均不列——bootstrap 相位必然在）。
+  assert.deepEqual(pkg.dsh?.client, {
+    platform: 'web',
+    inject: ['@deepseek-ai/dsh-api-remotes', '@deepseek-ai/dsh-client-ui-sidebar-right'],
+  });
+});
+
+test('dsh-mcp exports 两处齐备："." 指源码态模块 + "./client" 指 client 构建产物路径（官方 clientExportOf 形态）', async () => {
+  const pkg = await readPackageJson('dsh-mcp') as PluginPackageJson & { exports?: Record<string, unknown> };
+  // 官方 clientExportOf 接受字符串或 {default} 对象——字符串是最窄合法形态；
+  // "." 必存（exports 存在即约束包根解析，缺 "." 条目宿主 import 插件即 ERR_PACKAGE_PATH_NOT_EXPORTED）
+  assert.equal(pkg.exports?.['.'], './index.ts', '源码态 exports["."] 与 main 同指源码模块');
+  assert.equal(pkg.exports?.['./client'], './client.js', 'exports["./client"] 指向构建产物 client.js（官方 combo 资源名约定）');
+});
+
+test('dsh-mcp 源码态 files 含客户端源码目录 client（发布态换载归 prepack）', async () => {
+  const pkg = await readPackageJson('dsh-mcp');
+  assert.ok(
+    pkg.files?.includes('client'),
+    `源码态 files 须含 client 源码目录，实际：${JSON.stringify(pkg.files)}`,
+  );
+});
 
 // ---------- demo 特例（包历史约束，不进参数化）----------
 

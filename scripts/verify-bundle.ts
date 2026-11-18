@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 插件包 bundle 清单校验器（spec 20261115-495e FR-2，规范文档 docs/plugin-assets.md §1.2/§1.4；
-// 双态口径归 spec 20261115-ed9f 插件预编译契约，票 20261115-cf39）。
+// 双态口径归 spec 20261115-ed9f 插件预编译契约，票 20261115-cf39；客户端载体三查归
+// spec 20261118-0de6 FR-7 五查扩展，票 20261118-7504）。
 // 接口窄：进插件包目录（源码态）或发布 tarball（发布态），出缺陷清单（空 = 通过）。
 //
 // 源码态（collectBundleDefects，仓库插件目录）——核对 §1.2 清单四要素与 §1.4 两项附录：
@@ -16,6 +17,11 @@
 //      （换载后目录态）。静态读源码，套件约定 ESM + 内联导出，照抄 demo 即在此形态内。
 //      导出识别在剥注释后的文本上做：.ts 文档注释天然引用导出名、type 声明形似导出，裸正则
 //      会误放行幽灵导出）。
+//   6–8. 客户端载体三查（有 dsh.client 声明的包）：dsh.client 声明 ⇔ exports["./client"] ⇔
+//      files 含 client 源码目录三元组一致 + 形态逐字段镜像官方 parseDshClient/clientExportOf
+//      （dsh-client-modules@0.2.2-rc.4 一手来源，票 20261118-7504 Progress 留痕）；无声明包
+//      三查全跳（纯 Host 插件合法）。源码态不查产物本体——零构建纪律，client.js 只存在于
+//      发布面；源码态查 client/ 源码目录在盘且在 files（包内 prepack 构建输入契约）。
 //
 // 发布态（collectPublishedBundleDefects / collectTarballBundleDefects，插件包自有 registry
 // tarball——dsh 官方命令安装的消费者拿到的就是它）——FR-7 证伪定案（node 拒载 node_modules 下
@@ -25,6 +31,9 @@
 //   6. main 须指 .js（main 指 .ts 即 FR-7 证伪形态，缺陷引用证伪报告）；
 //   7. files 白名单须含编译产物（main 入口）；
 //   8. 目录内无 .ts 源码残留（spec 预编译契约：发布 tarball 不含 .ts）。
+//   9–11. 客户端载体三查语义同源码态，files 查换为产物本体：exports 路径在 files 清单且
+//      client bundle 文件在包内（pack 对缺盘文件只 warn 不报错，声明了产物而包内缺文件 =
+//      装出去官方启动即抛 missing bundle composition error）。
 // tarball 入口按 pnpm/npm pack 产物 package/ 单包布局解包后走目录口径。
 //
 // scripts/verify-pack.ts 的插件侧复用源码态实现（根初始化器包内嵌插件目录 = 编目数据，
@@ -39,13 +48,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 被校验插件包 package.json 的清单切片（四要素相关字段；其余键不进核对范围）。
+// 被校验插件包 package.json 的清单切片（四要素 + 客户端载体相关字段；其余键不进核对范围）。
 interface PluginPackageJson {
   name?: string;
   type?: string;
   files?: string[];
   main?: string;
-  dsh?: { bundle?: { patch?: string } };
+  exports?: Record<string, unknown>;
+  dsh?: { bundle?: { patch?: string }; client?: unknown };
 }
 
 // package.json 里的声明值（'./cordis.patch.yml'）与 files 条目（'cordis.patch.yml'）同法归一后再比对
@@ -295,6 +305,175 @@ function collectPatchDefects(name: string, patchTarget: string, patchText: strin
   return defects;
 }
 
+// ---------- 客户端载体三查（spec 20261118-0de6 FR-7 五查扩展，票 20261118-7504） ----------
+//
+// 契约一手来源（探针留痕工票 Progress）：dsh-client-modules@0.2.2-rc.4 lib/client.js 的
+// parseDshClient（声明形态校验）与 lib/index.js 的 clientExportOf（导出解析）+ node 半区扫描
+// （decl === undefined || decl.platform !== 'web' 即跳过；声明无导出 → 官方启动抛 composition
+// error「declares dsh.client but exports no "./client" bundle」，fiber FAILED）。两函数逐形态
+// 镜像官方：替身契约照真实签名（first-party-api-probing 纪律）。
+//
+// 三元组一致性 = 三查的判定骨架：dsh.client 声明 ⇔ exports["./client"] ⇔ files 含 client 面。
+// 任一在而其余缺即缺陷（声明无导出 = 官方启动失败；导出无声明 = 官方扫描不认的半配置面）；
+// 全部缺席 = 无客户端面的纯 Host 插件（dsh-demo 形态，合法）。
+// files 查按态分派：源码态 = client 源码目录（suite 客户端面布局约定 = 包内 prepack 构建输入
+// 契约）；发布态 = exports 指向的产物文件本体随包（清单声明了产物而 tarball 缺文件 = 装出去
+// 官方启动即抛 missing bundle）。
+
+// 源码态客户端面源码目录（suite 布局约定：agents/<宿主>/plugins/<包>/client/index.ts，
+// 包内 prepack 客户端面编译的单入口；拆多文件须先扩发布面，见各包 prepack）
+const CLIENT_SOURCE_DIR = 'client';
+
+// 官方 parseDshClient 逐形态镜像（lib/client.js 一手来源；错误文案保留官方原文关键段）：
+// dsh.client 须对象；platform 须字符串；inject/external 存在须字符串数组；immediately
+// 存在须布尔。platform 非 web 不判缺陷——官方 node 半区扫描只把 platform==='web' 进表，
+// 非 web 是惰性声明（官方语义：形态合法即可，进不进表归官方）。
+function collectClientDeclarationDefects(displayName: string, decl: unknown): string[] {
+  const defects: string[] = [];
+  if (typeof decl !== 'object' || decl === null || Array.isArray(decl)) {
+    defects.push(
+      `${displayName}：dsh.client 声明须为对象（官方 parseDshClient：非对象声明官方启动即抛）——实际：${JSON.stringify(decl)}`,
+    );
+    return defects;
+  }
+  const declaration = decl as Record<string, unknown>;
+  if (typeof declaration.platform !== 'string') {
+    defects.push(
+      `${displayName}：dsh.client.platform 须为字符串（官方 parseDshClient：dsh.client.platform must be a string）——实际：${JSON.stringify(declaration.platform)}`,
+    );
+  }
+  for (const field of ['inject', 'external'] as const) {
+    const value = declaration[field];
+    if (value !== undefined && (!Array.isArray(value) || value.some((item) => typeof item !== 'string'))) {
+      defects.push(
+        `${displayName}：dsh.client.${field} 须为字符串数组（官方 parseDshClient：dsh.client.${field} must be a string array）——实际：${JSON.stringify(value)}`,
+      );
+    }
+  }
+  if (declaration.immediately !== undefined && typeof declaration.immediately !== 'boolean') {
+    defects.push(
+      `${displayName}：dsh.client.immediately 须为布尔（官方 parseDshClient：dsh.client.immediately must be a boolean）——实际：${JSON.stringify(declaration.immediately)}`,
+    );
+  }
+  return defects;
+}
+
+// 官方 clientExportOf 逐形态镜像（lib/index.js 一手来源）：exports 须对象；exports["./client"]
+// 接受字符串或含字符串 default 的对象，归一为相对路径。返回 { path } 或 { defect }。
+function clientExportPath(
+  displayName: string,
+  exportsField: unknown,
+): { path?: string; defect?: string } {
+  if (typeof exportsField !== 'object' || exportsField === null || Array.isArray(exportsField)) {
+    // 官方 clientExportOf 对非对象 exports 返回 undefined（→ 扫描报声明无导出），不另抛——
+    // 镜像同语义：无导出可用，交由三查的声明侧缺陷承担
+    return {};
+  }
+  const client = (exportsField as Record<string, unknown>)['./client'];
+  if (client === undefined) return {};
+  if (typeof client === 'string') return { path: client };
+  if (typeof client === 'object' && client !== null) {
+    const fallback = (client as Record<string, unknown>).default;
+    if (typeof fallback === 'string') return { path: fallback };
+  }
+  return {
+    defect:
+      `${displayName}：exports["./client"] 须为字符串或含字符串 default 的对象（官方 clientExportOf：` +
+      `must be a string or an object with a string default）——实际：${JSON.stringify(client)}`,
+  };
+}
+
+// 客户端载体三查主体。双态差异只在 files 查：源码态查 client 源码目录（目录在盘且在 files
+// 清单），发布态查产物文件（exports 路径在 files 清单且文件在盘——pack 对 files 清单里缺盘
+// 的文件只 warn 不报错，声明了产物而包内缺文件 = 装出去官方启动即抛，必须在发布面拦下）。
+function collectClientDefects(
+  displayName: string,
+  name: string | undefined,
+  pluginDir: string,
+  pkg: PluginPackageJson,
+  files: string[] | null,
+  published: boolean,
+): string[] {
+  const defects: string[] = [];
+  const clientDeclared = pkg.dsh?.client !== undefined;
+  if (clientDeclared) {
+    defects.push(...collectClientDeclarationDefects(displayName, pkg.dsh?.client));
+  }
+
+  const exportResolved = clientExportPath(displayName, pkg.exports);
+  if (exportResolved.defect !== undefined) {
+    defects.push(exportResolved.defect);
+  }
+  const clientArtifact =
+    typeof exportResolved.path === 'string' && exportResolved.path !== ''
+      ? normalizeEntry(exportResolved.path)
+      : null;
+
+  // 一致性查（连带抑制同要素 2/3/4 先例：形态坏时对端无从谈一致，各自缺陷已列，不再叠报）
+  if (clientDeclared && clientArtifact === null && exportResolved.defect === undefined) {
+    defects.push(
+      `${displayName}：package.json 声明了 dsh.client 但 exports 无 "./client" 导出` +
+        `（官方扫描：declares dsh.client but exports no "./client" bundle——composition error，` +
+        `官方启动即抛且 fiber FAILED）`,
+    );
+  }
+  if (!clientDeclared && clientArtifact !== null) {
+    defects.push(
+      `${displayName}：package.json 有 exports["./client"] 导出但缺 dsh.client 声明` +
+        `（官方扫描只认 dsh.client 声明包——半配置面：导出永远不被分发，客户端路由表不进）`,
+    );
+  }
+
+  if (clientDeclared && clientArtifact !== null && name) {
+    if (published) {
+      if (!files) {
+        defects.push(`${name}：package.json 缺 files 清单——客户端产物不会随包分发`);
+      } else if (!files.includes(clientArtifact)) {
+        defects.push(
+          `${name}：files 清单缺客户端产物 ${clientArtifact}——白名单外文件不随包分发，` +
+            `装出去的包缺 bundle（官方启动即抛 composition error）`,
+        );
+      }
+      let bundleReadable = false;
+      try {
+        bundleReadable = fs.statSync(path.join(pluginDir, clientArtifact)).isFile();
+      } catch {
+        bundleReadable = false;
+      }
+      if (!bundleReadable) {
+        defects.push(
+          `${name}：客户端产物文件读不到（${clientArtifact}）——发布 tarball 缺 bundle 本体，` +
+            `官方启动即抛 missing bundle composition error`,
+        );
+      }
+    } else {
+      // 源码态：files 查 = client 源码目录（suite 布局约定 = 包内 prepack 构建输入契约；
+      // 产物 client.js 在源码树常态不存在——零构建纪律，发布态才查产物本体）
+      if (!files) {
+        defects.push(`${name}：package.json 缺 files 清单——客户端面源码目录不在分发清单`);
+      } else if (!files.includes(CLIENT_SOURCE_DIR)) {
+        defects.push(
+          `${name}：files 清单缺客户端面源码目录 ${CLIENT_SOURCE_DIR}——` +
+            `声明了 dsh.client 而客户端源码不入包清单（构建输入缺位）`,
+        );
+      }
+      let sourceDirReadable = false;
+      try {
+        sourceDirReadable = fs.statSync(path.join(pluginDir, CLIENT_SOURCE_DIR)).isDirectory();
+      } catch {
+        sourceDirReadable = false;
+      }
+      if (!sourceDirReadable) {
+        defects.push(
+          `${name}：客户端面源码目录读不到（${CLIENT_SOURCE_DIR}/）——声明了 dsh.client 而` +
+            `客户端源码缺盘，包内 prepack 客户端面编译无从进行`,
+        );
+      }
+    }
+  }
+  return defects;
+}
+
 // 剥注释（字符串感知，票 20261115-e692 .ts 形态适配）：导出识别前先把行注释与块注释逐字符
 // 换成空格（保留换行与字符位，防 token 粘连）。机制取舍：AST 解析需 typescript 依赖，而本
 // 校验器被 verify-pack（发布对账）与测试直跑复用、scripts/ 零运行时依赖纪律（ADR
@@ -513,6 +692,10 @@ function collectBundleDefectsFor(pluginDir: string, published: boolean): string[
     }
   }
 
+  // 五查扩展（spec 20261118-0de6 FR-7，票 20261118-7504）：客户端载体三查——dsh.client 声明
+  // ⇔ exports["./client"] ⇔ files 含 client 面，三元组一致性 + 形态镜像官方校验器。
+  defects.push(...collectClientDefects(displayName, name, pluginDir, pkg, files, published));
+
   return defects;
 }
 
@@ -532,7 +715,7 @@ function runCli(args: string[]): number {
         console.error(`✗ 发布态 tarball 校验不过：${tarball}`);
         for (const defect of defects) console.error(`  - ${defect}`);
       } else {
-        console.log(`✓ 发布态校验通过（.js 形态、四要素齐备、无 .ts 源码）：${tarball}`);
+        console.log(`✓ 发布态校验通过（.js 形态、四要素齐备、无 .ts 源码、客户端载体三查过）：${tarball}`);
       }
     }
     return failed > 0 ? 1 : 0;
@@ -550,7 +733,7 @@ function runCli(args: string[]): number {
       console.error(`✗ bundle 校验不过：${dir}`);
       for (const defect of defects) console.error(`  - ${defect}`);
     } else {
-      console.log(`✓ bundle 校验通过（四要素齐备）：${dir}`);
+      console.log(`✓ bundle 校验通过（四要素齐备，客户端载体三查过或有声明即齐备）：${dir}`);
     }
   }
   return failed > 0 ? 1 : 0;

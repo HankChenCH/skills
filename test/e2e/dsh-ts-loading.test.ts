@@ -33,6 +33,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertPluginPreconditions, commandExists } from '../../src/kernel/dsh-command.ts';
+import { withPackLock } from './dsh-mcp-pack-lock.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PLUGIN_DIR = path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo');
@@ -359,22 +360,26 @@ test(`[FR-7|集成级] ${PKG} 发布面预编译形态（pnpm pack 产物）经�
   const packDir = makeTempDir(t, 'dsh-js-e2e-pack-');
 
   // 打包段：插件包经自身 prepack/postpack 生命周期出发布态 tarball。打包在临时拷贝上进行
-  //（node_modules 以符号链接带回 tsc 工具链）——prepack 的清单换载发生在拷贝内，不触仓库树，
-  // 与并行读取插件包清单的其他测试零竞争（可重复确定纪律）。
+  //（node_modules 以符号链接带回 tsc 工具链）——prepack 的清单换载发生在拷贝内，不触仓库树。
+  // pack 命令本身经共享跨进程锁互斥（dsh-mcp-pack-lock.ts，票 20261118-4349）：node --test
+  // 默认并行跑测试文件，本段与 dsh-mcp 系 pack 并发时实测 staging prepack exit 1（单跑恒绿，
+  // 验收报告 20261118-e87d draft）——pnpm pack 进程级竞争，与 dsh-mcp 系消费方同锁串行化。
   const stagingDir = path.join(packDir, 'staging');
   fs.cpSync(PLUGIN_DIR, stagingDir, {
     recursive: true,
     filter: (source) => !source.includes('node_modules'), // 依赖目录不入拷贝，符号链接带回
   });
   fs.symlinkSync(path.join(PLUGIN_DIR, 'node_modules'), path.join(stagingDir, 'node_modules'), 'dir');
-  const pack = spawnSync('pnpm', ['pack', '--pack-destination', packDir], {
-    cwd: stagingDir,
-    encoding: 'utf8',
-    timeout: 120 * 1000,
-    env: { ...process.env, PATH: integrationPath() },
+  const tarball = await withPackLock(() => {
+    const pack = spawnSync('pnpm', ['pack', '--pack-destination', packDir], {
+      cwd: stagingDir,
+      encoding: 'utf8',
+      timeout: 120 * 1000,
+      env: { ...process.env, PATH: integrationPath() },
+    });
+    assert.equal(pack.status, 0, `pnpm pack 应成功（含插件包 prepack 生命周期编译）: ${failDetail(pack)}`);
+    return resolvePackedTarball(packDir, pack.stdout ?? '');
   });
-  assert.equal(pack.status, 0, `pnpm pack 应成功（含插件包 prepack 生命周期编译）: ${failDetail(pack)}`);
-  const tarball = resolvePackedTarball(packDir, pack.stdout ?? '');
 
   // 发布态对账（FR-7 回退形态本体）：tarball 清单载 .js 形态——有 index.js + cordis.patch.yml
   // + package.json、无任何 .ts 源码；打包清单 main 指 index.js、files 为发布态白名单。
