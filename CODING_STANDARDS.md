@@ -8,6 +8,7 @@
 - [parse-normalization.md](docs/standards/parse-normalization.md) —— 引用形态判定与键归约单点化：判定单点、键空间同源、失败显式上抛、分支带尾锚。
 - [declarative-artifact-strict-parse.md](docs/standards/declarative-artifact-strict-parse.md) —— 声明式工件有效性判断用真解析器：可解析性判据归真解析器全文件解析（同因同位报因），自写解析器只承结构契约，平纯标量禁冒号空格，真跑为最终防线。
 - [design-docs.md](docs/standards/design-docs.md) —— 文档与看板呈现的设计语言基线：配色语义板、等宽规则、密度口径、间距与字号阶梯、组件观感与反例；界面设计先读此册，偏离逐条声明理由。
+- [design-web.md](docs/standards/design-web.md) —— web 界面设计语言基线（dsh `--dsw-*` token 体系）：配色 alias 面、三路字体、密度口径、圆角/字号阶梯、组件观感与反例；web 界面设计先读此册，偏离逐条声明理由。
 - [skill-reference-mounting.md](docs/standards/skill-reference-mounting.md) —— 参考技能挂载双落点纪律：description 发现面 + 正文装载行执行面，蓝图 §7.2 矩阵同批登记。
 - [bash-multibyte-bracing.md](docs/standards/bash-multibyte-bracing.md) —— bash 3.2 变量展开紧邻多字节字符必须 `${VAR}` 花括号；日志禁 `head -c` 截 UTF-8。
 - [stub-fidelity-integration.md](docs/standards/stub-fidelity-integration.md) —— 替身保真缺口与集成级拦截纪律：被真实协作者校验/解析/发布的交付物不得只靠注入替身测试背书；替身测试钉替身契约、真实链路断言钉工件级语义。
