@@ -27,7 +27,7 @@
 
 ## 间距与字号阶梯
 
-- **圆角阶梯**（`--dsw-radius-*`）：xs 4px / sm 8px / md 12px / lg 16px / xl 20px / panel 28px / pill 999px。
+- **圆角阶梯**（`--dsw-radius-*`）：xs 4px / sm 8px / md 12px / lg 16px / xl 20px / panel 28px / pill 999px。修订（2026-11-18，rc.5 一手取证）：宿主主题 stylesheet 实际只分发 xs/sm/md/lg/xl/panel 六档，pill 档未随主题分发（`--dsw-radius-pill` 不存在，解析为空）——插件侧引 pill 档必须带直值兜底（`var(--dsw-radius-pill, 999px)` 形态），基线记载的七档全分发与实况不符以本注记为准。
 - **字号阶梯**：语义组合 token 族 `--dsw-font-<档>`（每档带 -font-family/-font-size/-font-style/-font-weight/-line-height 五元组，引用整组不拆散），已证实常用档 base-16 / m-18 / l-20（其余档清单归 design-ui 时全量提取——假设：档位全集以 token stylesheets 为准）。
 - **间距**：官方无全局 spacing token——组件级 px 直值（官方组件实况：gap 10px、padding 18px 一类）；本基线沿用同法：间距用 px 直值、以官方组件实况为参照系，不发明 spacing token（假设：官方后续若引入 spacing token 则跟随，届时修订本册）。
 - **elevation**：`--dsw-elevation-{soft,panel,prominent,stroke}` 四档 + `--dsw-shadow-lv{1,2,3}`；侧栏面板用 panel 档。
