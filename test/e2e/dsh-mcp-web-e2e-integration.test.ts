@@ -15,18 +15,18 @@
 // （client/index.ts addServer：stdio = transport/command/args[/env/cwd]、远程 =
 // transport/url[/headers]、无 enabled/reconnect 键）驱动；浏览器渲染与点击交互归验收人工段。
 //
-// 设计发现（2026-11-18 真跑实证，工票 Progress 定性、编排会话处置，不作测试断言钉死——
-// 插件修复落地后不得误红）：官方 web 形态的 dsh-web-app bundle patch 自带 mcp-manager 行
-// （id: mcp-manager，"The manager owns the fleet of MCP servers that installed plugins
-// register" 一手注释）；本插件 cordis.patch.yml 又无条件自带 id: mcp 的 manager 行——两行
-// 同供 mcpManager 服务，后到者（插件行）duplicate 失败（真跑 boot 警告 "1 entry did not
-// activate"）；官方 Settings 命名空间随行 id 派生 → web 组合的 server 配置 ns =
-// 'mcp-manager'，插件写面硬编码 ns 'mcp' 在该组合被官方拒（settings/rejected: No
-// configurable plugin entry "mcp"）。本测试的写腿因此在官方行 id 派生 ns 上承载（同一
-// settings update/mutate 线通道 + 同一 entry 形态）；ns 错位与冗余 manager 行的插件修复归
-// 后续工票。profile 显式钉同版 manager（AD91 纪律）在本形态是必要条件而非可选步骤：不钉时
-// 插件依赖把 profile 级 manager 解析到旧 rc，官方行与插件行一并被 boot 兼容门禁用
-// （"disabling profile plugin row" 真跑实证），宿主将完全无 manager。
+// 设计发现与修复（2026-11-18 本票真跑实证 → fix 票 20261118-08f8 修复合回）：本票首跑暴露
+// 官方 web 形态的 dsh-web-app bundle patch 自带 mcp-manager 行，而插件 cordis.patch.yml 无条件
+// 自带 id: mcp 的 manager 行——两行同供 mcpManager 服务，插件行 duplicate 失败（boot 警告
+// "1 entry did not activate"），且官方 Settings ns 随行 id 派生（web 组合 ns = 'mcp-manager'）
+// 使插件写面硬编码 ns 'mcp' 被官方拒。08f8 修复 = ①manager 补位行条件化（startedBundles 含
+// dsh-web-app 即 disabled，web 组合官方行独供）；②Host/客户端写面 ns 改 describe 派生（唯一
+// servers 域，零/多在场 fail loud）。本测试据此钉 web 组合的修复后契约：boot 日志无 duplicate/
+// 兼容门禁用警告（激活卫生面），describe 恰一个 servers 域且 ns 字面 = mcp-manager（官方行
+// id 派生值，独立钉值），写腿经该 ns 承载（与插件派生结果同一通道同一落点）。profile 显式钉
+// 同版 manager（AD91 纪律）在本形态仍是必要条件而非可选步骤：不钉时插件依赖把 profile 级
+// manager 解析到旧 rc，官方行与插件行一并被 boot 兼容门禁用（"disabling profile plugin row"
+// 真跑实证），宿主将完全无 manager。
 //
 // 线层一手来源（npx 缓存 @deepseek-ai@0.2.2-rc.4 星座在盘，探针实证留痕工票 Progress）：
 // - 认证 = `GET /?token=<launch token>` 换签名 cookie（dsh-client-connection README
@@ -79,8 +79,8 @@ const PROFILE = 'dsh-mcp-web-e2e'; // 测试 profile 名固定（可重复确定
 const SERVER_NAME = 'webuiecho'; // 主流程 server 名（echo 工具 → probe 结果 toolNames 断言）
 const DEAD_NAME = 'deadwebui'; // 异常流 server 名（不可达 url）
 // 官方 web 组合的 server 配置命名空间 = dsh-web-app bundle patch 的 manager 行 id 派生
-// （见文件头设计发现节；真跑实证 ns 清单含 'mcp-manager'）。写腿用它承载是「同一模块通道」
-// 的官方落点，不是插件写面的 ns 字面（错位事实记录于文件头与工票，不在此断言钉死）。
+// （真跑实证 ns 清单含 'mcp-manager'；08f8 修复后插件写面 describe 派生的落点与它同域）。
+// 测试钉此字面 = 官方组合契约的独立期望值（与插件运行时派生互为印证，非同源推算）。
 const OFFICIAL_MCP_NS = 'mcp-manager';
 const MUX_PATH = '/api/remote.mux'; // Gateway Remote 流路由（dsh-api-gateway stream-protocol 一手常量）
 
@@ -688,6 +688,18 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
   }
   const { port, token } = booted.boot;
 
+  // —— boot 激活卫生（08f8 修复验证面）：无行激活失败（duplicate service 形态）、无兼容门
+  // 禁用（"disabling profile plugin row" = 行版本与宿主不同 rc 的组合病灶；钉版 + 行条件化
+  // 修复后两者都不应再现。官方补位行在 web 组合按 disabled 表达式静默禁用，不产生告警）——
+  assert.ok(
+    !booted.boot.bootLog.includes('did not activate'),
+    `boot 日志不应含行激活失败（08f8 后 web 组合官方行独供 mcpManager）：宿主日志：${booted.boot.bootLog.slice(-1500)}`,
+  );
+  assert.ok(
+    !booted.boot.bootLog.includes('disabling profile plugin row'),
+    `boot 日志不应含兼容门禁用行（钉版组合下行版本应与宿主同 rc）：宿主日志：${booted.boot.bootLog.slice(-1500)}`,
+  );
+
   // —— 认证交换：launch token → 签名会话 cookie（浏览器会话同一通道）——
   const cookie = await exchangeSessionCookie(port, token);
 
@@ -732,14 +744,24 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
   const initialViews = JSON.parse(initial.lastSeen) as Array<Record<string, unknown>>;
   assert.ok(Array.isArray(initialViews), `watch 首批应为视图数组：${initial.lastSeen.slice(0, 300)}`);
 
-  // —— settings 写腿（同一模块通道）：官方 ns 真跑 update（UI 面 addServer 的 entry 构造形态）→
-  // watch 推送新条目 → 官方 reconcile 挂载连接（connected + toolCount）→ 落盘 cordis.patch.yml ——
+  // —— settings 写腿（同一模块通道）：describe 派生域真跑 update（08f8 后插件写面同一派生
+  // 语义：唯一 servers 域；测试另钉字面 mcp-manager = 官方组合契约独立期望值）→ watch 推送
+  // 新条目 → 官方 reconcile 挂载连接 → 落盘 cordis.patch.yml ——
   const describe = await rpcCall(port, cookie, 'settings/describe', {});
   assert.ok(describe.ok, `settings/describe 应成功：${JSON.stringify(describe.error)}`);
-  const namespaces = (describe.value as { namespaces?: Array<{ ns: string }> }).namespaces ?? [];
-  assert.ok(
-    namespaces.some((row) => row.ns === OFFICIAL_MCP_NS),
-    `官方 web 组合应含 server 配置命名空间 ${OFFICIAL_MCP_NS}（行 id 派生，文件头设计发现节）；实际 ns：${namespaces.map((row) => row.ns).join(', ')}`,
+  const namespaces = (describe.value as { namespaces?: Array<{ ns: string; value?: unknown }> }).namespaces ?? [];
+  const serversDomains = namespaces.filter(
+    (row) => row.value !== null && typeof row.value === 'object' && !Array.isArray(row.value) && 'servers' in (row.value as object),
+  );
+  assert.equal(
+    serversDomains.length,
+    1,
+    `server 配置域应恰一个（零/多在场 = 组合契约破坏，插件派生 fail loud 同语义）：${JSON.stringify(serversDomains.map((row) => row.ns))}`,
+  );
+  assert.equal(
+    serversDomains[0]?.ns,
+    OFFICIAL_MCP_NS,
+    `server 配置域应为官方行 id 派生的 ${OFFICIAL_MCP_NS}：实际 ${serversDomains[0]?.ns}（全 ns：${namespaces.map((row) => row.ns).join(', ')}）`,
   );
   const addResult = await rpcCall(port, cookie, 'settings/update', {
     ns: OFFICIAL_MCP_NS,
