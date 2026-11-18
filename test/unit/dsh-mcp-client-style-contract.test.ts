@@ -90,6 +90,25 @@ test('client 产物含 token 化样式层：面板样式类与四态徽章 token
   assert.match(product, /--ds-font-family-code/, '等宽线索块引用宿主 code 字体用户设置（不写死字体族）');
 });
 
+test('深色主题按钮文字配对与 pill 兜底（验收 63b1 rejected 回归面，票 20261118-d63d）', () => {
+  const product = compileClientProduct();
+  assert.match(
+    product,
+    /color:var\(--dsw-alias-label-primary-foreground\)/,
+    'primary 底按钮文字 = label-primary-foreground（浅 bluish-00 白 / 深 bluish-1000 黑随主题翻转——rc.5 官方组件 primary-fill 配对先例），深色下白底黑字可读',
+  );
+  assert.doesNotMatch(
+    product,
+    /label-on-color/,
+    '零 label-on-color 消费（恒白 bluish-00 不随主题翻转，深色下与翻转浅底 ≈1:1——63b1 硬伤根因，零残留即防回归）',
+  );
+  assert.match(
+    product,
+    /border-radius:var\(--dsw-radius-pill,999px\)/,
+    '徽章 pill 引用带直值兜底（宿主 rc.5 主题未分发 --dsw-radius-pill，无兜底解析为直角——63b1 瑕疵根因）',
+  );
+});
+
 // ---- prepack 发布门（fail loud：违规产物中止打包；门不误伤 token 化产物）----
 // 探针形态（plugin-prepack-diagnostics.test.ts 先例）：插件目录副本置于包根（不在 agents/
 // 枚举面内），node_modules 以目录符号链接接回真身（Host 面 @deepseek-ai/dsh-mcp-manager

@@ -563,8 +563,11 @@ const PANEL_STYLES = [
   '.dsh-mcp-head{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
   '.dsh-mcp-title{font-size:14px;font-weight:600}',
   '.dsh-mcp-count{color:var(--dsw-alias-label-tertiary);font-size:12px}',
-  // 按钮两形态（基线按钮语义族收敛 ≤2 种）：主要动作 primary-fill、次动作 ghost 系
-  '.dsh-mcp-pri{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-on-color);border:0;border-radius:var(--dsw-radius-sm);padding:4px 12px;font-size:12px;cursor:pointer}',
+  // 按钮两形态（基线按钮语义族收敛 ≤2 种）：主要动作 primary-fill、次动作 ghost 系。
+  // primary 文字配对 = label-primary-foreground（浅 bluish-00 白 / 深 bluish-1000 黑，随主题
+  // 翻转）——rc.5 官方组件 primary-fill 配对先例；label-on-color 恒白，深色下与翻转浅底 1:1
+  // （验收 63b1 硬伤根因，票 20261118-d63d）
+  '.dsh-mcp-pri{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-primary-foreground);border:0;border-radius:var(--dsw-radius-sm);padding:4px 12px;font-size:12px;cursor:pointer}',
   '.dsh-mcp-ghost{background:transparent;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);color:var(--dsw-alias-label-primary);padding:3px 10px;font-size:12px;cursor:pointer}',
   '@media (hover:hover){.dsh-mcp-pri:hover{background:var(--dsw-alias-button-primary-hover)}.dsh-mcp-ghost:hover{background:var(--dsw-alias-interactive-bg-hover)}}',
   // 添加/编辑表单（决策 5/6）：清单上方/行内展开，bg-layer-2 卡；收起是 CSS 可见性（元素树恒在）
@@ -580,8 +583,10 @@ const PANEL_STYLES = [
   '.dsh-mcp-rowline{display:flex;align-items:center;gap:8px;min-width:0}',
   '.dsh-mcp-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
   '.dsh-mcp-transport,.dsh-mcp-tools{color:var(--dsw-alias-label-tertiary);font-size:12px;flex:none}',
-  // 状态徽章四态（决策 7）：pill 圆角 + 色系底色 + 文字标签同现（不只靠色相）
-  '.dsh-mcp-badge{margin-left:auto;flex:none;padding:3px 10px;border-radius:var(--dsw-radius-pill);font-size:12px;line-height:1.2;white-space:nowrap}',
+  // 状态徽章四态（决策 7）：pill 圆角 + 色系底色 + 文字标签同现（不只靠色相）。
+  // pill 引用带 999px 直值兜底——宿主 rc.5 主题未分发 --dsw-radius-pill（无兜底解析为直角，
+  // 验收 63b1 瑕疵根因；基线 design-web.md 已随实况修订注记，票 20261118-d63d）
+  '.dsh-mcp-badge{margin-left:auto;flex:none;padding:3px 10px;border-radius:var(--dsw-radius-pill,999px);font-size:12px;line-height:1.2;white-space:nowrap}',
   '.dsh-mcp-badge-connected{background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,transparent);color:var(--dsw-alias-state-success-primary)}',
   '.dsh-mcp-badge-failed{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 10%,transparent);color:var(--dsw-alias-state-error-primary)}',
   '.dsh-mcp-badge-waiting-credentials{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-primary)}',
@@ -1074,7 +1079,7 @@ function mcpServersTabDefinition(): SidebarRightTabDefinition {
       id: 'servers',
       order: GUIDE_ORDER,
       title: () => 'MCP Servers',
-      description: () => '查看已配置 MCP server 的连接状态与工具清单（只读）',
+      description: () => '查看并管理已配置 MCP server：连接状态、工具清单与添加/启停/编辑/移除（与 /mcp 命令共调同一写链路）',
     }],
   };
 }
