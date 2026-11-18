@@ -78,6 +78,10 @@ function makeTempDir(t: TestContext, prefix: string) {
   return dir;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // 集成 PATH = node bin 目录 + 标准系统目录（先例 dsh-plugin-integration 同款）：npx/pnpm/env
 // 可解析；pnpm shim 与 node 同目录（fnm/corepack 布局），probePnpm 会对把关。
 function integrationPath() {
@@ -219,14 +223,41 @@ function assertCommandOk(step: string, result: CommandResult) {
 
 // 本地 pack 插件 tarball（发布面 prepack 预编译经 pnpm pack 生命周期钩子自动生效，
 // postpack 还原仓库树）；产物路径显式输出到临时目录，仓库树不留 tgz。
-function packPluginTarball(t: TestContext): string {
+// prepack/postpack 钩子改写共享插件目录（index.js 进出仓库树），而 node --test 默认并行
+// 跑测试文件——本文件与 dsh-mcp-web-e2e-integration.test.ts（票 20261118-6df0）并发 pack
+// 同一插件目录时，一方 postpack 会删掉另一方刚编译的产物（竞态实证推演）。跨进程互斥用
+// O_EXCL 锁文件：拿不到就轮询等；陈锁（>5 分钟，持有者崩溃形态）强收。web 形态文件同锁同法。
+const PACK_LOCK_FILE = path.join(os.tmpdir(), 'dsh-mcp-plugin-pack.lock');
+
+async function acquirePackLock(): Promise<number> {
+  const deadline = Date.now() + 5 * 60 * 1000;
+  for (;;) {
+    try {
+      return fs.openSync(PACK_LOCK_FILE, 'wx');
+    } catch {
+      if (Date.now() > deadline) {
+        fs.rmSync(PACK_LOCK_FILE, { force: true }); // 陈锁强收后重抢
+        continue;
+      }
+      await sleep(200);
+    }
+  }
+}
+
+async function packPluginTarball(t: TestContext): Promise<string> {
   const destDir = makeTempDir(t, 'dsh-mcp-e2e-pack-');
-  const result = runCommand('pnpm', ['pack', '--pack-destination', destDir], { timeout: INSTALL_TIMEOUT_MS, cwd: PLUGIN_DIR });
-  assertCommandOk('pnpm pack（插件发布面预编译）', result);
   const tarball = path.join(destDir, `hankchen-dsh-mcp-${PKG_MANIFEST.version}.tgz`);
-  assert.ok(fs.existsSync(tarball), `pack 产物应在目标目录：${tarball}（输出：${result.output.slice(-500)}）`);
-  // 仓库树零构建纪律的兜底核对：pack 钩子结束后包目录不应残留编译产物（postpack 已还原）
-  assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'index.js')), false, 'postpack 应已还原仓库树（包目录无 index.js 残留）');
+  const lockFd = await acquirePackLock();
+  try {
+    const result = runCommand('pnpm', ['pack', '--pack-destination', destDir], { timeout: INSTALL_TIMEOUT_MS, cwd: PLUGIN_DIR });
+    assertCommandOk('pnpm pack（插件发布面预编译）', result);
+    assert.ok(fs.existsSync(tarball), `pack 产物应在目标目录：${tarball}（输出：${result.output.slice(-500)}）`);
+    // 仓库树零构建纪律的兜底核对：pack 钩子结束后包目录不应残留编译产物（postpack 已还原）
+    assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'index.js')), false, 'postpack 应已还原仓库树（包目录无 index.js 残留）');
+  } finally {
+    fs.closeSync(lockFd);
+    fs.rmSync(PACK_LOCK_FILE, { force: true });
+  }
   return tarball;
 }
 
@@ -585,7 +616,7 @@ test(`[FR-8|集成级] ${PKG} 真跑官方 dsh 端到端：装插件 → /mcp ad
   // —— 准备段：临时 DSH_HOME（绝不指向 ~/.dsh——前轮环境事故教训）+ 官方链路装插件 ——
   const dshHome = makeTempDir(t, 'dsh-mcp-e2e-home-');
   const workDir = makeTempDir(t, 'dsh-mcp-e2e-work-');
-  const tarball = packPluginTarball(t);
+  const tarball = await packPluginTarball(t);
   initSdkProfile(dshHome);
   pluginAddTarball(dshHome, tarball);
   pinManager(dshHome);
