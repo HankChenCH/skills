@@ -189,3 +189,82 @@ test('发布态 tarball 缺 main 指向的编译产物文件即拒绝（白名�
     `缺陷应点名编译产物缺失，实际：${JSON.stringify(defects)}`,
   );
 });
+
+// ---------- 客户端载体三查（spec 20261118-0de6 FR-7 五查扩展，票 20261118-7504；发布态口径）----------
+// 发布态 files 查 = 产物本体：exports 路径在 files 清单且 client.js 文件在包内。pack 对 files
+// 清单里缺盘的文件只 warn 不报错——「清单声明了产物而 tarball 缺文件」是 pack 静默漏过的形态，
+// 装出去官方启动即抛 missing bundle composition error（dsh-client-modules@0.2.2-rc.4 一手契约，
+// 票 Progress 留痕）。
+
+// 发布态合法客户端载体插件：四要素 + client 声明三件（dsh.client / exports["./client"] /
+// files 含 client.js）+ client.js 产物在盘。variant 供破坏测试变异。
+async function writePublishedClientPlugin(dir: string) {
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, 'package.json'),
+    JSON.stringify(
+      {
+        name: PLUGIN_NAME,
+        version: '0.2.0',
+        type: 'module',
+        main: 'index.js',
+        exports: { '.': './index.js', './client': './client.js' },
+        files: ['index.js', 'cordis.patch.yml', 'client.js'],
+        dsh: { bundle: { patch: './cordis.patch.yml' }, client: { platform: 'web', inject: [] } },
+      },
+      null,
+      2,
+    ),
+  );
+  await writeFile(
+    path.join(dir, 'index.js'),
+    `export const name = '${PLUGIN_NAME}';\n\nexport function apply(ctx) {\n  ctx.logger.info(\`插件已加载：\${name}\`);\n}\n`,
+  );
+  // client.js 产物 = 官方 lazy-CJS factory 形态（dsh-client-modules@0.2.2-rc.4 lib/client.js
+  // 官方 bundle 逐字外壳；发布态校验只查文件在盘与形态契约归属 carrier 测试，此处取真实形态）
+  await writeFile(
+    path.join(dir, 'client.js'),
+    `window.__ModuleLoader__.load({id:"${PLUGIN_NAME}",factory:require=>{var module={exports:{}};var exports=module.exports;exports.apply=function apply(){};return module.exports}});\n`,
+  );
+  await writeFile(path.join(dir, 'cordis.patch.yml'), OFFICIAL_PATCH);
+  return dir;
+}
+
+test('发布态客户端载体齐备的插件目录通过校验（缺陷清单为空）', async (t) => {
+  const dir = await writePublishedClientPlugin(path.join(await makeTempRoot(t), 'dsh-mcp'));
+  assert.deepEqual(collectPublishedBundleDefects(dir), []);
+});
+
+test('发布态声明 dsh.client 而 files 缺 client.js 即拒绝，缺陷点名 files 与产物路径', async (t) => {
+  const root = await makeTempRoot(t);
+  const dir = await writePublishedClientPlugin(root);
+  await rewritePublishedPackageJson(dir, (pkg) => {
+    (pkg as { files?: string[] }).files = ['index.js', 'cordis.patch.yml'];
+  });
+  const defects = collectPublishedBundleDefects(dir);
+  assert.ok(
+    defects.some((defect) => /files/.test(defect) && /client\.js/.test(defect)),
+    `缺陷应点名 files 缺客户端产物，实际：${JSON.stringify(defects)}`,
+  );
+});
+
+test('发布态 files 含 client.js 而产物文件缺盘即拒绝（pack 静默漏过形态），缺陷点名产物文件', async (t) => {
+  const root = await makeTempRoot(t);
+  const dir = await writePublishedClientPlugin(root);
+  await rm(path.join(dir, 'client.js'));
+  const defects = collectPublishedBundleDefects(dir);
+  assert.ok(
+    defects.some((defect) => /client\.js/.test(defect) && /读不到|缺 bundle/.test(defect)),
+    `缺陷应点名客户端产物文件缺失，实际：${JSON.stringify(defects)}`,
+  );
+});
+
+test('发布态 tarball 客户端载体齐备通过（真实 tar 布局）', async (t) => {
+  const root = await makeTempRoot(t);
+  const staging = path.join(root, 'package');
+  const dir = await writePublishedClientPlugin(staging);
+  const tarball = path.join(root, 'plugin-0.2.0.tgz');
+  const pack = spawnSync('tar', ['-czf', tarball, '-C', root, 'package'], { encoding: 'utf8' });
+  assert.equal(pack.status, 0, `fixture tar 打包应成功：${pack.stderr}`);
+  assert.deepEqual(collectTarballBundleDefects(tarball), []);
+});
