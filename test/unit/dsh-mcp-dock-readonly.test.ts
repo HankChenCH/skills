@@ -266,10 +266,15 @@ interface ManagedServerViewStub {
   status: unknown;
 }
 
-/** 官方 SettingsNamespaceView 的消费子集镜像（dsh-settings types.d.ts 一手来源：value 经 redact）。 */
+/**
+ * 官方 SettingsNamespaceView 的消费子集镜像（dsh-settings types.d.ts 一手来源：value 经
+ * redact）。revision = 官方视图 required 字段（票 1dc4 探针：dsh-settings src/index.ts
+ * monotonic 写入即 +1，从未写过的行 revision 0）——写面 expectedRevision 的读值来源。
+ */
 interface SettingsNamespaceViewStub {
   ns: string;
   value: unknown;
+  revision: number;
 }
 
 /** 官方 RemoteResult 镜像（dsh-typert-protocol types.d.ts 一手来源）。 */
@@ -303,9 +308,15 @@ interface ClientStubContext {
     };
     settings: {
       describe(): Promise<RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }>>;
-      /** 官方 remote 写面（dsh-api-settings-controller lib/typert.remote-client.d.ts 一手来源）。 */
-      update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResultStub<unknown>>;
-      mutate(namespace: string, ops: readonly unknown[]): Promise<RemoteResultStub<unknown>>;
+      /**
+       * 官方 remote 写面（dsh-api-settings-controller lib/typert.remote-client.d.ts 一手来源）。
+       * 三参形态 = 票 1dc4 探针实证：expectedRevision: number | undefined 为 TS 必传位
+       * （契约 acceptsUndefined: true；gateway prepareInvocation 按 descriptor.parameters.length
+       * 数参在 codec 之前，acceptsUndefined 不豁免传参个数——round 1 替身按 2 参镜像即替身
+       * 保真缺口，真机 `expected 3 argument(s), got 2` 暴露）。
+       */
+      update(namespace: string, patch: Record<string, unknown>, expectedRevision: number | undefined): Promise<RemoteResultStub<unknown>>;
+      mutate(namespace: string, ops: readonly unknown[], expectedRevision: number | undefined): Promise<RemoteResultStub<unknown>>;
       /** 官方 settings remote 同命名空间其余写面（哨兵：被触即记账+抛——写AC5 旁路守卫）。 */
       replace(namespace: string, section: Record<string, unknown>): Promise<RemoteResultStub<unknown>>;
       openSettingsDocument(signal?: AbortSignal): Promise<RemoteResultStub<unknown>>;
@@ -318,9 +329,9 @@ interface ClientStubContext {
     slotRegisters: Array<{ options: Record<string, unknown>; component: unknown }>;
     watchCalls: Array<{ signal: AbortSignal | undefined; stream: WatchStreamStub }>;
     describeCalls: number;
-    /** 写通道捕获：add = update 形态；编辑/启停/移除 = mutate ops 形态（round 1 同源字面）。 */
-    updateCalls: Array<{ namespace: string; patch: Record<string, unknown> }>;
-    mutateCalls: Array<{ namespace: string; ops: unknown[] }>;
+    /** 写通道捕获：add = update 形态；编辑/启停/移除 = mutate ops 形态（round 1 同源字面；expectedRevision = 票 1dc4 三参形态第三位）。 */
+    updateCalls: Array<{ namespace: string; patch: Record<string, unknown>; expectedRevision: number | undefined }>;
+    mutateCalls: Array<{ namespace: string; ops: unknown[]; expectedRevision: number | undefined }>;
     restartCalls: string[];
     probeCalls: string[];
     /** 旁路哨兵：官方 settings remote 其余写面被触即记账（替身契约——面板写面只许走 update/mutate）。 */
@@ -357,8 +368,8 @@ function createClientStubContext(
     slotRegisters: [] as Array<{ options: Record<string, unknown>; component: unknown }>,
     watchCalls: [] as Array<{ signal: AbortSignal | undefined; stream: WatchStreamStub }>,
     describeCalls: 0,
-    updateCalls: [] as Array<{ namespace: string; patch: Record<string, unknown> }>,
-    mutateCalls: [] as Array<{ namespace: string; ops: unknown[] }>,
+    updateCalls: [] as Array<{ namespace: string; patch: Record<string, unknown>; expectedRevision: number | undefined }>,
+    mutateCalls: [] as Array<{ namespace: string; ops: unknown[]; expectedRevision: number | undefined }>,
     restartCalls: [] as string[],
     probeCalls: [] as string[],
     bypassCalls: [] as string[],
@@ -490,6 +501,8 @@ function createClientStubContext(
                 {
                   ns: 'mcp',
                   value: { servers: structuredClone(serversWithTransport) },
+                  // 官方从未写入行的自然值（dsh-settings src/index.ts 一手：首次 revision 0）
+                  revision: 0,
                 },
               ],
             },
@@ -498,12 +511,16 @@ function createClientStubContext(
         // 官方 remote 写面形态（dsh-api-settings-controller lib/typert.remote-client.d.ts）：
         // 拒写经 {ok:false, error} 显式返回非抛出；捕获记录不落盘。捕获即结构克隆——
         // vm 沙箱对象与宿主原型隔离，克隆让断言面统一为宿主原型（替身契约钉死点）
-        async update(namespace, patch) {
-          captured.updateCalls.push({ namespace, patch: structuredClone(patch) });
+        // 官方 remote 写面形态（dsh-api-settings-controller lib/typert.remote-client.d.ts）：
+        // 拒写经 {ok:false, error} 显式返回非抛出；捕获记录不落盘。捕获即结构克隆——
+        // vm 沙箱对象与宿主原型隔离，克隆让断言面统一为宿主原型（替身契约钉死点）。
+        // 第三参照真实签名镜像并捕获（票 1dc4 替身保真：替身签名 = 真实签名）
+        async update(namespace, patch, expectedRevision) {
+          captured.updateCalls.push({ namespace, patch: structuredClone(patch), expectedRevision });
           return writeAnswer;
         },
-        async mutate(namespace, ops) {
-          captured.mutateCalls.push({ namespace, ops: structuredClone([...ops]) });
+        async mutate(namespace, ops, expectedRevision) {
+          captured.mutateCalls.push({ namespace, ops: structuredClone([...ops]), expectedRevision });
           return writeAnswer;
         },
         // 官方 settings remote 其余写面哨兵（dsh-api-settings-controller
@@ -1006,8 +1023,9 @@ test('添加表单 stdio 提交：settings.update("mcp", {servers:{…}}) 恰一
           },
         },
       },
+      expectedRevision: 0,
     },
-  ], '添加 = settings.update 深合并形态、命名空间 = 挂载行 entry id mcp（round 1 add 同源字面）；模板串原样透传不展开（展开归官方 mcp-client 运行时）');
+  ], '添加 = settings.update 三参深合并形态、命名空间 = 挂载行 entry id mcp、expectedRevision = describe 读值 0（round 1 add 同源字面 + 票 1dc4 三参）；模板串原样透传不展开（展开归官方 mcp-client 运行时）');
   assert.deepEqual(ctx.captured.mutateCalls, [], '添加不经 mutate（round 1 add = update 形态，写通道语义同源）');
   view.unmount();
 });
@@ -1043,8 +1061,9 @@ test('添加表单远程提交：url/headers 形态 update，headers 模板串�
           },
         },
       },
+      expectedRevision: 0,
     },
-  ], '远程形态 = transport streamable-http + url/headers（round 1 add remote 同源字面）；headers 模板串原样透传');
+  ], '远程形态 = transport streamable-http + url/headers，expectedRevision = describe 读值（round 1 add remote 同源字面 + 票 1dc4 三参）；headers 模板串原样透传');
   view.unmount();
 });
 
@@ -1180,8 +1199,8 @@ test('编辑只改 cwd：mutate ops 恰一条 set 且路径 = servers.docs.cwd�
   await view.settle();
 
   assert.deepEqual(ctx.captured.mutateCalls, [
-    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/new' }] },
-  ], '编辑 = mutate(ns, ops[]) 且只含被改路径（round 1 官方 ops 形态）；凭据 env 未重输 → 零 env op（官方保留语义）');
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/new' }], expectedRevision: 0 },
+  ], '编辑 = mutate(ns, ops[], expectedRevision) 且只含被改路径（round 1 官方 ops 形态 + 票 1dc4 三参）；凭据 env 未重输 → 零 env op（官方保留语义）');
   assert.deepEqual(ctx.captured.updateCalls, [], '编辑不经 update（round 1 编辑 = mutate 形态）');
   view.unmount();
 });
@@ -1211,6 +1230,7 @@ test('编辑 env 触碰：改值/新增行产 per-key set、删行产 unset，�
         { op: 'set', path: ['servers', 'docs', 'env', 'NEW_KEY'], value: 'v2' },
         { op: 'unset', path: ['servers', 'docs', 'env', 'OLD_KEY'] },
       ],
+      expectedRevision: 0,
     },
   ], '字典域 per-key ops：被改键 set、新增键 set、被删键 unset；凭据行同值保留 → 零凭据 op（不重传）');
   view.unmount();
@@ -1230,7 +1250,7 @@ test('停用/启用：mutate [{op:"set", path:["servers",名,"enabled"], value:�
   clickRowAction(view.view().tree as ElementNode, 'docs', 'disable');
   await view.settle();
   assert.deepEqual(ctx.captured.mutateCalls, [
-    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: false }] },
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: false }], expectedRevision: 0 },
   ], '停用 = 官方 set 只写 servers.<名>.enabled 持久意图字段（禁用卸载保条目语义的写形态）');
 
   // 官方 reconcile 推送停用后状态 → 行操作切换为启用
@@ -1239,7 +1259,7 @@ test('停用/启用：mutate [{op:"set", path:["servers",名,"enabled"], value:�
   clickRowAction(view.view().tree as ElementNode, 'docs', 'enable');
   await view.settle();
   assert.deepEqual(ctx.captured.mutateCalls[1], {
-    namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: true }],
+    namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: true }], expectedRevision: 0,
   }, '启用 = 同形 set op，value: true');
   assert.equal(ctx.captured.mutateCalls.length, 2, '两次启停恰两次 mutate（写通道单点）');
   view.unmount();
@@ -1256,7 +1276,7 @@ test('移除：mutate [{op:"unset", path:["servers",名]}] 官方删键形态恰
   clickRowAction(view.view().tree as ElementNode, 'docs', 'remove');
   await view.settle();
   assert.deepEqual(ctx.captured.mutateCalls, [
-    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'docs'] }] },
+    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'docs'] }], expectedRevision: 0 },
   ], '移除 = 官方 SettingsPathOp unset 删键（生效语义 = 官方 reconcile 卸载并消失）');
   assert.deepEqual(ctx.captured.updateCalls, [], '移除不经 update');
   view.unmount();
@@ -1391,13 +1411,13 @@ test('写路径单点：添加/编辑/启停/移除/重试/探测全动作序列
   await view.settle();
 
   assert.deepEqual(ctx.captured.updateCalls, [
-    { namespace: 'mcp', patch: { servers: { searcher: { transport: 'stdio', command: 'node' } } } },
-  ], 'UI 添加 = round 1 双入口同一写通道字面（ns=mcp、update 深合并形态）');
+    { namespace: 'mcp', patch: { servers: { searcher: { transport: 'stdio', command: 'node' } } }, expectedRevision: 0 },
+  ], 'UI 添加 = round 1 双入口同一写通道字面（ns=mcp、update 三参深合并形态——票 1dc4）');
   assert.deepEqual(ctx.captured.mutateCalls, [
-    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/deploy' }] },
-    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: false }] },
-    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'searcher'] }] },
-  ], 'UI 编辑/启停/移除 = round 1 双入口同一 ops 字面（SettingsPathOp 形态逐条同源）');
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/deploy' }], expectedRevision: 0 },
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: false }], expectedRevision: 0 },
+    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'searcher'] }], expectedRevision: 0 },
+  ], 'UI 编辑/启停/移除 = round 1 双入口同一 ops 字面（SettingsPathOp 形态逐条同源；expectedRevision = 各次写前 describe 读值——票 1dc4 三参形态）');
   assert.deepEqual(ctx.captured.restartCalls, ['loader'], '重试 = restart Remote 单次');
   assert.deepEqual(ctx.captured.probeCalls, ['sleeper'], '探测 = probe Remote 单次');
   assert.deepEqual(ctx.captured.bypassCalls, [], '旁路哨兵零触碰（settings.replace / openSettingsDocument 未被任何 UI 动作调用——写通道单点，无旁路写路径）');
@@ -1502,9 +1522,11 @@ test('web 组合 ns 对齐：describe 报 mcp-manager 域时，添加/编辑/启
   ctx.describeAnswer({
     ok: true,
     value: {
+      // 两域 revision 故意不同值（3 vs 7）：写面 expectedRevision 断言钉死 = 写目标域
+      // （mcp-manager）的视图 revision——证伪「任意视图 revision」或「2 参缺位」回归（票 1dc4）
       namespaces: [
-        { ns: 'llm-deepseek', value: { model: 'deepseek-chat' } },
-        { ns: 'mcp-manager', value: { servers: { docs: { transport: 'stdio', command: 'npx', cwd: '/work' } } } },
+        { ns: 'llm-deepseek', value: { model: 'deepseek-chat' }, revision: 3 },
+        { ns: 'mcp-manager', value: { servers: { docs: { transport: 'stdio', command: 'npx', cwd: '/work' } } }, revision: 7 },
       ],
     },
   });
@@ -1525,8 +1547,8 @@ test('web 组合 ns 对齐：describe 报 mcp-manager 域时，添加/编辑/启
   clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
   await view.settle();
   assert.deepEqual(ctx.captured.updateCalls, [
-    { namespace: 'mcp-manager', patch: { servers: { searcher: { transport: 'stdio', command: 'node' } } } },
-  ], '添加写通道 ns = describe 派生的实际生效 manager 行 id（round 1 硬编码 mcp 在 web 组合被官方拒写——本测试即其回归面）');
+    { namespace: 'mcp-manager', patch: { servers: { searcher: { transport: 'stdio', command: 'node' } } }, expectedRevision: 7 },
+  ], '添加写通道 ns/expectedRevision = describe 派生的实际生效 manager 行 id 及其视图 revision（round 1 硬编码 mcp 在 web 组合被官方拒写——本测试即其回归面；票 1dc4 三参形态）');
 
   // 编辑：ops 基线读 mcp-manager 域、mutate ns = mcp-manager
   clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
@@ -1545,17 +1567,17 @@ test('web 组合 ns 对齐：describe 报 mcp-manager 域时，添加/编辑/启
   await view.settle();
 
   assert.deepEqual(ctx.captured.mutateCalls, [
-    { namespace: 'mcp-manager', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/deploy' }] },
-    { namespace: 'mcp-manager', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: false }] },
-    { namespace: 'mcp-manager', ops: [{ op: 'unset', path: ['servers', 'docs'] }] },
-  ], '编辑/启停/移除三通道 ns 全部 = mcp-manager（写/读面与实际生效 manager 行 id 对齐）');
+    { namespace: 'mcp-manager', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/deploy' }], expectedRevision: 7 },
+    { namespace: 'mcp-manager', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: false }], expectedRevision: 7 },
+    { namespace: 'mcp-manager', ops: [{ op: 'unset', path: ['servers', 'docs'] }], expectedRevision: 7 },
+  ], '编辑/启停/移除三通道 ns 与 expectedRevision 全部 = mcp-manager 域视图 revision 7（写/读面与实际生效 manager 行 id 对齐；票 1dc4 三参形态）');
   view.unmount();
 });
 
 test('describe 无 servers 配置域（组合缺 manager 提供者）：添加与编辑拒绝并指明原因，零写调用（票 08f8 fail loud）', async () => {
   const harness = createHarness();
   const ctx = createClientStubContext([connectedView('docs')]);
-  ctx.describeAnswer({ ok: true, value: { namespaces: [{ ns: 'llm-deepseek', value: { model: 'deepseek-chat' } }] } });
+  ctx.describeAnswer({ ok: true, value: { namespaces: [{ ns: 'llm-deepseek', value: { model: 'deepseek-chat' }, revision: 1 }] } });
   harness.apply(ctx);
   const view = harness.mountBody(ctx, new AbortController().signal);
   view.mount();
