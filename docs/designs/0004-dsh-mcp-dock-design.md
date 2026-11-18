@@ -1,8 +1,9 @@
 ---
 id: 0004
 spec: 20261118-0de6
-status: draft
+status: approved
 created: 2026-11-18
+approved: 2026-11-18
 ---
 # dsh MCP Dock 页美化述标：token 化样式层让插件 UI 与宿主不可分辨
 
