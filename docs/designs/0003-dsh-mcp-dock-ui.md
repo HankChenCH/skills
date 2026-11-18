@@ -1,8 +1,9 @@
 ---
 id: 0003
 spec: 20261118-0de6
-status: draft
+status: approved
 created: 2026-11-18
+approved: 2026-11-18
 ---
 # dsh MCP Dock 页界面设计方案（美化轮）
 
@@ -57,3 +58,7 @@ created: 2026-11-18
 
 - **风格跟随声明**：全程跟随基线 design-web.md（配色 alias 面/三路字体/密度/圆角与字号阶梯/组件观感六项逐项对齐，零硬编码）；实现时校验点 = bundle 内无 `#[0-9a-f]{3,6}` 直值色、无 font-family 写死、全部取色经 `var(--dsw-alias-*)`。
 - **交 design-deliver 定稿的清单**：本稿布局方案 9 条 + 视觉决策 7 项 + 原型（临时路径 `/tmp/design-ui-dock.html`，定稿落 docs/designs/assets/）+ 硬指标自查结果 + 豁免 1 条（触控目标）。
+
+## 定稿记录
+
+2026-11-18 念稿（布局 9 条/移动端断点决策/视觉跟随零偏离/硬指标 4 项含触控豁免 1 条），用户确认「确认」。原型临时文件用完即弃，定稿落 assets 归 design-deliver。
