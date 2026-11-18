@@ -25,7 +25,9 @@
 // 5. ctx.remote.settings.describe()——官方生成面
 //    （@deepseek-ai/dsh-api-settings-controller@0.2.2-rc.4 lib/typert.remote-client.d.ts 一手
 //    来源）：`describe() => Promise<RemoteResult<SettingsDescribeValue>>`；视图 value 恒经
-//    redactSecrets（dsh-settings types.d.ts 一手来源）。替身按给定清单构 ns='mcp' 视图。
+//    redactSecrets（dsh-settings types.d.ts 一手来源）。替身缺省按给定清单构 ns='mcp' 视图
+//    （headless 补位组合），describeAnswer 可整表改写（web 组合 ns='mcp-manager' 用例——票
+//    20261118-08f8：面板 ns 派生自 describe 中 value.servers 在场的唯一域，不硬编码）。
 // 6. react 运行时替身——useState/useEffect/useCallback/createElement 的最小驱动模型：
 //    hook 槽位按调用序编号（官方 hook 顺序语义）、setter 入队微任务重渲；useEffect 镜像官方
 //    依赖数组语义（deps 浅比较，依赖变化先跑旧 cleanup 再跑新 effect——首轮必跑）；不镜像的
@@ -343,7 +345,9 @@ function viewOf(name: string, status: unknown, configured = true): ManagedServer
 function createClientStubContext(
   initialViews: ManagedServerViewStub[] = [],
   // ns 'mcp' 的 describe 读值条目（官方读值恒 redact——dsh-settings types.d.ts；本 ns 的
-  // Config schema 无 secret role 声明，模板串原样在场即非秘密引用形态，探针留痕票 Progress）
+  // Config schema 无 secret role 声明，模板串原样在场即非秘密引用形态，探针留痕票 Progress）。
+  // ns 'mcp' = headless 补位组合的插件行 id（票 20261118-08f8：web 组合用 describeAnswer
+  // 改写为 mcp-manager——面板按 value.servers 域派生 ns，不硬编码）
   serversWithTransport: Record<string, unknown> = {},
 ): ClientStubContext {
   const captured = {
@@ -1481,5 +1485,104 @@ test('describe 被拒：打开编辑与保存均内联「当前配置不可读�
   assert.match(textOf(saveNote), /当前配置不可读/, '保存路径同一守卫（describe 读失败不产写）');
   assert.deepEqual(ctx.captured.mutateCalls, [], 'describe 被拒零 mutate（diff 基线缺失即拒写）');
   assert.deepEqual(ctx.captured.updateCalls, [], 'describe 被拒零 update');
+  view.unmount();
+});
+
+// ---- settings ns 口径（票 20261118-08f8）：面板写/读面 ns 与实际生效 manager 行 id 对齐 ----
+// 期望值独立来源 = rc.4 一手探针（工票 Progress 留痕）：官方 settings write 以
+// entry.options.id === ns 定位（dsh-settings lib/index.js write 一手），web 组合 ns =
+// mcp-manager（dsh-web-app patch 一手），round 1 硬编码 mcp 在 web 组合全部被官方拒
+// （settings/rejected: No configurable plugin entry "mcp"，6df0 真跑复现）。派生口径 =
+// describe 视图 value.servers 在场的唯一 ns（manager Config 唯一 volatile 顶层字段、
+// default 恒解析在场；rc.4 星座无第二 servers 域）；域不在场即拒绝写（fail loud 不猜测）。
+
+test('web 组合 ns 对齐：describe 报 mcp-manager 域时，添加/编辑/启停/移除与 transport 列全部对齐 mcp-manager（票 08f8）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')]);
+  ctx.describeAnswer({
+    ok: true,
+    value: {
+      namespaces: [
+        { ns: 'llm-deepseek', value: { model: 'deepseek-chat' } },
+        { ns: 'mcp-manager', value: { servers: { docs: { transport: 'stdio', command: 'npx', cwd: '/work' } } } },
+      ],
+    },
+  });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  // 读面：transport 列投影自 mcp-manager 域（ns 派生读路径）
+  const transportCell = nodeWith(view.view().tree as ElementNode, 'data-mcp-server-transport', 'docs');
+  assert.equal(textOf(transportCell), 'stdio', 'transport 列投影自派生出的 mcp-manager 域（非硬编码 ns）');
+
+  // 添加：update ns = mcp-manager
+  let tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'searcher');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'node');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+  assert.deepEqual(ctx.captured.updateCalls, [
+    { namespace: 'mcp-manager', patch: { servers: { searcher: { transport: 'stdio', command: 'node' } } } },
+  ], '添加写通道 ns = describe 派生的实际生效 manager 行 id（round 1 硬编码 mcp 在 web 组合被官方拒写——本测试即其回归面）');
+
+  // 编辑：ops 基线读 mcp-manager 域、mutate ns = mcp-manager
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  const envNode = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-field', 'cwd');
+  assert.equal(envNode.props?.value, '/work', '编辑表单显示值读自 mcp-manager 域（读面同口径派生）');
+  changeInput(view.view().tree as ElementNode, 'data-mcp-edit-field', 'cwd', '/deploy');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  // 启停/移除：mutate ns = mcp-manager
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'disable');
+  await view.settle();
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'remove');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp-manager', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/deploy' }] },
+    { namespace: 'mcp-manager', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: false }] },
+    { namespace: 'mcp-manager', ops: [{ op: 'unset', path: ['servers', 'docs'] }] },
+  ], '编辑/启停/移除三通道 ns 全部 = mcp-manager（写/读面与实际生效 manager 行 id 对齐）');
+  view.unmount();
+});
+
+test('describe 无 servers 配置域（组合缺 manager 提供者）：添加与编辑拒绝并指明原因，零写调用（票 08f8 fail loud）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')]);
+  ctx.describeAnswer({ ok: true, value: { namespaces: [{ ns: 'llm-deepseek', value: { model: 'deepseek-chat' } }] } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  // 添加：派生拒绝 → 内联报错点名，零写调用
+  let tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'deployer');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'npx');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+  const addNote = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-note', 'note');
+  const addText = textOf(addNote);
+  assert.match(addText, /servers 配置域/, '添加内联报错指明 servers 配置域未在场');
+  assert.match(addText, /manager/i, '添加内联报错指明 manager 提供者缺位');
+  assert.deepEqual(ctx.captured.updateCalls, [], '派生失败零 update（不猜测 ns）');
+  assert.deepEqual(ctx.captured.mutateCalls, [], '派生失败零 mutate');
+
+  // 编辑：保存路径同守卫 → 同拒绝零写
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+  const editNote = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-note', 'note');
+  assert.match(textOf(editNote), /servers 配置域/, '编辑保存同一派生守卫');
+  assert.deepEqual(ctx.captured.updateCalls, [], '编辑派生失败零 update');
+  assert.deepEqual(ctx.captured.mutateCalls, [], '编辑派生失败零 mutate');
   view.unmount();
 });

@@ -36,9 +36,14 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { load as loadYaml, JSON_SCHEMA, defineScalarTag } from 'js-yaml';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PLUGIN_URL = new URL('../../agents/dsh/plugins/dsh-mcp/index.ts', import.meta.url);
 const PLUGIN_NAME = '@hankchen/dsh-mcp';
+const PLUGIN_DIR = path.dirname(fileURLToPath(PLUGIN_URL));
 
 // ---- 官方形状（@deepseek-ai/dsh-mcp-manager@0.2.2-rc.2 types.ts 一手来源的结构镜像）----
 
@@ -93,6 +98,7 @@ interface StubContext {
   commands: { register(definition: CapturedCommand): () => void };
   tools: { register(definition: CapturedTool): () => void };
   settings: {
+    describe(): Array<{ ns: string; value: unknown }>;
     update(namespace: string, patch: Record<string, unknown>): Promise<void>;
     mutate(namespace: string, ops: readonly SettingsOpStub[], expectedRevision?: number): Promise<void>;
   };
@@ -107,11 +113,22 @@ interface StubContext {
     settingsCalls: SettingsCall[];
   };
   setViews(views: McpManagedServerView[]): void;
+  /** 改写 describe 的 manager 配置域 ns（默认 'mcp' = headless 补位组合的插件行 id）。 */
+  setMcpSettingsNamespace(ns: string): void;
+  /** 整表改写 describe 视图（默认视图外的形态：零 servers 域 / 多 servers 域）。 */
+  setSettingsNamespaces(rows: Array<{ ns: string; value: unknown }>): void;
 }
 
 function createStubContext(initialViews: McpManagedServerView[] = []): StubContext {
   const views = [...initialViews];
   const captured = { commands: [] as CapturedCommand[], tools: [] as CapturedTool[], settingsCalls: [] as SettingsCall[] };
+  // describe 视图（票 20261118-08f8 替身契约）：默认 = headless 补位组合——manager 配置域
+  // ns 'mcp'（插件行 id）+ 一个官方形状的异域（官方 describe 列全部可配置条目，非 manager
+  // 域的 value 无 servers 对象）。manager Config 唯一 volatile 顶层字段 servers、default
+  // {} 恒解析在场（dsh-settings resolveConfig→Config validate 一手），故 manager 域 value
+  // 形态 = { servers: {} }；web 组合经 setMcpSettingsNamespace('mcp-manager') 改写。
+  let mcpSettingsNamespace = 'mcp';
+  let settingsNamespaceRows: Array<{ ns: string; value: unknown }> | undefined;
   return {
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
     commands: {
@@ -133,6 +150,13 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
       },
     },
     settings: {
+      describe() {
+        if (settingsNamespaceRows !== undefined) return settingsNamespaceRows;
+        return [
+          { ns: 'llm-deepseek', value: { model: 'deepseek-chat' } },
+          { ns: mcpSettingsNamespace, value: { servers: {} } },
+        ];
+      },
       async update(namespace, patch) {
         captured.settingsCalls.push({ kind: 'update', namespace, patch });
       },
@@ -156,6 +180,12 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
     captured,
     setViews(next) {
       views.splice(0, views.length, ...next);
+    },
+    setMcpSettingsNamespace(ns) {
+      mcpSettingsNamespace = ns;
+    },
+    setSettingsNamespaces(rows) {
+      settingsNamespaceRows = rows;
     },
   };
 }
@@ -660,4 +690,130 @@ test('list 投影含 waiting-credentials 状态（AC5+AC4：凭据引用缺失�
   assert.equal(reply.kind, 'success', '命令 list 返回官方 success 形态');
   assert.match(reply.text ?? '', /waiting-credentials/, '命令投影含 waiting-credentials 状态');
   assert.match(reply.text ?? '', /GITHUB_TOKEN/, '命令投影含凭据缺失线索');
+});
+
+// ---- 组合契约（票 20261118-08f8）：manager 行条件化——官方预挂在场即复用、补位组合保留插件行 ----
+// 期望值独立来源 = rc.4 星座一手探针（工票 Progress 留痕）：官方 web 形态 dsh-web-app
+// cordis.patch.yml 自带 `id: mcp-manager` 的 mcp-manager 行（installed plugins 注册 server
+// 的官方载体）；条件行机制官方先例 = web-app preset 的 `disabled: !!js "<表达式>"`（求值 =
+// cordis-plugin-loader lib/index.js：with(ctx){return eval(expr)}，ctx 为 cordis Context、
+// get 对缺失服务返回 undefined；boot 先 provide profileContext 后挂载条目——dsh-app-boot
+// lib/index.js boot 函数一手时序）。profileContext.startedBundles = profile bundle 包名序
+// 列（dsh-app-boot lib/types/profile-context.d.ts 一手），已装插件包声明 dsh.bundle 者亦入
+// 序列（dsh-app-boot reconcileProfilePlugins 一手）。
+
+/** 官方 patch 文件解析 schema 镜像（cordis-plugin-include entryListSchema：!!js 节点构 {__jsExpr}）。 */
+const jsExprTag = defineScalarTag('tag:yaml.org,2002:js', {
+  resolve: (source: string) => ({ __jsExpr: source }),
+  identify: () => false,
+});
+const patchSchema = JSON_SCHEMA.withTags(jsExprTag);
+
+/** 官方 loader 的 !!js 求值形态逐字镜像（cordis-plugin-loader lib/index.js：evaluate =
+ * with(ctx){return eval(expr)}；_resolveDisabled 以 Boolean 包裹求值结果——缺失服务路径
+ * 得 undefined 亦归 false）。 */
+function resolveDisabled(expression: string, services: Record<string, unknown>): boolean {
+  const evaluated = new Function('ctx', 'expr', 'with (ctx) {\n    return eval(expr)\n  }')({ get: (name: string) => services[name] }, expression);
+  return Boolean(evaluated);
+}
+
+test('patch 契约：manager 行条件化（官方预挂 bundle 在场禁用插件行、否则补位）且插件行无条件（票 08f8）', () => {
+  const patchText = fs.readFileSync(path.join(PLUGIN_DIR, 'cordis.patch.yml'), 'utf8');
+  const patch = loadYaml(patchText, { schema: patchSchema }) as Array<Record<string, unknown>>;
+  assert.equal(Array.isArray(patch), true, 'patch 文件 = 顶层 YAML 数组（官方 PatchOptions 形态，round 1 契约不变）');
+  assert.equal(patch.length, 1, '恰一个 patch 元素（以包名引用自己——round 1 契约不变）');
+  const inserts = patch[0].insert as Array<Record<string, unknown>>;
+  assert.equal(inserts.length, 2, '恰两 insert 行（round 1 need FR-7 契约不变）');
+
+  const managerRow = inserts[0];
+  assert.equal(managerRow.id, 'mcp', 'manager 行 id = mcp（补位组合 ns 派生自本行 id——round 1 契约不变）');
+  assert.equal(managerRow.name, '@deepseek-ai/dsh-mcp-manager', 'manager 行挂官方 mcp-manager 模块');
+  assert.deepEqual(managerRow.inject, ['credentials'], 'manager 行 inject credentials（凭据模板展开归官方，round 1 契约不变）');
+  const disabled = managerRow.disabled as { __jsExpr?: string } | undefined;
+  assert.notEqual(disabled, undefined, 'manager 行必须带 disabled 条件（无条件挂载在 web 组合与官方预挂行 duplicate——票 08f8 缺陷）');
+  assert.equal(typeof disabled?.__jsExpr, 'string', 'disabled 为 !!js 表达式节点（官方条件行先例形态）');
+  const expression = disabled?.__jsExpr ?? '';
+  assert.match(expression, /profileContext/, '判据读 profileContext（官方 preset 同款作用域先例）');
+  assert.match(expression, /startedBundles/, '判据读 startedBundles（bundle 包名序列 = 组合的启动面事实）');
+  assert.match(expression, /@deepseek-ai\/dsh-web-app/, '判据点名官方预挂 bundle（rc.4 星座唯一自带 mcp-manager 行的官方 bundle）');
+
+  // 表达式按官方求值形态在三种组合下成立：web（禁用→官方行独供）、headless（启用→插件行补位）、
+  // 非 dsh 启动（get 缺 profileContext 返回 undefined→Boolean 归假→启用，round 1 行为保持）
+  const web = resolveDisabled(expression, {
+    profileContext: { startedBundles: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', '@hankchen/dsh-mcp'] },
+  });
+  assert.equal(web, true, 'web 组合（startedBundles 含 dsh-web-app）→ 行禁用，官方 mcp-manager 行独供');
+  const headless = resolveDisabled(expression, {
+    profileContext: { startedBundles: ['@hankchen/dsh-mcp'] },
+  });
+  assert.equal(headless, false, 'headless 补位组合（无官方预挂）→ 行在场，恰一个提供者');
+  const nonDsh = resolveDisabled(expression, {});
+  assert.equal(nonDsh, false, '非 dsh 启动（无 profileContext 服务）→ 行在场（round 1 行为不变）');
+
+  const pluginRow = inserts[1];
+  assert.equal(pluginRow.id, 'dsh-mcp-manage', '插件行 id = dsh-mcp-manage（round 1 契约不变）');
+  assert.equal(pluginRow.name, '@hankchen/dsh-mcp', '插件行挂本包模块（round 1 契约不变）');
+  assert.equal(pluginRow.disabled, undefined, '插件行不条件化——本插件自身功能全组合在场（只有 manager 补位行需条件）');
+  assert.deepEqual(pluginRow.inject, ['mcpManager', 'commands', 'tools', 'settings'], '插件行 inject 四服务（round 1 契约不变）');
+});
+
+// ---- settings ns 口径（票 20261118-08f8）：写面 ns 与实际生效 manager 行 id 对齐 ----
+// 期望值独立来源 = rc.4 一手探针（工票 Progress 留痕）：官方 settings write 以
+// entry.options.id === ns 定位可配置条目（dsh-settings lib/index.js write 一手），未知 ns
+// 拒写 `No configurable plugin entry "<ns>"`（6df0 真跑复现的同款拒绝）；manager Config 唯一
+// volatile 顶层字段 servers（dsh-mcp-manager lib/index.js static Config 一手），rc.4 星座
+// 无第二服务暴露 servers 配置域。派生口径 = describe 视图中 value.servers 在场的唯一 ns；
+// 零在场或多于一个在场即拒绝写（fail loud 不猜测——spec settings 命名空间口径决策）。
+
+test('web 组合 ns 对齐：describe 报 mcp-manager 配置域时，add/remove/enable 写到 mcp-manager（票 08f8）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
+  // web 组合事实：官方预挂行 id mcp-manager（dsh-web-app patch 一手），插件补位行被 disabled
+  ctx.setMcpSettingsNamespace('mcp-manager');
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const added = (await tool.execute({ action: 'add', serverName: 'docs', transport: 'stdio', command: 'npx' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(added.ok, true, 'web 组合 add 成功');
+  const removed = (await tool.execute({ action: 'remove', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(removed.ok, true, 'web 组合 remove 成功');
+  const enabled = (await tool.execute({ action: 'enable', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(enabled.ok, true, 'web 组合 enable 成功（写失败会以 ok:false 显式返回）');
+
+  assert.deepEqual(ctx.captured.settingsCalls.map((call) => call.namespace), ['mcp-manager', 'mcp-manager', 'mcp-manager'],
+    '三条写通道 ns 全部 = describe 派生的实际生效 manager 行 id mcp-manager（round 1 硬编码 mcp 在 web 组合被官方拒写——本测试即其回归面）');
+  const addCall = ctx.captured.settingsCalls[0];
+  assert.deepEqual(addCall.kind === 'update' ? addCall.patch : undefined,
+    { servers: { docs: { transport: 'stdio', command: 'npx' } } }, 'add patch 形态与 round 1 同源字面');
+});
+
+test('settings 零 servers 配置域（组合缺 manager 提供者）：add 拒绝并指明原因，零写调用（票 08f8 fail loud）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([]);
+  ctx.setSettingsNamespaces([{ ns: 'llm-deepseek', value: { model: 'deepseek-chat' } }]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'docs', transport: 'stdio', command: 'npx' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  assert.equal(result.ok, false, '无 manager 配置域即拒绝写');
+  assert.match(result.error, /servers/, '拒绝信息指明 servers 配置域未在场');
+  assert.match(result.error, /manager/i, '拒绝信息指明 manager 提供者缺位');
+  assert.deepEqual(ctx.captured.settingsCalls, [], 'fail loud 零写调用（不猜测 ns）');
+});
+
+test('settings 多个 servers 配置域（manager 提供者不唯一）：add 拒绝并列出竞争域，零写调用（票 08f8 fail loud）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([]);
+  ctx.setSettingsNamespaces([
+    { ns: 'mcp', value: { servers: {} } },
+    { ns: 'mcp-manager', value: { servers: {} } },
+  ]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'docs', transport: 'stdio', command: 'npx' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  assert.equal(result.ok, false, '多 manager 配置域即拒绝写（拒绝猜测写目标）');
+  assert.match(result.error, /mcp/, '拒绝信息列出竞争域 mcp');
+  assert.match(result.error, /mcp-manager/, '拒绝信息列出竞争域 mcp-manager');
+  assert.deepEqual(ctx.captured.settingsCalls, [], 'fail loud 零写调用');
 });
