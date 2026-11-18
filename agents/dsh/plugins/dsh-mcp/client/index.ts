@@ -138,7 +138,8 @@ interface ClientContext {
 
 // ---- 写操作面（官方 client remote 写通道；写通道语义与 round 1 管理服务同源——
 // spec 实现决策「添加/启停/移除语义」：UI 不绕过管理服务另起写路径，双入口与 UI 三面
-// 共调同一官方 settings 写链路 ns='mcp'）----
+// 共调同一官方 settings 写链路；ns 不硬编码（票 20261118-08f8 修订，round 1「ns='mcp'」
+// 口径作废）——写/读时经 describe 派生实际生效 manager 行 id，见 deriveMcpNamespace）----
 
 /** DOM 输入事件的消费子集（受控组件 onChange 惯例形态；替身测试以同形字面量驱动）。 */
 interface InputEventLike {
@@ -166,6 +167,46 @@ interface SettingsWriteFace {
 
 /** 官方 SERVER_NAME_PATTERN（@deepseek-ai/dsh-mcp-client src/index.ts 一手来源，与 Host 面 index.ts 逐字同值）。 */
 const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
+
+/**
+ * manager 配置域标记（票 20261118-08f8，与 Host 面 isMcpConfigValue 同源同形）：官方 manager
+ * Config 唯一 volatile 顶层字段 servers（@deepseek-ai/dsh-mcp-manager lib/index.js static
+ * Config 一手；default {} 经 cordis resolveConfig→validate 恒解析在场），且 rc.4 星座无第二
+ * 服务暴露 servers 配置域（星座全量探针）——以 value.servers 在场判定 manager 配置域。
+ */
+function isMcpConfigValue(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const servers = (value as { servers?: unknown }).servers;
+  return typeof servers === 'object' && servers !== null && !Array.isArray(servers);
+}
+
+/**
+ * mcp 配置域 ns 派生（票 20261118-08f8，spec「settings 命名空间口径」决策）：官方 settings
+ * 以 Loader entry id 为 ns（dsh-settings write/describe 一手：ns = entry.options.id，未知
+ * ns 写即拒 `No configurable plugin entry`），行 id 随组合变化——web/desktop 为官方预挂行
+ * id mcp-manager（dsh-web-app patch 一手），补位组合为插件行 id mcp。写/读时经 describe
+ * 派生实际生效域：value.servers 在场的唯一 ns；describe 被拒、零在场或多于一个在场即拒绝
+ * （fail loud 不猜测）。
+ */
+async function deriveMcpNamespace(settings: SettingsWriteFace): Promise<{ namespace: string } | { refusal: string }> {
+  let described: RemoteResult<SettingsDescribeValue>;
+  try {
+    described = await settings.describe();
+  } catch (error) {
+    return { refusal: `settings describe 失败：${error instanceof Error ? error.message : String(error)}` };
+  }
+  if (described.ok === false) {
+    return { refusal: `settings describe 被拒：${described.error.message ?? '未知原因'}` };
+  }
+  const candidates = described.value.namespaces.filter((row) => isMcpConfigValue(row.value));
+  if (candidates.length === 0) {
+    return { refusal: 'settings describe 无 servers 配置域：mcp-manager 提供者未在场或未激活（组合缺 manager 行，无法定位写目标）' };
+  }
+  if (candidates.length > 1) {
+    return { refusal: `settings describe 有 ${String(candidates.length)} 个 servers 配置域（${candidates.map((row) => row.ns).join('、')}）：manager 提供者不唯一，拒绝猜测写目标` };
+  }
+  return { namespace: candidates[0].ns };
+}
 
 /**
  * 官方 mcpManager Remote 重试面（@deepseek-ai/dsh-mcp-manager lib/typert.remote-client.d.ts
@@ -333,8 +374,11 @@ function createMcpPanelWrites(
           if (Object.keys(headers).length > 0) entry.headers = headers;
         }
       }
+      // ns 写前派生（票 08f8）：派生拒绝与官方拒写同走内联报错，零猜测零旁路
+      const derived = await deriveMcpNamespace(channels.settings);
+      if ('refusal' in derived) return { ok: false, error: derived.refusal };
       try {
-        const refused = writeRefused(await channels.settings.update('mcp', { servers: { [name]: entry } }));
+        const refused = writeRefused(await channels.settings.update(derived.namespace, { servers: { [name]: entry } }));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交 server "${name}"（${draft.transport}）——官方 reconcile 即时生效` };
       } catch (error) {
@@ -354,15 +398,22 @@ function createMcpPanelWrites(
       if (described.ok === false) {
         return { ok: false, error: `当前配置不可读（settings.describe 被拒）：${described.error.message ?? '未知原因'}` };
       }
-      const namespace = described.value.namespaces.find((row) => row.ns === 'mcp');
-      const servers = (namespace?.value as { servers?: Record<string, Record<string, unknown>> } | undefined)?.servers;
+      // ns 从同一次 describe 派生（票 08f8）：读基线与写目标同一实际生效 manager 行 id
+      const domains = described.value.namespaces.filter((row) => isMcpConfigValue(row.value));
+      if (domains.length !== 1) {
+        return { ok: false, error: domains.length === 0
+          ? 'settings describe 无 servers 配置域：mcp-manager 提供者未在场或未激活（组合缺 manager 行，无法定位写目标）'
+          : `settings describe 有 ${String(domains.length)} 个 servers 配置域（${domains.map((row) => row.ns).join('、')}）：manager 提供者不唯一，拒绝猜测写目标` };
+      }
+      const namespace = domains[0].ns;
+      const servers = (domains[0].value as { servers?: Record<string, Record<string, unknown>> } | undefined)?.servers;
       const current = servers?.[name];
       if (current === undefined) return { ok: false, error: `server "${name}"：无配置条目可编辑（/mcp list 查看现存 server）` };
       const ops = editOps(name, current, draft);
       if (typeof ops === 'string') return { ok: false, error: ops };
       if (ops.length === 0) return { ok: true, message: '无变更——未改任何字段，官方配置保持原样' };
       try {
-        const refused = writeRefused(await channels.settings.mutate('mcp', ops));
+        const refused = writeRefused(await channels.settings.mutate(namespace, ops));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交 server "${name}" 的编辑（${String(ops.length)} 项变更）——官方 reconcile 即时生效（字段变化重建单实例）` };
       } catch (error) {
@@ -372,14 +423,16 @@ function createMcpPanelWrites(
 
     // 启停/移除前置守卫与 round 1 管理服务同源（configured=false = 已移除清理未完成，
     // 无配置可写）；ops 形态 = 官方 {op:'set', enabled} / {op:'unset'}（生效语义归官方
-    // reconcile：禁用卸载保条目、移除卸载并消失）
+    // reconcile：禁用卸载保条目、移除卸载并消失）；ns 写前派生（票 08f8）
     async setServerEnabled(name, enabled) {
       const existing = snapshot.views.find((view) => view.name === name);
       if (existing === undefined || existing.configured === false) {
         return { ok: false, error: `server "${name}"：无配置条目——/mcp list 查看现存 server` };
       }
+      const derived = await deriveMcpNamespace(channels.settings);
+      if ('refusal' in derived) return { ok: false, error: derived.refusal };
       try {
-        const refused = writeRefused(await channels.settings.mutate('mcp',
+        const refused = writeRefused(await channels.settings.mutate(derived.namespace,
           [{ op: 'set', path: ['servers', name, 'enabled'], value: enabled }]));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交 server "${name}" ${enabled ? '启用' : '停用'}——官方 reconcile 即时生效（禁用卸载保条目/启用重建）` };
@@ -396,8 +449,10 @@ function createMcpPanelWrites(
       if (existing.configured === false) {
         return { ok: false, error: `server "${name}"：无配置条目（已移除但清理未完成，重启宿主方可清账）` };
       }
+      const derived = await deriveMcpNamespace(channels.settings);
+      if ('refusal' in derived) return { ok: false, error: derived.refusal };
       try {
-        const refused = writeRefused(await channels.settings.mutate('mcp',
+        const refused = writeRefused(await channels.settings.mutate(derived.namespace,
           [{ op: 'unset', path: ['servers', name] }]));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交移除 server "${name}"——官方 reconcile 即时生效（条目卸载并消失）` };
@@ -489,9 +544,9 @@ function describeStatus(status: McpManagedServerStatus): string {
   }
 }
 
-/** transport 列的数据源：settings.describe 的 ns='mcp' 视图 → name→transport 映射（value 恒 redact，transport 非敏感照读）。 */
+/** transport 列的数据源：settings.describe 的 manager 配置域（ns 派生，票 08f8）→ name→transport 映射（value 恒 redact，transport 非敏感照读）。 */
 function transportsOf(describeValue: SettingsDescribeValue): Map<string, string> {
-  const view = describeValue.namespaces.find((namespace) => namespace.ns === 'mcp');
+  const view = describeValue.namespaces.find((namespace) => isMcpConfigValue(namespace.value));
   const servers = (view?.value as { servers?: Record<string, { transport?: unknown }> } | undefined)?.servers;
   const transports = new Map<string, string>();
   if (typeof servers === 'object' && servers !== null) {
@@ -591,7 +646,7 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
       if (feedback.ok === true) setAddDraft({});
     }, [io, addTransport, addDraft]);
 
-    /** 打开行内编辑：表单显示值取 describe 一次性读的快照（ops 基线仍归写面保存时再读）。 */
+    /** 打开行内编辑：表单显示值取 describe 一次性读的快照（manager 配置域 ns 派生，票 08f8；ops 基线仍归写面保存时再读）。 */
     const openEdit = (view: McpManagedServerView): void => {
       setEditingName(view.name);
       setEditDraft({});
@@ -601,8 +656,8 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
           setEditNote({ ok: false, error: `当前配置不可读（settings.describe 被拒）：${answer.error.message ?? '未知原因'}` });
           return;
         }
-        const namespace = answer.value.namespaces.find((row) => row.ns === 'mcp');
-        const servers = (namespace?.value as { servers?: Record<string, Record<string, unknown>> } | undefined)?.servers;
+        const domain = answer.value.namespaces.find((row) => isMcpConfigValue(row.value));
+        const servers = (domain?.value as { servers?: Record<string, Record<string, unknown>> } | undefined)?.servers;
         setEditCurrent(servers?.[view.name]);
       }).catch(() => {
         setEditNote({ ok: false, error: '当前配置不可读（settings.describe 失败）' });
