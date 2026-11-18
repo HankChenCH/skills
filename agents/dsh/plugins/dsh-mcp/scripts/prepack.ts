@@ -25,6 +25,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { collectStyleContractDefects } from './style-contract.ts';
+
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE = path.join(pluginRoot, 'index.ts');
 const EMITTED = path.join(pluginRoot, 'index.js');
@@ -170,8 +172,18 @@ function runPrepack(): void {
     process.exit(1);
   }
   const clientBundle = compileClientBundle(typescript, sourceManifest.name);
+  // 样式契约门（spec 20261118-8a57 FR-7，票 20261118-eb6a；design 0004 述标实现校验点）：
+  // 产物零 hex 直值色、零写死 font-family——缺陷即中止打包（fail loud，比照编译诊断门先例）
+  const styleDefects = collectStyleContractDefects(clientBundle);
+  if (styleDefects.length > 0) {
+    console.error(`✗ prepack：客户端产物样式契约 ${styleDefects.length} 条缺陷，中止打包（design 0004 契约：取色全走 var(--dsw-alias-*) token、字体族只许 var() 引用）：`);
+    for (const defect of styleDefects) {
+      console.error(`  - [${defect.rule}] ${defect.snippet}`);
+    }
+    process.exit(1);
+  }
   fs.writeFileSync(CLIENT_EMITTED, clientBundle);
-  console.log('✓ prepack：客户端面编译完成（client/index.ts → client.js，lazy-CJS factory 形态）');
+  console.log('✓ prepack：客户端面编译完成（client/index.ts → client.js，lazy-CJS factory 形态，样式契约通过）');
 
   // ---- 清单换载：打包清单 main/exports/files 直指发布态（备份 → 改写；postpack 用备份还原
   // 仓库树）。exports["."] 与 main 同步换载：exports 字段存在即约束包根解析（Node 语义），

@@ -26,6 +26,16 @@
 //   本地镜像，react 不入仓库依赖。
 // - 单文件纪律（7504 延续）：客户端面单入口文件，拆多文件须先扩发布面为 bundling
 //   （prepack 对多文件产物 fail loud）。
+// - 样式层（spec 20261118-8a57 round 2，票 20261118-eb6a；design 0004 述标 approved）：token
+//   化样式表随面板 <style> 节点注入——取色全走 var(--dsw-alias-*)（浅色/深色主题自动随宿主
+//   ThemeSnapshot，不自管双主题）、字体族只许 var() 引用（继承宿主 text/code 用户设置，等宽
+//   线索块用 --ds-font-family-code）、圆角全 var(--dsw-radius-*)、字号 14/12 两档、间距 px
+//   直值（官方组件实况口径）。布局 9 条落位：面板头/行卡/异常内联/行内操作条/添加表单（点
+//   头部「添加」展开，默认收起——收起/展开是 CSS 可见性，元素树恒在）/行内编辑/空态/错误
+//   降级/加载态（watch 首批未到 skeleton）。功能零变更契约：data-mcp-* 属性钩子与写通道
+//   调用形态全部不动，样式只改呈现；行操作矩阵保持 round 1 语义（configured 行恒有移除，
+//   不引入一次确认——design 0004 决策 4 的最小矩阵会改功能面，本票非目标）。样式契约自动
+//   断言：scripts/style-contract.ts（prepack fail loud）+ 单测产物全扫。
 // 测试：test/unit/dsh-mcp-dock-readonly.test.ts（vm 官方物化形态替身 + 客户端 ctx 替身）。
 import { createElement, useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -537,6 +547,129 @@ const TAB_KIND = 'mcp-servers';
 /** guide 入口盒在 guide 页的位置（官方先例值 10/30 同域；外部插件取靠后档）。 */
 const GUIDE_ORDER = 30;
 
+// ---- 样式层（token 化；design 0004 述标 approved，契约与校验面见文件头注）----
+
+/**
+ * 面板样式表：随面板 <style> 节点注入（组件树内渲染，面板卸载随之移除——样式生命周期与
+ * 面板同生共死）。取值纪律（机械断言 = scripts/style-contract.ts）：颜色全 var(--dsw-alias-*)
+ * （官方 PluginManagerPage 徽章先例 = color-mix(in srgb, state 主色 10–12%, transparent) 底
+ * + 主色文字；waiting 底色 state-warn-tertiary + 文字 warn-primary 同为官方实况）；字体族全
+ * var() 引用；圆角全 var(--dsw-radius-*)；字号 14/12 两档；间距 px 直值（官方组件实况口径）。
+ */
+const PANEL_STYLES = [
+  '.dsh-mcp-panel{box-sizing:border-box;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg);padding:12px;color:var(--dsw-alias-label-primary);font-size:14px;line-height:1.5}',
+  '.dsh-mcp-panel *,.dsh-mcp-panel *::before,.dsh-mcp-panel *::after{box-sizing:border-box}',
+  // 面板头（决策 1）：标题 + 计数次信息 + 「添加」常驻钮
+  '.dsh-mcp-head{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;border-bottom:1px solid var(--dsw-alias-border-l2)}',
+  '.dsh-mcp-title{font-size:14px;font-weight:600}',
+  '.dsh-mcp-count{color:var(--dsw-alias-label-tertiary);font-size:12px}',
+  // 按钮两形态（基线按钮语义族收敛 ≤2 种）：主要动作 primary-fill、次动作 ghost 系
+  '.dsh-mcp-pri{background:var(--dsw-alias-button-primary-fill);color:var(--dsw-alias-label-on-color);border:0;border-radius:var(--dsw-radius-sm);padding:4px 12px;font-size:12px;cursor:pointer}',
+  '.dsh-mcp-ghost{background:transparent;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);color:var(--dsw-alias-label-primary);padding:3px 10px;font-size:12px;cursor:pointer}',
+  '@media (hover:hover){.dsh-mcp-pri:hover{background:var(--dsw-alias-button-primary-hover)}.dsh-mcp-ghost:hover{background:var(--dsw-alias-interactive-bg-hover)}}',
+  // 添加/编辑表单（决策 5/6）：清单上方/行内展开，bg-layer-2 卡；收起是 CSS 可见性（元素树恒在）
+  '.dsh-mcp-addform,.dsh-mcp-editform{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-2);padding:10px 12px;margin-top:8px}',
+  '.dsh-mcp-addform.dsh-mcp-collapsed{display:none}',
+  '.dsh-mcp-formtitle{display:block;font-size:14px;font-weight:600;margin-bottom:6px}',
+  '.dsh-mcp-addform input,.dsh-mcp-addform select,.dsh-mcp-addform textarea,.dsh-mcp-editform input,.dsh-mcp-editform textarea{display:block;width:100%;margin-top:6px;padding:6px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-size:14px}',
+  '.dsh-mcp-addform textarea,.dsh-mcp-editform textarea{min-height:56px;resize:vertical;font-family:var(--ds-font-family-code);font-size:12px}',
+  '.dsh-mcp-formops{display:flex;align-items:center;gap:6px;margin-top:10px}',
+  // 行卡（决策 2）：radius-md + border-l2 1px + bg-layer-1 底，紧凑 padding，单列一屏 ≥5 行
+  '.dsh-mcp-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}',
+  '.dsh-mcp-row{border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-1);padding:10px 12px}',
+  '.dsh-mcp-rowline{display:flex;align-items:center;gap:8px;min-width:0}',
+  '.dsh-mcp-name{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  '.dsh-mcp-transport,.dsh-mcp-tools{color:var(--dsw-alias-label-tertiary);font-size:12px;flex:none}',
+  // 状态徽章四态（决策 7）：pill 圆角 + 色系底色 + 文字标签同现（不只靠色相）
+  '.dsh-mcp-badge{margin-left:auto;flex:none;padding:3px 10px;border-radius:var(--dsw-radius-pill);font-size:12px;line-height:1.2;white-space:nowrap}',
+  '.dsh-mcp-badge-connected{background:color-mix(in srgb,var(--dsw-alias-state-success-primary) 12%,transparent);color:var(--dsw-alias-state-success-primary)}',
+  '.dsh-mcp-badge-failed{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 10%,transparent);color:var(--dsw-alias-state-error-primary)}',
+  '.dsh-mcp-badge-waiting-credentials{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-primary)}',
+  '.dsh-mcp-badge-disabled,.dsh-mcp-badge-closed{background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-tertiary)}',
+  '.dsh-mcp-badge-connecting,.dsh-mcp-badge-reconnecting{background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary)}',
+  // 异常内联（决策 3）：原因块 bg-layer-2 底 + 左侧 3px state-error 提示条 + 等宽 12px，不折叠
+  '.dsh-mcp-detail{margin:6px 0 0;color:var(--dsw-alias-label-tertiary);font-size:12px}',
+  '.dsh-mcp-reason{margin:8px 0 0;padding:6px 8px;border-left:3px solid var(--dsw-alias-state-error-primary);border-radius:var(--dsw-radius-xs);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-state-error-primary);font-family:var(--ds-font-family-code);font-size:12px;overflow-wrap:anywhere}',
+  // 行内操作条（决策 4）：ghost 组 + 即时中间态
+  '.dsh-mcp-ops{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px}',
+  '.dsh-mcp-mid{color:var(--dsw-alias-label-tertiary);font-size:12px}',
+  // 写反馈注记：拒绝走 state-error（异常优先），成功走次信息色
+  '.dsh-mcp-note{margin:8px 0 0;padding:6px 4px 0;color:var(--dsw-alias-label-secondary);font-size:12px}',
+  '.dsh-mcp-note-error{color:var(--dsw-alias-state-error-primary)}',
+  // 空态（决策 7）：虚线框 + tertiary 引导，无按钮无表单入口
+  '.dsh-mcp-empty{margin:8px 0 0;padding:28px 10px;border:1px dashed var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);color:var(--dsw-alias-label-tertiary);text-align:center;font-size:14px}',
+  '.dsh-mcp-empty p{margin:4px 0}',
+  // 错误降级（决策 8）：错误块不崩溃不白屏，摘要 mono 体 + 指引次信息
+  '.dsh-mcp-errorbox{margin:8px 0 0;padding:14px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);color:var(--dsw-alias-label-primary)}',
+  '.dsh-mcp-errorbox p{margin:4px 0}',
+  '.dsh-mcp-errmono{font-family:var(--ds-font-family-code);font-size:12px;color:var(--dsw-alias-state-error-primary)}',
+  '.dsh-mcp-errhint{color:var(--dsw-alias-label-tertiary);font-size:12px}',
+  // 加载态（决策 9）：watch 首批未到 = skeleton 行（官方骨架实况 = bg-skeleton + 2s 脉动）
+  '.dsh-mcp-skbar{height:56px;margin-top:8px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-skeleton);animation:dsh-mcp-skeleton 2s cubic-bezier(0.36,0,0.64,1) infinite}',
+  '@keyframes dsh-mcp-skeleton{50%{opacity:0.45}}',
+  '@media (prefers-reduced-motion:reduce){.dsh-mcp-skbar{animation:none}}',
+  '.dsh-mcp-loadinghint{margin:8px 0 0;text-align:center;color:var(--dsw-alias-label-tertiary);font-size:12px}',
+  // ≤767px 断点（design 0003 移动端适配决策）：行卡一线允许换行、操作条换行、字号阶梯不变
+  '@media (max-width:767px){.dsh-mcp-rowline{flex-wrap:wrap}.dsh-mcp-name{white-space:normal}}',
+].join('\n');
+
+/** 面板样式节点（常量元素：四个呈现态的渲染树复用同一对象；面板卸载即随树移除）。 */
+const panelStyleNode = createElement('style', null, PANEL_STYLES);
+
+/**
+ * 状态徽章短标（决策 2 的一线扫读位；完整线索归 describeStatus 原文的详情行/内联块投影——
+ * 文案与 round 1 逐字一致）。
+ */
+function badgeLabelOf(status: McpManagedServerStatus): string {
+  switch (status.state) {
+    case 'connected':
+      return '已连接';
+    case 'connecting':
+      return '连接中';
+    case 'reconnecting':
+      return '重连中';
+    case 'waiting-credentials':
+      return '等待凭据';
+    case 'failed':
+      return '失败';
+    case 'disabled':
+      return '已停用';
+    case 'closed':
+      return '已关闭';
+    default: {
+      const exhaustive: never = status;
+      return String(exhaustive);
+    }
+  }
+}
+
+/** 已连接行的工具数次信息（决策 2 的 12px 次信息列；其余状态无工具数，返回空串不渲染）。 */
+function toolsLabelOf(status: McpManagedServerStatus): string {
+  return status.state === 'connected' ? `工具 ${String(status.toolCount)} 个` : '';
+}
+
+/**
+ * 一线之外的补充投影：connecting/reconnecting 的进行时线索以次信息行带出；failed 与
+ * waiting-credentials 的失败线索以 state-error 内联块带出（决策 3 不折叠）。投影文本 =
+ * describeStatus 原文（文案零变更）；已连接/已停用/已关闭一线徽章已足，无补充行（空串）。
+ */
+function statusDetailOf(status: McpManagedServerStatus): string {
+  switch (status.state) {
+    case 'connecting':
+    case 'reconnecting':
+    case 'failed':
+    case 'waiting-credentials':
+      return describeStatus(status);
+    default:
+      return '';
+  }
+}
+
+/** 写反馈注记的呈现类：拒绝 = state-error（异常优先），成功 = 次信息色。 */
+function noteClassOf(note: WriteFeedback): string {
+  return note.ok === true ? 'dsh-mcp-note' : 'dsh-mcp-note dsh-mcp-note-error';
+}
+
 // ---- 状态投影（官方状态联合逐成员的行内线索；与 Host 面 describeStatus 同源语义）----
 
 /** 单条状态的一行描述：state + 官方给的失败线索（lastError/cleanup 结果），原样带出不加工。 */
@@ -615,8 +748,14 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
     const [editCurrent, setEditCurrent] = useState<Record<string, unknown> | undefined>(undefined);
     const [editNote, setEditNote] = useState<WriteFeedback | undefined>(undefined);
     const [rowNote, setRowNote] = useState<WriteFeedback | undefined>(undefined);
+    // 纯呈现态（design 0004 决策 1/5/9，票 20261118-eb6a）：添加表单收起/展开、watch 首批
+    // 未到的加载门、行动作即时中间态——零数据通道参与（写面与 watch 调用形态不变）
+    const [addFormOpen, setAddFormOpen] = useState(false);
+    const [receivedBatch, setReceivedBatch] = useState(false);
+    const [pendingAction, setPendingAction] = useState<{ server: string; kind: 'toggle' | 'retry' | 'probe' } | undefined>(undefined);
     const applyBatch = useCallback((batch: McpManagedServerView[]): void => {
       setViews(batch);
+      setReceivedBatch(true);
       io.snapshot.views = batch;
       // transport 列随批刷新：describe 一次性读（官方生成面无流形态）；读取失败列降级 '—'
       // （辅助列显式降级，主列状态照常投影）。
@@ -709,17 +848,32 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
       setEditNote(feedback);
     }, [io, editingName, editDraft]);
 
+    // 动作中间态（决策 4）：触发即现身（connecting…/probing…），反馈落定即清——纯呈现，
+    // 写通道调用形态与 round 1 一字不变（中间态槽位单例：面板窄栏同一时刻一个动作在途，
+    // 反馈即清；并发动作的中间态显示归最后触发者，落定态不受影响）
     const setEnabled = (name: string, enabled: boolean): void => {
-      void io.writes.setServerEnabled(name, enabled).then(setRowNote);
+      setPendingAction({ server: name, kind: 'toggle' });
+      void io.writes.setServerEnabled(name, enabled).then((note) => {
+        setPendingAction(undefined);
+        setRowNote(note);
+      });
     };
     const removeRow = (name: string): void => {
       void io.writes.removeServer(name).then(setRowNote);
     };
     const retryRow = (name: string): void => {
-      void io.writes.retryServer(name).then(setRowNote);
+      setPendingAction({ server: name, kind: 'retry' });
+      void io.writes.retryServer(name).then((note) => {
+        setPendingAction(undefined);
+        setRowNote(note);
+      });
     };
     const probeRow = (name: string): void => {
-      void io.writes.probeServer(name).then(setRowNote);
+      setPendingAction({ server: name, kind: 'probe' });
+      void io.writes.probeServer(name).then((note) => {
+        setPendingAction(undefined);
+        setRowNote(note);
+      });
     };
 
     /** 行内编辑表单（显示值 = describe 快照；被触字段覆盖显示）。 */
@@ -732,8 +886,8 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
         return Object.entries(dict).map(([key, value]) => `${key}=${String(value)}`).join('\n');
       };
       const isStdio = transport === 'stdio';
-      return createElement('div', { 'data-mcp-edit-form': name },
-        createElement('span', null, `编辑 ${name}（transport ${transport} 只读；换 transport 请移除后重加）`),
+      return createElement('div', { 'data-mcp-edit-form': name, className: 'dsh-mcp-editform' },
+        createElement('span', { className: 'dsh-mcp-formtitle' }, `编辑 ${name}（transport ${transport} 只读；换 transport 请移除后重加）`),
         isStdio ? [
           createElement('input', {
             'data-mcp-edit-field': 'command', value: editDraft.command ?? currentText('command'),
@@ -763,54 +917,56 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
             onChange: changeEditField('headers'),
           }),
         ],
-        createElement('button', { 'data-mcp-edit-save': name, onClick: () => void submitEdit() }, '保存'),
-        createElement('button', { 'data-mcp-edit-cancel': name, onClick: closeEdit }, '取消'),
-        editNote === undefined ? null : createElement('p', { 'data-mcp-edit-note': 'note' },
-          editNote.ok === true ? editNote.message : editNote.error));
+        createElement('div', { className: 'dsh-mcp-formops' },
+          createElement('button', { 'data-mcp-edit-save': name, className: 'dsh-mcp-pri', onClick: () => void submitEdit() }, '保存'),
+          createElement('button', { 'data-mcp-edit-cancel': name, className: 'dsh-mcp-ghost', onClick: closeEdit }, '取消'),
+          editNote === undefined ? null : createElement('span', { 'data-mcp-edit-note': 'note', className: noteClassOf(editNote) },
+            editNote.ok === true ? editNote.message : editNote.error)));
     };
 
     if (streamError !== undefined) {
-      return createElement('div', { 'data-mcp-servers': 'error', 'data-mcp-tab-id': tab.id },
-        createElement('p', null, `MCP server 列表暂不可读：${streamError}`),
-        createElement('p', null, '可稍后切走再切回本页重试；/mcp list 命令始终可用。'));
+      // 错误降级（决策 8）：错误块呈现（摘要 mono 体 + 指引次信息），不崩溃不白屏；
+      // 文案与 round 1 逐字一致（mono span 内联拆分只改呈现，拼接文本不变）
+      return createElement('div', { 'data-mcp-servers': 'error', 'data-mcp-tab-id': tab.id, className: 'dsh-mcp-panel' },
+        panelStyleNode,
+        createElement('div', { className: 'dsh-mcp-errorbox' },
+          createElement('p', null, 'MCP server 列表暂不可读：',
+            createElement('span', { className: 'dsh-mcp-errmono' }, streamError)),
+          createElement('p', { className: 'dsh-mcp-errhint' }, '可稍后切走再切回本页重试；/mcp list 命令始终可用。')));
+    }
+    if (views.length === 0 && !receivedBatch) {
+      // 加载态（决策 9）：watch 首批未到 = skeleton 行可感知（3 条骨架 + 读取提示），
+      // 空态与加载态不混淆（空态只在首批已到且为空时呈现）
+      return createElement('div', { 'data-mcp-servers': 'loading', 'data-mcp-tab-id': tab.id, className: 'dsh-mcp-panel' },
+        panelStyleNode,
+        createElement('div', { className: 'dsh-mcp-skbar' }),
+        createElement('div', { className: 'dsh-mcp-skbar' }),
+        createElement('div', { className: 'dsh-mcp-skbar' }),
+        createElement('p', { className: 'dsh-mcp-loadinghint' }, '正在读取 server 清单…'));
     }
     if (views.length === 0) {
       // 空态契约（spec FR-5 / 拍板 D4）：只渲染引导文案，无按钮无表单入口
       //（添加表单只在非空清单态渲染——D4 只约束空态，见工票 Progress 决策）
-      return createElement('div', { 'data-mcp-servers': 'empty', 'data-mcp-tab-id': tab.id },
-        createElement('p', null, '还没有配置任何 MCP server。'),
-        createElement('p', null, '在会话里输入 /mcp add 添加（支持 stdio 命令与远程端点，敏感值用 ${credential:REF} 模板引用），或直接用自然语言让助手接入（它会调用 mcp_manage 工具）。'));
+      return createElement('div', { 'data-mcp-servers': 'empty', 'data-mcp-tab-id': tab.id, className: 'dsh-mcp-panel' },
+        panelStyleNode,
+        createElement('div', { className: 'dsh-mcp-empty' },
+          createElement('p', null, '还没有配置任何 MCP server。'),
+          createElement('p', null, '在会话里输入 /mcp add 添加（支持 stdio 命令与远程端点，敏感值用 ${credential:REF} 模板引用），或直接用自然语言让助手接入（它会调用 mcp_manage 工具）。')));
     }
-    return createElement('div', { 'data-mcp-servers': 'list', 'data-mcp-tab-id': tab.id },
-      createElement('ul', null, views.map((view) => createElement('li', { key: view.name, 'data-mcp-server': view.name },
-        createElement('span', { 'data-mcp-server-name': view.name }, view.name),
-        createElement('span', { 'data-mcp-server-transport': view.name }, transports.get(view.name) ?? '—'),
-        createElement('span', { 'data-mcp-server-status': view.name }, describeStatus(view.status)),
-        view.configured ? null : createElement('span', null, '（非配置条目：已移除但清理未完成）'),
-        view.configured ? [
-          createElement('button', {
-            'data-mcp-action': view.status.state === 'disabled' ? 'enable' : 'disable',
-            'data-mcp-action-server': view.name,
-            onClick: () => setEnabled(view.name, view.status.state === 'disabled'),
-          }, view.status.state === 'disabled' ? '启用' : '停用'),
-          createElement('button', {
-            'data-mcp-action': 'edit', 'data-mcp-action-server': view.name, onClick: () => openEdit(view),
-          }, '编辑'),
-          createElement('button', {
-            'data-mcp-action': 'remove', 'data-mcp-action-server': view.name, onClick: () => removeRow(view.name),
-          }, '移除'),
-          // 失败态契约（spec FR-4）：failed 条目重试 = restart；disabled 条目探测 = probe
-          view.status.state === 'failed' ? createElement('button', {
-            'data-mcp-action': 'retry', 'data-mcp-action-server': view.name, onClick: () => retryRow(view.name),
-          }, '重试') : null,
-          view.status.state === 'disabled' ? createElement('button', {
-            'data-mcp-action': 'probe', 'data-mcp-action-server': view.name, onClick: () => probeRow(view.name),
-          }, '探测') : null,
-        ] : null,
-        editingName === view.name && view.configured ? renderEditForm(view.name, transports.get(view.name) ?? '') : null))),
-      rowNote === undefined ? null : createElement('p', { 'data-mcp-write-note': 'note' },
-        rowNote.ok === true ? rowNote.message : rowNote.error),
-      createElement('div', { 'data-mcp-add-form': 'form' },
+    return createElement('div', { 'data-mcp-servers': 'list', 'data-mcp-tab-id': tab.id, className: 'dsh-mcp-panel' },
+      panelStyleNode,
+      // 面板头（决策 1）：标题 + server 计数（次信息 12px）+「添加」常驻钮（primary，头部右侧）
+      createElement('div', { className: 'dsh-mcp-head' },
+        createElement('b', { className: 'dsh-mcp-title' }, 'MCP Servers'),
+        createElement('span', { className: 'dsh-mcp-count' }, `${String(views.length)} 项`),
+        createElement('button', {
+          'data-mcp-add-open': 'open', className: 'dsh-mcp-pri',
+          onClick: () => setAddFormOpen(true),
+        }, '添加')),
+      // 添加表单（决策 5）：点头部「添加」在清单上方展开（收起/展开是 CSS 可见性——元素树
+      // 恒在，替身契约测试照常直驱字段）；transport 同表单切换，提交/取消在表单底部
+      createElement('div', { 'data-mcp-add-form': 'form', className: addFormOpen ? 'dsh-mcp-addform' : 'dsh-mcp-addform dsh-mcp-collapsed' },
+        createElement('span', { className: 'dsh-mcp-formtitle' }, '添加 server'),
         createElement('select', {
           'data-mcp-add-transport': addTransport,
           value: addTransport,
@@ -849,9 +1005,61 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
             onChange: changeAddField('headers'),
           }),
         ],
-        createElement('button', { 'data-mcp-add-submit': 'submit', onClick: () => void submitAdd() }, '添加 server'),
-        addNote === undefined ? null : createElement('p', { 'data-mcp-add-note': 'note' },
-          addNote.ok === true ? addNote.message : addNote.error)));
+        createElement('div', { className: 'dsh-mcp-formops' },
+          createElement('button', { 'data-mcp-add-submit': 'submit', className: 'dsh-mcp-pri', onClick: () => void submitAdd() }, '添加 server'),
+          createElement('button', { 'data-mcp-add-cancel': 'cancel', className: 'dsh-mcp-ghost', onClick: () => setAddFormOpen(false) }, '取消'),
+          addNote === undefined ? null : createElement('span', { 'data-mcp-add-note': 'note', className: noteClassOf(addNote) },
+            addNote.ok === true ? addNote.message : addNote.error))),
+      createElement('ul', { className: 'dsh-mcp-list' }, views.map((view) => {
+        const statusDetail = statusDetailOf(view.status);
+        const failureInline = view.status.state === 'failed' || view.status.state === 'waiting-credentials';
+        return createElement('li', { key: view.name, 'data-mcp-server': view.name, className: 'dsh-mcp-row' },
+          // 行卡一线（决策 2）：名称 14px 加权 + transport/工具数 12px 次信息 + 状态徽章右侧
+          // pill（四态色系 + 文字标签同现，不只靠色相）
+          createElement('div', { className: 'dsh-mcp-rowline' },
+            createElement('span', { 'data-mcp-server-name': view.name, className: 'dsh-mcp-name' }, view.name),
+            createElement('span', { 'data-mcp-server-transport': view.name, className: 'dsh-mcp-transport' }, transports.get(view.name) ?? '—'),
+            toolsLabelOf(view.status) === '' ? null : createElement('span', { className: 'dsh-mcp-tools' }, toolsLabelOf(view.status)),
+            createElement('span', { 'data-mcp-server-status': view.name, className: `dsh-mcp-badge dsh-mcp-badge-${view.status.state}` }, badgeLabelOf(view.status))),
+          // 补充投影（决策 3）：failed/waiting-credentials 原因内联块不折叠（bg-layer-2 底 +
+          // 左侧 3px state-error 提示条 + mono 12px）；connecting/reconnecting 进行时线索以
+          // 次信息行带出——投影文本 = describeStatus 原文，文案零变更
+          statusDetail === '' ? null : failureInline
+            ? createElement('div', { className: 'dsh-mcp-reason' }, statusDetail)
+            : createElement('div', { className: 'dsh-mcp-detail' }, statusDetail),
+          view.configured ? null : createElement('div', { className: 'dsh-mcp-detail' }, '（非配置条目：已移除但清理未完成）'),
+          // 行内操作条（决策 4）：ghost 形态组 + 动作触发即时中间态（connecting…/probing…）。
+          // 按钮矩阵保持 round 1 语义（configured 行恒有移除；一次确认不引入——见文件头注）
+          view.configured ? createElement('div', { className: 'dsh-mcp-ops' },
+            createElement('button', {
+              'data-mcp-action': view.status.state === 'disabled' ? 'enable' : 'disable',
+              'data-mcp-action-server': view.name, className: 'dsh-mcp-ghost',
+              onClick: () => setEnabled(view.name, view.status.state === 'disabled'),
+            }, view.status.state === 'disabled' ? '启用' : '停用'),
+            createElement('button', {
+              'data-mcp-action': 'edit', 'data-mcp-action-server': view.name, className: 'dsh-mcp-ghost',
+              onClick: () => openEdit(view),
+            }, '编辑'),
+            createElement('button', {
+              'data-mcp-action': 'remove', 'data-mcp-action-server': view.name, className: 'dsh-mcp-ghost',
+              onClick: () => removeRow(view.name),
+            }, '移除'),
+            // 失败态契约（spec FR-4）：failed 条目重试 = restart；disabled 条目探测 = probe
+            view.status.state === 'failed' ? createElement('button', {
+              'data-mcp-action': 'retry', 'data-mcp-action-server': view.name, className: 'dsh-mcp-ghost',
+              onClick: () => retryRow(view.name),
+            }, '重试') : null,
+            view.status.state === 'disabled' ? createElement('button', {
+              'data-mcp-action': 'probe', 'data-mcp-action-server': view.name, className: 'dsh-mcp-ghost',
+              onClick: () => probeRow(view.name),
+            }, '探测') : null,
+            pendingAction !== undefined && pendingAction.server === view.name
+              ? createElement('span', { className: 'dsh-mcp-mid' }, pendingAction.kind === 'toggle' ? 'connecting…' : 'probing…')
+              : null) : null,
+          editingName === view.name && view.configured ? renderEditForm(view.name, transports.get(view.name) ?? '') : null);
+      })),
+      rowNote === undefined ? null : createElement('p', { 'data-mcp-write-note': 'note', className: noteClassOf(rowNote) },
+        rowNote.ok === true ? rowNote.message : rowNote.error));
   };
 }
 
