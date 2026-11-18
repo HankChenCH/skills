@@ -1,0 +1,579 @@
+// dsh-mcp 右栏 Dock 页只读面测试（spec 20261118-0de6 FR-1/FR-4/FR-5 工单级，票 20261118-1812）。
+// 被测源码：agents/dsh/plugins/dsh-mcp/client/index.ts（客户端模块）——经 TypeScript 转译为
+// 官方 lazy-CJS factory 形态后在 vm 沙箱内按官方物化协议执行（官方运行形态即 CJS-in-factory，
+// node ESM 直跑 .ts 反而不是官方物化形态；vm 先例 = dsh-mcp-client-carrier.test.ts）。
+// 期望值来源 = 官方一手源码探针（@deepseek-ai@0.2.2-rc.4 星座，npx 缓存在盘可复核，票 Progress
+// 留痕）+ spec 实现决策契约，逐条标注于替身契约注释。
+//
+// 替身契约（stub-fidelity 门：替身测试钉替身契约，浏览器真渲染归集成级人工段——spec 非目标 D6）：
+// 1. ctx.effect(fn, label)——cordis effect 语义镜像（官方 sidebar-right.md 文档规范形态
+//    `ctx.effect(() => ctx.sidebarRightTabs.register(…), 'image type')`）：执行 fn、收集其返回的
+//    disposer 由插件生命周期持有；替身记录 label 与返回值，收集面供断言。
+// 2. ctx.sidebarRightTabs.register(definition)——官方一手来源
+//    （@deepseek-ai/dsh-client-ui-sidebar-right@0.2.2-rc.4 src/client/tab-registry.ts）：
+//    重复 id 同步抛 `sidebarRight: tab type id "<id>" is already registered`；返回 disposer。
+// 3. ctx.slots.inject(name, factory, label) / ctx.slots.register(options, component)——官方
+//    keyed slot 注册形态（dsh-client-ui-sidebar-files@0.2.2-rc.4 src/client/index.ts 一手先例：
+//    `ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({name, key}, Body))`）；
+//    inject 的 factory 在替身内同步执行（官方为服务就绪后回调——替身简化点，钉替身契约）。
+// 4. ctx.remote.mcpManager.watch(signal?)——官方生成面
+//    （@deepseek-ai/dsh-mcp-manager@0.2.2-rc.4 lib/typert.remote-client.d.ts 一手来源）：
+//    `watch(signal?) => RemoteStreamHandle<McpManagedServerView[], never>`；RemoteStreamHandle
+//    extends AsyncIterable（@deepseek-ai/dsh-typert-protocol lib/types/types.d.ts 一手来源），
+//    dispose() 取消逻辑流、break 出 for await 同效。替身流支持 push 续推与 end（官方常驻流
+//    直至 abort/终止——替身在测试驱动下逐批续推，仍非真常驻流，钉替身契约）。
+// 5. ctx.remote.settings.describe()——官方生成面
+//    （@deepseek-ai/dsh-api-settings-controller@0.2.2-rc.4 lib/typert.remote-client.d.ts 一手
+//    来源）：`describe() => Promise<RemoteResult<SettingsDescribeValue>>`；视图 value 恒经
+//    redactSecrets（dsh-settings types.d.ts 一手来源）。替身按给定清单构 ns='mcp' 视图。
+// 6. react 运行时替身——useState/useEffect/useCallback/createElement 的最小驱动模型：
+//    hook 槽位按调用序编号（官方 hook 顺序语义）、setter 入队微任务重渲、effect 在渲染后收集、
+//    卸载跑 cleanup；依赖数组比较不镜像（每次渲染收集 effect——替身简化点，钉替身契约）。
+//    元素树为普通对象（type/props/children），断言打在其上。
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import vm from 'node:vm';
+import type { TestContext } from 'node:test';
+import ts from 'typescript';
+
+const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const PLUGIN_ROOT = path.join(PACKAGE_ROOT, 'agents', 'dsh', 'plugins', 'dsh-mcp');
+const CLIENT_SOURCE = path.join(PLUGIN_ROOT, 'client', 'index.ts');
+const PLUGIN_NAME = '@hankchen/dsh-mcp';
+const TAB_ID = PLUGIN_NAME;
+const TAB_KIND = 'mcp-servers';
+
+// ---- 客户端模块物化（官方 lazy-CJS factory 形态的镜像执行）----
+
+/** client/index.ts 的 CJS 转译体（与 prepack compileClientBundle 同编译形态：CommonJS + ES2023）。 */
+function transpileClientBody(): string {
+  const source = fs.readFileSync(CLIENT_SOURCE, 'utf8');
+  const result = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2023,
+      module: ts.ModuleKind.CommonJS,
+      // esModuleInterop 缺省关：与 prepack 客户端面编译选项集一致，import 成员直取属性访问
+    },
+  });
+  return result.outputText;
+}
+
+/** 官方 factory shell 的逐字形态（prepack compileClientBundle 同款；id = 包名）。 */
+function wrapInFactoryShell(body: string): string {
+  return `window.__ModuleLoader__.load({id:${JSON.stringify(PLUGIN_NAME)},factory:require=>{` +
+    `var module={exports:{}};var exports=module.exports;` +
+    `${body}` +
+    `return module.exports}});\n`;
+}
+
+interface CapturedRegistration {
+  id: unknown;
+  factory: (require: (specifier: string) => unknown) => unknown;
+}
+
+/**
+ * 以官方物化协议执行客户端模块：脚本注册 factory（window.__ModuleLoader__ queue facade，
+ * dsh-client-modules lib/index.js bootInjections 逐字镜像，carrier 测试先例）→ factory(require)
+ * 物化出 module.exports。require 由调用方给（模块表替身）。
+ */
+function materializeClientModule(requireFn: (specifier: string) => unknown): {
+  apply: (ctx: unknown) => void;
+  inject: readonly string[];
+} {
+  const pendingQueue: CapturedRegistration[] = [];
+  const sandbox = {
+    window: {
+      __ModuleLoader__: {
+        load(registration: CapturedRegistration): void {
+          pendingQueue.push(registration);
+        },
+      },
+    },
+  };
+  vm.createContext(sandbox);
+  const script = new vm.Script(wrapInFactoryShell(transpileClientBody()), { filename: 'client.test.js' });
+  script.runInContext(sandbox);
+  assert.equal(pendingQueue.length, 1, '脚本执行应恰好注册一次 factory（官方 lazy-CJS 模型）');
+  assert.equal(pendingQueue[0].id, PLUGIN_NAME, '注册 id = 包名（官方 register() 按 id 归 owner）');
+  const exports = pendingQueue[0].factory(requireFn) as { apply: (ctx: unknown) => void; inject: readonly string[] };
+  assert.equal(typeof exports.apply, 'function', '物化导出须含 apply（客户端模块 = cordis 插件模块面）');
+  return exports;
+}
+
+// ---- react 运行时替身（最小驱动模型；契约见文件头第 6 条）----
+
+interface ElementNode {
+  readonly type: unknown;
+  readonly props: Record<string, unknown> | null;
+  readonly children: readonly ElementChild[];
+}
+
+type ElementChild = ElementNode | string | number | boolean | null;
+
+function isElement(node: unknown): node is ElementNode {
+  return typeof node === 'object' && node !== null && 'type' in node && 'props' in node;
+}
+
+interface RenderedView {
+  /** 最近一轮渲染的元素树根。 */
+  tree: ElementChild;
+  /** 本轮渲染收集到的 effect 尚未运行的原始函数（调试用；flush 由驱动器承担）。 */
+  effectCount: number;
+}
+
+/**
+ * react 替身驱动器：mount 一轮渲染（收集 effect → 运行 → 记 cleanup），setter 触发微任务重渲。
+ * hook 槽位按调用序编号（官方 hook 顺序语义）；依赖数组不比较（替身契约，文件头第 6 条）。
+ */
+function createReactDriver(component: (props: never) => unknown, props: never) {
+  let slots: unknown[] = [];
+  let hookCursor = 0;
+  let cleanups: Array<() => void> = [];
+  const collectedEffects: Array<() => void | (() => void)> = [];
+  let pending = false;
+  let latest: RenderedView = { tree: null, effectCount: 0 };
+  let renderListeners: Array<() => void> = [];
+
+  const reactStub = {
+    createElement(
+      type: unknown,
+      propsValue: Record<string, unknown> | null,
+      ...children: unknown[]
+    ): ElementNode {
+      return {
+        type,
+        props: propsValue ?? null,
+        children: (children as ElementChild[]).flat(9).filter(
+          (child) => child !== null && child !== undefined && child !== false && child !== true,
+        ),
+      };
+    },
+    useState<S>(initial: S | (() => S)): [S, (value: S | ((previous: S) => S)) => void] {
+      const index = hookCursor;
+      hookCursor += 1;
+      if (slots[index] === undefined) {
+        slots[index] = typeof initial === 'function' ? (initial as () => S)() : initial;
+      }
+      return [slots[index] as S, (value) => {
+        slots[index] = typeof value === 'function' ? (value as (previous: S) => S)(slots[index] as S) : value;
+        scheduleRender();
+      }];
+    },
+    useEffect(effect: () => void | (() => void)): void {
+      collectedEffects.push(effect);
+    },
+    useCallback<T>(callback: T): T {
+      return callback;
+    },
+  };
+
+  function scheduleRender(): void {
+    if (pending) return;
+    pending = true;
+    queueMicrotask(() => {
+      pending = false;
+      rerender();
+      for (const listener of renderListeners) listener();
+    });
+  }
+
+  function rerender(): void {
+    hookCursor = 0;
+    collectedEffects.length = 0;
+    latest = { tree: (component as (p: never) => unknown)(props) as ElementChild, effectCount: collectedEffects.length };
+    for (const effect of collectedEffects) {
+      const cleanup = effect();
+      if (typeof cleanup === 'function') cleanups.push(cleanup);
+    }
+  }
+
+  return {
+    react: reactStub,
+    /** 首轮渲染：重置槽位与 cleanup、渲染、flush effects。 */
+    mount(): RenderedView {
+      slots = [];
+      cleanups.forEach((cleanup) => cleanup());
+      cleanups = [];
+      rerender();
+      return latest;
+    },
+    /** 最近一轮渲染树。 */
+    view(): RenderedView {
+      return latest;
+    },
+    /** 等待已调度的微任务重渲与流批处理链排空（无 pending 且连续两轮空闲即稳定）。 */
+    async settle(): Promise<void> {
+      const tick = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+      for (let round = 0; round < 50; round += 1) {
+        const wasPending = pending;
+        await tick();
+        await tick();
+        if (!pending && !wasPending) return;
+      }
+    },
+    /** 卸载：按官方 Destructor 语义运行全部收集的 cleanup。 */
+    unmount(): void {
+      for (const cleanup of cleanups) cleanup();
+      cleanups = [];
+    },
+    /** 等待下一轮重渲完成（setter 调度后由流测试显式等待）。 */
+    onceRendered(): Promise<void> {
+      return new Promise((resolve) => {
+        renderListeners.push(resolve);
+        if (latest.effectCount >= 0 && renderListeners.length === 1 && !pending) resolve();
+      });
+    },
+  };
+}
+
+// ---- 客户端 ctx 替身（契约见文件头第 1–5 条）----
+
+/** 官方 McpManagedServerView 镜像（dsh-mcp-manager types.ts 一手来源；status 联合见测试样本）。 */
+interface ManagedServerViewStub {
+  name: string;
+  configured: boolean;
+  status: unknown;
+}
+
+/** 官方 SettingsNamespaceView 的消费子集镜像（dsh-settings types.d.ts 一手来源：value 经 redact）。 */
+interface SettingsNamespaceViewStub {
+  ns: string;
+  value: unknown;
+}
+
+/** 官方 RemoteResult 镜像（dsh-typert-protocol types.d.ts 一手来源）。 */
+type RemoteResultStub<T> = { ok: true; value: T } | { ok: false; error: { message?: string } };
+
+interface WatchStreamStub {
+  handle: AsyncIterable<ManagedServerViewStub[]> & { dispose(): void };
+  /** 推一批视图（官方「变更续推」语义的替身承载）。 */
+  push(batch: ManagedServerViewStub[]): void;
+  /** 终止流（此后 for await 结束）。 */
+  end(): void;
+  disposed: boolean;
+}
+
+interface ClientStubContext {
+  effect(fn: () => unknown, label?: string): unknown;
+  sidebarRightTabs: {
+    register(definition: Record<string, unknown>): () => void;
+    get(kind: string): Record<string, unknown> | undefined;
+  };
+  slots: {
+    inject(name: string, factory: () => unknown, label?: string): () => void;
+    register(options: Record<string, unknown>, component: unknown): unknown;
+  };
+  remote: {
+    mcpManager: {
+      watch(signal?: AbortSignal): WatchStreamStub['handle'];
+    };
+    settings: {
+      describe(): Promise<RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }>>;
+    };
+  };
+  captured: {
+    effects: Array<{ label?: string; heldDisposer: unknown }>;
+    tabDefinitions: Array<Record<string, unknown>>;
+    slotInjects: Array<{ name: string; label?: string }>;
+    slotRegisters: Array<{ options: Record<string, unknown>; component: unknown }>;
+    watchCalls: Array<{ signal: AbortSignal | undefined; stream: WatchStreamStub }>;
+    describeCalls: number;
+  };
+  /** 给 watch 流推下一批视图。 */
+  pushViews(batch: ManagedServerViewStub[]): void;
+  /** 设置 describe 的答复（缺省 = ns 'mcp' 视图按 serversWithTransport 构造）。 */
+  describeAnswer(answer: RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }> | undefined): void;
+  setViews(batch: ManagedServerViewStub[]): void;
+}
+
+function viewOf(name: string, status: unknown, configured = true): ManagedServerViewStub {
+  return { name, configured, status };
+}
+
+function createClientStubContext(
+  initialViews: ManagedServerViewStub[] = [],
+  serversWithTransport: Record<string, { transport: string }> = {},
+): ClientStubContext {
+  const captured = {
+    effects: [] as Array<{ label?: string; heldDisposer: unknown }>,
+    tabDefinitions: [] as Array<Record<string, unknown>>,
+    slotInjects: [] as Array<{ name: string; label?: string }>,
+    slotRegisters: [] as Array<{ options: Record<string, unknown>; component: unknown }>,
+    watchCalls: [] as Array<{ signal: AbortSignal | undefined; stream: WatchStreamStub }>,
+    describeCalls: 0,
+  };
+  let currentViews = initialViews.map((view) => structuredClone(view));
+  let describeAnswer: RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }> | undefined;
+  const ids = new Set<string>();
+  const kinds = new Map<string, Record<string, unknown>>();
+  const streams: WatchStreamStub[] = [];
+
+  const makeWatchStream = (signal: AbortSignal | undefined): WatchStreamStub => {
+    const queue: ManagedServerViewStub[][] = [];
+    let ended = false;
+    let disposed = false;
+    const listeners: Array<() => void> = [];
+    const wake = (): void => {
+      for (const listener of listeners.splice(0)) listener();
+    };
+    const stub: WatchStreamStub = {
+      disposed: false,
+      push(batch) {
+        queue.push(batch.map((view) => structuredClone(view)));
+        wake();
+      },
+      end() {
+        ended = true;
+        wake();
+      },
+      handle: {
+        async *[Symbol.asyncIterator]() {
+          // 官方 Host 流在 signal abort 时终止（替身镜像此语义：abort 即结束迭代）
+          const aborted = (): boolean => signal?.aborted === true;
+          if (aborted()) return;
+          const onAbort = (): void => wake();
+          signal?.addEventListener('abort', onAbort, { once: true });
+          try {
+            if (currentViews.length >= 0 && queue.length === 0 && !ended && !aborted()) {
+              yield currentViews.map((view) => structuredClone(view));
+            }
+            while (!ended && !aborted()) {
+              if (queue.length === 0) {
+                await new Promise<void>((resolve) => listeners.push(resolve));
+                continue;
+              }
+              yield queue.shift() as ManagedServerViewStub[];
+            }
+          } finally {
+            signal?.removeEventListener('abort', onAbort);
+          }
+        },
+        dispose() {
+          disposed = true;
+          stub.disposed = true;
+          ended = true;
+          wake();
+        },
+      },
+    };
+    streams.push(stub);
+    return stub;
+  };
+
+  return {
+    effect(fn, label) {
+      const heldDisposer = fn();
+      captured.effects.push({ label, heldDisposer });
+      return heldDisposer;
+    },
+    sidebarRightTabs: {
+      register(definition) {
+        const id = definition.id as string;
+        // 官方证伪形态镜像（tab-registry.ts register 一手来源）：重复 id 同步抛
+        if (ids.has(id)) throw new Error(`sidebarRight: tab type id "${id}" is already registered`);
+        ids.add(id);
+        const kind = definition.kind as string;
+        kinds.set(kind, definition);
+        captured.tabDefinitions.push(definition);
+        return () => {
+          ids.delete(id);
+          if (kinds.get(kind) === definition) kinds.delete(kind);
+        };
+      },
+      get(kind) {
+        return kinds.get(kind);
+      },
+    },
+    slots: {
+      inject(name, factory, label) {
+        captured.slotInjects.push({ name, label });
+        // 官方为服务就绪后回调；替身同步执行（替身契约，文件头第 3 条）。
+        // inject 返回 disposer（官方先例：sidebar-right src/client/index.ts
+        // `const disposeSeat = ctx.slots.inject(...)` 一手形态），释放其管理的注册。
+        factory();
+        let released = false;
+        return () => {
+          released = true;
+          void released;
+        };
+      },
+      register(options, component) {
+        captured.slotRegisters.push({ options, component });
+        return undefined;
+      },
+    },
+    remote: {
+      mcpManager: {
+        watch(signal) {
+          const stream = makeWatchStream(signal);
+          captured.watchCalls.push({ signal, stream });
+          return stream.handle;
+        },
+      },
+      settings: {
+        async describe() {
+          captured.describeCalls += 1;
+          if (describeAnswer !== undefined) return describeAnswer;
+          return {
+            ok: true,
+            value: {
+              namespaces: [
+                {
+                  ns: 'mcp',
+                  value: { servers: structuredClone(serversWithTransport) },
+                },
+              ],
+            },
+          };
+        },
+      },
+    },
+    captured,
+    pushViews(batch) {
+      const stream = streams.at(-1);
+      if (stream !== undefined) stream.push(batch);
+    },
+    describeAnswer(answer) {
+      describeAnswer = answer;
+    },
+    setViews(batch) {
+      currentViews = batch.map((view) => structuredClone(view));
+    },
+  };
+}
+
+// ---- 官方 SidebarRightTabInfo 替身（contract/slots.ts SidebarRightTabInfo 一手来源的消费子集）----
+
+function tabInfoOf(signal: AbortSignal): () => {
+  sidebar: { expanded: boolean; fullscreen: boolean };
+  panel: { id: string; isFloating: boolean };
+  tab: Record<string, unknown>;
+} {
+  return () => ({
+    sidebar: { expanded: true, fullscreen: false },
+    panel: { id: 'pane-1', isFloating: false },
+    tab: {
+      id: 'tab-7',
+      kind: TAB_KIND,
+      contentId: `sidebar://${TAB_KIND}`,
+      signal,
+      visible: true,
+      navigation: { address: `sidebar://${TAB_KIND}`, params: undefined, revision: 1 },
+      actions: {
+        bindCommands: () => () => undefined,
+        openResource: () => undefined,
+        openTab: () => undefined,
+        close: () => undefined,
+      },
+    },
+  });
+}
+
+// ---- 物化 + apply 组合替身（每个测试独立实例）----
+
+function moduleRequireOf(driver: { react: unknown }): (specifier: string) => unknown {
+  return (specifier) => {
+    if (specifier === 'react') return driver.react;
+    // 官方物化哨兵的镜像（carrier 测试先例）：非 react 的外部请求即构建泄漏
+    throw new Error(`客户端模块请求了未预期的外部模块 "${specifier}"（模块表替身只供 react）`);
+  };
+}
+
+async function loadClientModule(driver: { react: unknown }) {
+  return materializeClientModule(moduleRequireOf(driver));
+}
+
+// ---- AC1：Host 侧注册契约 ----
+
+test('apply 经 ctx.effect 注册 tab 类型：id = 包名、kind 自定义、title 与 guide 入口盒齐备（AC1）', async (t) => {
+  const driver = createReactDriver(() => null, null as never);
+  const plugin = await loadClientModule(driver);
+  const ctx = createClientStubContext();
+  plugin.apply(ctx);
+
+  assert.equal(ctx.captured.tabDefinitions.length, 1, 'ctx.sidebarRightTabs.register 恰收到一个定义');
+  const definition = ctx.captured.tabDefinitions[0];
+  assert.equal(definition.id, TAB_ID, '定义 id = 包名（官方「package name is the natural value」，sidebar-right.md 字段表）');
+  assert.equal(typeof definition.kind, 'string', 'kind 为字符串 discriminator（官方字段表）');
+  assert.ok(
+    !['guide', 'text', 'files', 'browser'].includes(definition.kind as string),
+    `kind 须为本面板自定义（不得撞官方 shipped kinds guide/text/files/browser），实际：${String(definition.kind)}`,
+  );
+  assert.equal(typeof definition.title, 'function', 'title 为函数（官方字段表：chip 文本，open 时捕获）');
+  const title = (definition.title as (address: string) => string)(`sidebar://${TAB_KIND}`);
+  assert.ok(title.length > 0, 'title 返回非空文案');
+  assert.equal(
+    definition.patterns,
+    undefined,
+    '页面型省略 patterns（官方字段表：a page type opened by kind omits them）',
+  );
+
+  assert.ok(Array.isArray(definition.guide), 'guide 为入口盒数组（官方字段表：guide entry boxes）');
+  const guide = definition.guide as Array<Record<string, unknown>>;
+  assert.equal(guide.length, 1, '本面板贡献恰一个 guide 入口盒');
+  const entry = guide[0];
+  assert.equal(typeof entry.id, 'string', 'guide entry 带 provider 内稳定 id（官方 SidebarRightGuideEntry）');
+  assert.equal(typeof entry.order, 'number', 'guide entry 带 order（官方：ascending position）');
+  assert.equal(typeof entry.title, 'function', 'guide entry title 为 thunk（官方：read fresh on every use）');
+  assert.ok((entry.title as () => string)().length > 0, 'guide entry title 非空');
+  assert.equal(typeof entry.description, 'function', 'guide entry description 为 thunk（官方可选，本面板提供一行说明）');
+  assert.ok((entry.description as () => string)().length > 0, 'guide entry description 非空');
+});
+
+test('注册 disposer 由 ctx.effect 持有：effect 收集的两个注册 disposer 可将注册面清空（AC1 disposer 生命周期）', async (t) => {
+  const driver = createReactDriver(() => null, null as never);
+  const plugin = await loadClientModule(driver);
+  const ctx = createClientStubContext();
+  plugin.apply(ctx);
+
+  assert.equal(ctx.captured.effects.length, 2, '两个注册各由一个 ctx.effect 持有（tab 类型 + keyed slot body）');
+  for (const held of ctx.captured.effects) {
+    assert.equal(typeof held.heldDisposer, 'function', `effect（label: ${String(held.label)}）持有函数 disposer（官方语义：实现随插件生命周期）`);
+    assert.ok(typeof held.label === 'string' && held.label.length > 0, 'effect 带 label（官方示例形态第二实参）');
+  }
+  assert.notEqual(
+    ctx.captured.effects[0].heldDisposer,
+    ctx.captured.effects[1].heldDisposer,
+    '两个注册各持各的 disposer（tab 类型与 keyed slot 是两个独立生命周期）',
+  );
+
+  // 逐个释放：官方 register 返回幂等 disposer——释放后注册面清空（get(kind) = undefined）
+  for (const held of ctx.captured.effects) {
+    (held.heldDisposer as () => void)();
+  }
+  assert.equal(ctx.sidebarRightTabs.get(TAB_KIND), undefined, 'disposer 释放后 tab 类型从注册面移除');
+  assert.equal(ctx.captured.tabDefinitions.length, 1, '释放不回改捕获记录（记录面只增）');
+});
+
+test('keyed slot body 经 ctx.slots.inject 按定义 id 注册，且同样由 ctx.effect 持有（AC1+AC2 注册面）', async (t) => {
+  const driver = createReactDriver(() => null, null as never);
+  const plugin = await loadClientModule(driver);
+  const ctx = createClientStubContext();
+  plugin.apply(ctx);
+
+  assert.equal(ctx.captured.slotInjects.length, 1, 'ctx.slots.inject 恰一次');
+  const slotInject = ctx.captured.slotInjects[0];
+  assert.equal(slotInject.name, 'sidebar.right.pane.tab', 'slot 名 = 官方 keyed seat（contract/slots.ts SlotMap）');
+
+  assert.equal(ctx.captured.slotRegisters.length, 1, 'inject 的 factory 恰注册一个 body');
+  const register = ctx.captured.slotRegisters[0];
+  assert.equal(register.options.name, 'sidebar.right.pane.tab', 'register options.name = slot 名');
+  assert.equal(register.options.key, TAB_ID, 'register options.key = 定义 id（官方：the key the body registers under）');
+  assert.equal(typeof register.component, 'function', 'body 为组件函数');
+});
+
+test('客户端模块 inject 面声明注册所需服务（AC1 inject 面扩展声明）', async (t) => {
+  const driver = createReactDriver(() => null, null as never);
+  const plugin = await loadClientModule(driver);
+  assert.ok(Array.isArray(plugin.inject), 'inject 为数组（官方 client-ui-* 先例：export const inject = [...]）');
+  for (const service of ['sidebarRightTabs', 'slots'] as const) {
+    assert.ok(plugin.inject.includes(service), `inject 面声明 ${service}（官方文档示例形态）`);
+  }
+  for (const service of ['remote', 'remote.mcpManager', 'remote.settings'] as const) {
+    assert.ok(plugin.inject.includes(service), `inject 面声明 ${service}（官方 files 先例的 remote 命名空间子键形态）`);
+  }
+});
