@@ -1399,3 +1399,87 @@ test('写路径单点：添加/编辑/启停/移除/重试/探测全动作序列
   assert.deepEqual(ctx.captured.bypassCalls, [], '旁路哨兵零触碰（settings.replace / openSettingsDocument 未被任何 UI 动作调用——写通道单点，无旁路写路径）');
   view.unmount();
 });
+
+// ---- 拒绝/失败支路覆盖（评审 20261118-2fb3 阻断条目修复：refuseWrites / restartAnswer
+// 两个替身旋钮接线——写面全部官方拒绝/失败分支的错误归宿：内联报错点名官方原因 +
+// 零后续写副作用；「若回归把官方拒写误当成功，这些测试红」）----
+
+test('官方拒写：添加提交被 {ok:false} 拒 → 内联报错点名官方原因、草稿保留、恰一次写尝试零后续写（写AC1 拒写支路）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('github')], { github: { transport: 'stdio' } });
+  ctx.refuseWrites('官方校验器拒绝该条目');
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'deployer');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'npx');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  assert.deepEqual(
+    ctx.captured.updateCalls.map((call) => call.namespace),
+    ['mcp'],
+    '恰一次写尝试（官方拒写不触发重试/换通道 fallback 写）',
+  );
+  assert.deepEqual(ctx.captured.mutateCalls, [], '拒写零后续写副作用（不经 mutate 兜底）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-note', 'note');
+  const noteText = textOf(note);
+  assert.match(noteText, /settings 写被拒/, '内联报错点名拒写通道（官方校验/revision 校验）');
+  assert.match(noteText, /官方校验器拒绝该条目/, '官方 error.message 原样带出（不吞不加工）');
+  const nameInput = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-field', 'name');
+  assert.equal(nameInput.props?.value, 'deployer', '拒写不清草稿——用户输入保留可修正重提');
+  view.unmount();
+});
+
+test('restart 拒绝：failed 行重试被 {ok:false} 拒 → 内联报错点名 Remote 原因、零 settings 写（写AC4 restart 拒绝支路）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' })]);
+  ctx.restartAnswer({ ok: false, error: { message: '远程端不可达' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'loader', 'retry');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.restartCalls, ['loader'], '重试恰一次 Remote 调用');
+  assert.deepEqual(ctx.captured.updateCalls, [], 'Remote 拒绝不落 settings 写');
+  assert.deepEqual(ctx.captured.mutateCalls, [], 'Remote 拒绝不落 settings 写');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-write-note', 'note');
+  const noteText = textOf(note);
+  assert.match(noteText, /重试被拒/, '内联报错点名 restart Remote 拒绝');
+  assert.match(noteText, /远程端不可达/, '官方 error.message 原样带出');
+  view.unmount();
+});
+
+test('describe 被拒：打开编辑与保存均内联「当前配置不可读」点名官方原因、零写调用（写AC2 describe 失败支路）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], { docs: { transport: 'stdio', command: 'npx' } });
+  ctx.describeAnswer({ ok: false, error: { message: '会话已过期' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  // 打开编辑：openEdit 的 describe 被拒支路 → 行内注记点名
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  const openNote = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-note', 'note');
+  const openText = textOf(openNote);
+  assert.match(openText, /当前配置不可读/, '打开编辑即内联报错（不吞 describe 拒绝）');
+  assert.match(openText, /会话已过期/, '官方 error.message 原样带出');
+
+  // 保存：editServer 的 describe 被拒支路（ops 基线读失败拒绝写）→ 同点名零写
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+  const saveNote = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-note', 'note');
+  assert.match(textOf(saveNote), /当前配置不可读/, '保存路径同一守卫（describe 读失败不产写）');
+  assert.deepEqual(ctx.captured.mutateCalls, [], 'describe 被拒零 mutate（diff 基线缺失即拒写）');
+  assert.deepEqual(ctx.captured.updateCalls, [], 'describe 被拒零 update');
+  view.unmount();
+});
