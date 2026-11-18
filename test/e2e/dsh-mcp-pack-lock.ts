@@ -1,8 +1,12 @@
 // dsh-mcp 插件 pack 跨进程锁（test/e2e 共享 helper，评审 20261118-137e 建议 #5 单点化；
-// 消费方 = dsh-mcp-e2e-integration.test.ts 与 dsh-mcp-web-e2e-integration.test.ts）：
+// 消费方 = dsh-mcp-e2e-integration.test.ts / dsh-mcp-web-e2e-integration.test.ts /
+// dsh-ts-loading.test.ts）：
 // prepack/postpack 钩子改写共享插件目录（index.js/client.js 进出仓库树），而 node --test
 // 默认并行跑测试文件——两文件并发 pack 同一插件目录时，一方 postpack 会删掉另一方刚编译
-// 的产物（竞态实证推演）。O_EXCL 锁文件互斥，锁内写持有者 token（pid+随机数）。
+// 的产物（竞态实证推演）；dsh-ts-loading 的 demo pack 段（票 20261118-4349 接入）虽在
+// 临时拷贝内打外卖 tarball、不触仓库树，但与 dsh-mcp 系并发 pnpm pack 时实测 staging
+// prepack exit 1（单跑恒绿，验收报告 20261118-e87d draft）——进程级竞争同锁互斥。
+// O_EXCL 锁文件互斥，锁内写持有者 token（pid+随机数）。
 //
 // 修复环（评审 20261118-137e 三阻断的落点，此前双份拷贝各自带缺陷）：
 // - 阻断 1：释放必须核验持有者身份再 unlink——读锁文件比对 token 一致才删；不一致（等待者
