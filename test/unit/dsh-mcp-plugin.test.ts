@@ -98,6 +98,7 @@ interface StubContext {
   commands: { register(definition: CapturedCommand): () => void };
   tools: { register(definition: CapturedTool): () => void };
   settings: {
+    describe(): Array<{ ns: string; value: unknown }>;
     update(namespace: string, patch: Record<string, unknown>): Promise<void>;
     mutate(namespace: string, ops: readonly SettingsOpStub[], expectedRevision?: number): Promise<void>;
   };
@@ -112,11 +113,22 @@ interface StubContext {
     settingsCalls: SettingsCall[];
   };
   setViews(views: McpManagedServerView[]): void;
+  /** 改写 describe 的 manager 配置域 ns（默认 'mcp' = headless 补位组合的插件行 id）。 */
+  setMcpSettingsNamespace(ns: string): void;
+  /** 整表改写 describe 视图（默认视图外的形态：零 servers 域 / 多 servers 域）。 */
+  setSettingsNamespaces(rows: Array<{ ns: string; value: unknown }>): void;
 }
 
 function createStubContext(initialViews: McpManagedServerView[] = []): StubContext {
   const views = [...initialViews];
   const captured = { commands: [] as CapturedCommand[], tools: [] as CapturedTool[], settingsCalls: [] as SettingsCall[] };
+  // describe 视图（票 20261118-08f8 替身契约）：默认 = headless 补位组合——manager 配置域
+  // ns 'mcp'（插件行 id）+ 一个官方形状的异域（官方 describe 列全部可配置条目，非 manager
+  // 域的 value 无 servers 对象）。manager Config 唯一 volatile 顶层字段 servers、default
+  // {} 恒解析在场（dsh-settings resolveConfig→Config validate 一手），故 manager 域 value
+  // 形态 = { servers: {} }；web 组合经 setMcpSettingsNamespace('mcp-manager') 改写。
+  let mcpSettingsNamespace = 'mcp';
+  let settingsNamespaceRows: Array<{ ns: string; value: unknown }> | undefined;
   return {
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
     commands: {
@@ -138,6 +150,13 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
       },
     },
     settings: {
+      describe() {
+        if (settingsNamespaceRows !== undefined) return settingsNamespaceRows;
+        return [
+          { ns: 'llm-deepseek', value: { model: 'deepseek-chat' } },
+          { ns: mcpSettingsNamespace, value: { servers: {} } },
+        ];
+      },
       async update(namespace, patch) {
         captured.settingsCalls.push({ kind: 'update', namespace, patch });
       },
@@ -161,6 +180,12 @@ function createStubContext(initialViews: McpManagedServerView[] = []): StubConte
     captured,
     setViews(next) {
       views.splice(0, views.length, ...next);
+    },
+    setMcpSettingsNamespace(ns) {
+      mcpSettingsNamespace = ns;
+    },
+    setSettingsNamespaces(rows) {
+      settingsNamespaceRows = rows;
     },
   };
 }
@@ -730,4 +755,65 @@ test('patch 契约：manager 行条件化（官方预挂 bundle 在场禁用插�
   assert.equal(pluginRow.name, '@hankchen/dsh-mcp', '插件行挂本包模块（round 1 契约不变）');
   assert.equal(pluginRow.disabled, undefined, '插件行不条件化——本插件自身功能全组合在场（只有 manager 补位行需条件）');
   assert.deepEqual(pluginRow.inject, ['mcpManager', 'commands', 'tools', 'settings'], '插件行 inject 四服务（round 1 契约不变）');
+});
+
+// ---- settings ns 口径（票 20261118-08f8）：写面 ns 与实际生效 manager 行 id 对齐 ----
+// 期望值独立来源 = rc.4 一手探针（工票 Progress 留痕）：官方 settings write 以
+// entry.options.id === ns 定位可配置条目（dsh-settings lib/index.js write 一手），未知 ns
+// 拒写 `No configurable plugin entry "<ns>"`（6df0 真跑复现的同款拒绝）；manager Config 唯一
+// volatile 顶层字段 servers（dsh-mcp-manager lib/index.js static Config 一手），rc.4 星座
+// 无第二服务暴露 servers 配置域。派生口径 = describe 视图中 value.servers 在场的唯一 ns；
+// 零在场或多于一个在场即拒绝写（fail loud 不猜测——spec settings 命名空间口径决策）。
+
+test('web 组合 ns 对齐：describe 报 mcp-manager 配置域时，add/remove/enable 写到 mcp-manager（票 08f8）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);
+  // web 组合事实：官方预挂行 id mcp-manager（dsh-web-app patch 一手），插件补位行被 disabled
+  ctx.setMcpSettingsNamespace('mcp-manager');
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const added = (await tool.execute({ action: 'add', serverName: 'docs', transport: 'stdio', command: 'npx' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(added.ok, true, 'web 组合 add 成功');
+  const removed = (await tool.execute({ action: 'remove', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(removed.ok, true, 'web 组合 remove 成功');
+  const enabled = (await tool.execute({ action: 'enable', serverName: 'searcher' }, { signal: new AbortController().signal })) as { ok: boolean };
+  assert.equal(enabled.ok, true, 'web 组合 enable 成功（写失败会以 ok:false 显式返回）');
+
+  assert.deepEqual(ctx.captured.settingsCalls.map((call) => call.namespace), ['mcp-manager', 'mcp-manager', 'mcp-manager'],
+    '三条写通道 ns 全部 = describe 派生的实际生效 manager 行 id mcp-manager（round 1 硬编码 mcp 在 web 组合被官方拒写——本测试即其回归面）');
+  const addCall = ctx.captured.settingsCalls[0];
+  assert.deepEqual(addCall.kind === 'update' ? addCall.patch : undefined,
+    { servers: { docs: { transport: 'stdio', command: 'npx' } } }, 'add patch 形态与 round 1 同源字面');
+});
+
+test('settings 零 servers 配置域（组合缺 manager 提供者）：add 拒绝并指明原因，零写调用（票 08f8 fail loud）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([]);
+  ctx.setSettingsNamespaces([{ ns: 'llm-deepseek', value: { model: 'deepseek-chat' } }]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'docs', transport: 'stdio', command: 'npx' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  assert.equal(result.ok, false, '无 manager 配置域即拒绝写');
+  assert.match(result.error, /servers/, '拒绝信息指明 servers 配置域未在场');
+  assert.match(result.error, /manager/i, '拒绝信息指明 manager 提供者缺位');
+  assert.deepEqual(ctx.captured.settingsCalls, [], 'fail loud 零写调用（不猜测 ns）');
+});
+
+test('settings 多个 servers 配置域（manager 提供者不唯一）：add 拒绝并列出竞争域，零写调用（票 08f8 fail loud）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext([]);
+  ctx.setSettingsNamespaces([
+    { ns: 'mcp', value: { servers: {} } },
+    { ns: 'mcp-manager', value: { servers: {} } },
+  ]);
+  plugin.apply(ctx);
+  const tool = ctx.captured.tools[0];
+
+  const result = (await tool.execute({ action: 'add', serverName: 'docs', transport: 'stdio', command: 'npx' }, { signal: new AbortController().signal })) as { ok: boolean; error: string };
+  assert.equal(result.ok, false, '多 manager 配置域即拒绝写（拒绝猜测写目标）');
+  assert.match(result.error, /mcp/, '拒绝信息列出竞争域 mcp');
+  assert.match(result.error, /mcp-manager/, '拒绝信息列出竞争域 mcp-manager');
+  assert.deepEqual(ctx.captured.settingsCalls, [], 'fail loud 零写调用');
 });
