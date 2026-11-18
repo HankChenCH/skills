@@ -123,3 +123,48 @@ test('client.js 无 .ts specifier 残留且无 ESM 语句（发布面 .js 形态
   assert.doesNotMatch(bundle, /\bexport\s+(?:const|let|var|function|default)\b/, 'bundle 不得含 ESM export 语句');
   assert.doesNotMatch(bundle, /from\s+['"][^'"]+\.ts['"]/, 'bundle 不得残留 .ts specifier（node_modules 下拒剥类型形态）');
 });
+
+test('prepack 清单换载三处直指发布态：main 与 exports["."] → index.js，files 含 client 产物', (t) => {
+  const probe = makeProbe(t);
+  assert.equal(runPrepack(probe).status, 0);
+  const manifest = JSON.parse(fs.readFileSync(path.join(probe, 'package.json'), 'utf8')) as {
+    main?: string;
+    exports?: Record<string, string>;
+    files?: string[];
+  };
+  assert.equal(manifest.main, 'index.js', 'main 须换载为编译产物（FR-7 证伪回退）');
+  assert.equal(
+    manifest.exports?.['.'],
+    './index.js',
+    'exports["."] 须与 main 同步换载（exports 存在即约束包根解析，"." 指 .ts 而包内只有 .js = 悬空导出）',
+  );
+  assert.equal(
+    manifest.exports?.['./client'],
+    './client.js',
+    'exports["./client"] 两态同指产物（客户端 bundle 无 .ts 形态，无换载问题）',
+  );
+  assert.deepEqual(
+    manifest.files,
+    ['index.js', 'cordis.patch.yml', 'client.js'],
+    'files 白名单 = 两面编译产物 + patch（不含 .ts 源码）',
+  );
+});
+
+test('postpack 还原仓库树：清单回源码态、两面编译产物清理（零构建常态）', (t) => {
+  const probe = makeProbe(t);
+  assert.equal(runPrepack(probe).status, 0);
+  const postpack = spawnSync(process.execPath, [path.join(probe, 'scripts', 'postpack.ts')], {
+    encoding: 'utf8',
+  });
+  assert.equal(postpack.status, 0, `postpack 应成功，实际退出码 ${postpack.status}：${postpack.stderr}`);
+  const manifest = JSON.parse(fs.readFileSync(path.join(probe, 'package.json'), 'utf8')) as {
+    main?: string;
+    exports?: Record<string, string>;
+    files?: string[];
+  };
+  assert.equal(manifest.main, 'index.ts', 'main 须还原源码态');
+  assert.equal(manifest.exports?.['.'], './index.ts', 'exports["."] 须还原源码态');
+  assert.deepEqual(manifest.files, ['index.ts', 'cordis.patch.yml', 'client'], 'files 须还原源码态（含 client 源码目录）');
+  assert.equal(fs.existsSync(path.join(probe, 'index.js')), false, 'Host 面编译产物须清理');
+  assert.equal(fs.existsSync(path.join(probe, 'client.js')), false, '客户端面编译产物须清理');
+});
