@@ -29,6 +29,9 @@ const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const SOURCE = path.join(pluginRoot, 'index.ts');
 const EMITTED = path.join(pluginRoot, 'index.js');
 const CLIENT_SOURCE = path.join(pluginRoot, 'client', 'index.ts');
+// react 类型镜像（client/react-runtime.d.ts ambient declare module 'react'）——客户端面
+// import 'react' 的解析前提（react 不入仓库依赖，运行时经模块表 seed 表解析；票 20261118-1812）
+const CLIENT_REACT_SHIM = path.join(pluginRoot, 'client', 'react-runtime.d.ts');
 const CLIENT_EMITTED = path.join(pluginRoot, 'client.js');
 const manifestPath = path.join(pluginRoot, 'package.json');
 const manifestBackupPath = `${manifestPath}.prepack-bak`;
@@ -46,7 +49,12 @@ function compileClientBundle(typescript: typeof import('typescript'), packageNam
     console.error(`✗ prepack：客户端面入口缺失（${path.relative(pluginRoot, CLIENT_SOURCE)}）——package.json 已声明 dsh.client 与 exports["./client"]，声明无产物装进 profile 官方启动即抛（composition error），中止打包`);
     process.exit(1);
   }
-  const program = typescript.createProgram([CLIENT_SOURCE], {
+  if (!fs.existsSync(CLIENT_REACT_SHIM)) {
+    console.error(`✗ prepack：react 类型镜像缺失（${path.relative(pluginRoot, CLIENT_REACT_SHIM)}）——客户端面 import 'react' 无解析前提（react 不入仓库依赖，类型侧由该镜像声明），中止打包`);
+    process.exit(1);
+  }
+  // shim（.d.ts）只参与模块解析不产 emit 产物——单文件 emit 检查不受影响
+  const program = typescript.createProgram([CLIENT_SOURCE, CLIENT_REACT_SHIM], {
     target: typescript.ScriptTarget.ES2023,
     module: typescript.ModuleKind.CommonJS,
     moduleResolution: typescript.ModuleResolutionKind.Node10,

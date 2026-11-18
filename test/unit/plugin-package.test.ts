@@ -65,7 +65,10 @@ const PLUGINS: PluginFixture[] = [
     ],
     dsh: {
       bundle: { patch: './cordis.patch.yml' },
-      client: { platform: 'web', inject: [] },
+      client: {
+        platform: 'web',
+        inject: ['@deepseek-ai/dsh-api-remotes', '@deepseek-ai/dsh-client-ui-sidebar-right'],
+      },
     },
   },
 ];
@@ -178,11 +181,17 @@ for (const plugin of PLUGINS) {
 // 探针（票 Progress 留痕）：客户端载体两处齐备才进客户端路由表——package.json 声明 dsh.client
 // 与导出 exports["./client"]；产物路径约定 client.js（官方 combo 资源名硬编码 <包名>/client.js）。
 
-test('dsh-mcp 客户端声明齐备：dsh.client = {platform web, inject []}（官方 parseDshClient 校验形态）', async () => {
+test('dsh-mcp 客户端声明齐备：dsh.client = {platform web, inject 服务提供者包边}（官方 parseDshClient 校验形态）', async () => {
   const pkg = await readPackageJson('dsh-mcp');
   // 全文档等值钉住无多余键：官方 parseDshClient 只认 platform/inject/external/immediately，
-  // 平台非 web 的声明不进 web 插件表（官方 node 半区扫描 platform !== 'web' 即跳过）
-  assert.deepEqual(pkg.dsh?.client, { platform: 'web', inject: [] });
+  // 平台非 web 的声明不进 web 插件表（官方 node 半区扫描 platform !== 'web' 即跳过）。
+  // inject 边 = 客户端面板 apply 消费服务的提供者包（官方 files 先例形态）：
+  // api-remotes = remote/remote.mcpManager/remote.settings 命名空间，client-ui-sidebar-right =
+  // sidebarRightTabs 服务；slots 属平台层（官方 client-ui 先例均不列——bootstrap 相位必然在）。
+  assert.deepEqual(pkg.dsh?.client, {
+    platform: 'web',
+    inject: ['@deepseek-ai/dsh-api-remotes', '@deepseek-ai/dsh-client-ui-sidebar-right'],
+  });
 });
 
 test('dsh-mcp exports 两处齐备："." 指源码态模块 + "./client" 指 client 构建产物路径（官方 clientExportOf 形态）', async () => {

@@ -97,11 +97,21 @@ test('client.js 是合法 lazy-CJS factory：脚本执行恰好注册一次，id
   const registration = registrations[0];
   assert.equal(registration.id, PLUGIN_NAME, '注册 id 须为包名（官方 register() 按 id 归 owner，错名即错行）');
   assert.equal(typeof registration.factory, 'function', 'factory 须为函数（官方 create() 以 factory(require) 物化）');
-  // 物化契约：factory(require) → module.exports。官方 create() 给 bootstrap 传的 require 对
-  // 任何外部请求即抛——载体最小入口零依赖，require 被调用即构建泄漏（镜像官方形态的证伪哨兵）。
+  // 物化契约：factory(require) → module.exports。官方 create() 给 bootstrap 传的 require 按
+  // 模块表解析；本包客户端面自票 20261118-1812 起依赖 react（官方 client-ui bundle 一手先例
+  // require("react")，模块表 platform seed table 解析）——react 放行、react 之外任何请求
+  // 即抛（构建泄漏哨兵保留）。
   const materialized = (registration.factory as (require: (specifier: string) => unknown) => unknown)(
     (specifier) => {
-      throw new Error(`官方物化哨兵：载体入口不应请求外部模块 "${specifier}"`);
+      if (specifier === 'react') {
+        return {
+          createElement: () => null,
+          useCallback: (fn: unknown) => fn,
+          useEffect: () => undefined,
+          useState: (initial: unknown) => [initial, () => undefined],
+        };
+      }
+      throw new Error(`官方物化哨兵：非 react 的外部模块请求 "${specifier}"（构建泄漏）`);
     },
   );
   assert.ok(
