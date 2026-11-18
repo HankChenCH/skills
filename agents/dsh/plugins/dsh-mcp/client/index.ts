@@ -123,7 +123,11 @@ interface ClientContext {
     register(options: { name: string; key: string }, component: unknown): unknown;
   };
   remote: {
-    mcpManager: { watch(signal?: AbortSignal): RemoteStreamHandle<McpManagedServerView[]> };
+    mcpManager: {
+      watch(signal?: AbortSignal): RemoteStreamHandle<McpManagedServerView[]>;
+      restart(name: string): Promise<RemoteResult<unknown>>;
+      probe(name: string, signal?: AbortSignal): Promise<RemoteResult<unknown>>;
+    };
     settings: {
       describe(): Promise<RemoteResult<SettingsDescribeValue>>;
       update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResult<unknown>>;
@@ -163,6 +167,22 @@ interface SettingsWriteFace {
 /** 官方 SERVER_NAME_PATTERN（@deepseek-ai/dsh-mcp-client src/index.ts 一手来源，与 Host 面 index.ts 逐字同值）。 */
 const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]{1,32}$/;
 
+/**
+ * 官方 mcpManager Remote 重试面（@deepseek-ai/dsh-mcp-manager lib/typert.remote-client.d.ts
+ * 一手来源，探针留痕工票 Progress）：restart(name) => RemoteResult<void>；
+ * probe(name, signal?) => RemoteResult<McpProbeResult>（probe 不触碰 live instance，
+ * disabled 条目可 probe——官方失败态契约）。
+ */
+interface McpManagerRetryFace {
+  restart(name: string): Promise<RemoteResult<unknown>>;
+  probe(name: string, signal?: AbortSignal): Promise<RemoteResult<unknown>>;
+}
+
+/** 官方 McpProbeResult 消费子集（@deepseek-ai/dsh-mcp-client lib/types/types.d.ts 一手来源）。 */
+type McpProbeOutcome =
+  | { ok: true; toolNames: string[]; durationMs: number }
+  | { ok: false; stage: string; message: string; durationMs: number };
+
 /** 写操作反馈（面板内联呈现；拒绝 = 本地轻校验或官方拒写，官方写时校验仍是后盾——round 1 纪律）。 */
 type WriteFeedback = { ok: true; message: string } | { ok: false; error: string };
 
@@ -199,6 +219,8 @@ interface McpPanelWrites {
   editServer(name: string, draft: EditFormDraft): Promise<WriteFeedback>;
   setServerEnabled(name: string, enabled: boolean): Promise<WriteFeedback>;
   removeServer(name: string): Promise<WriteFeedback>;
+  retryServer(name: string): Promise<WriteFeedback>;
+  probeServer(name: string): Promise<WriteFeedback>;
 }
 
 /**
@@ -273,7 +295,7 @@ function editOps(name: string, current: Record<string, unknown>, draft: EditForm
  * 拒绝与官方拒写均显式内联不吞）。快照持有者由 apply 建立并随 watch 批刷新。
  */
 function createMcpPanelWrites(
-  channels: { settings: SettingsWriteFace },
+  channels: { settings: SettingsWriteFace; mcpManager: McpManagerRetryFace },
   snapshot: { views: readonly McpManagedServerView[] },
 ): McpPanelWrites {
   const writeRefused = (result: RemoteResult<unknown>): string =>
@@ -381,6 +403,45 @@ function createMcpPanelWrites(
         return { ok: true, message: `已提交移除 server "${name}"——官方 reconcile 即时生效（条目卸载并消失）` };
       } catch (error) {
         return { ok: false, error: `settings 写失败：${error instanceof Error ? error.message : String(error)}` };
+      }
+    },
+
+    // 重试面 = 官方 mcpManager Remote 直调（restart / probe），零 settings 写——失败态
+    // 契约：failed 条目重试走 restart；disabled 条目走 probe（probe 不触碰 live instance）。
+    // 结果投影官方 McpProbeResult 字面量（stage/message/toolNames/durationMs 原样带出）。
+    async retryServer(name) {
+      const existing = snapshot.views.find((view) => view.name === name);
+      if (existing === undefined) {
+        return { ok: false, error: `server "${name}"：无此条目——/mcp list 查看现存 server` };
+      }
+      try {
+        const answer = await channels.mcpManager.restart(name);
+        if (answer.ok === false) {
+          return { ok: false, error: `重试被拒（restart Remote）：${answer.error.message ?? '未知原因'}` };
+        }
+        return { ok: true, message: `已提交 server "${name}" 重试（restart）——连接状态以列表刷新为准` };
+      } catch (error) {
+        return { ok: false, error: `restart 调用失败：${error instanceof Error ? error.message : String(error)}` };
+      }
+    },
+
+    async probeServer(name) {
+      const existing = snapshot.views.find((view) => view.name === name);
+      if (existing === undefined) {
+        return { ok: false, error: `server "${name}"：无此条目——/mcp list 查看现存 server` };
+      }
+      try {
+        const answer = await channels.mcpManager.probe(name);
+        if (answer.ok === false) {
+          return { ok: false, error: `探测被拒（probe Remote）：${answer.error.message ?? '未知原因'}` };
+        }
+        const outcome = answer.value as McpProbeOutcome;
+        if (outcome.ok === true) {
+          return { ok: true, message: `探测成功：工具 ${String(outcome.toolNames.length)} 个（协商+列工具 ${String(outcome.durationMs)}ms；探测不触碰连接，条目保持原状）` };
+        }
+        return { ok: false, error: `探测失败（${outcome.stage}）：${outcome.message}（${String(outcome.durationMs)}ms）` };
+      } catch (error) {
+        return { ok: false, error: `probe 调用失败：${error instanceof Error ? error.message : String(error)}` };
       }
     },
   };
@@ -575,6 +636,12 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
     const removeRow = (name: string): void => {
       void io.writes.removeServer(name).then(setRowNote);
     };
+    const retryRow = (name: string): void => {
+      void io.writes.retryServer(name).then(setRowNote);
+    };
+    const probeRow = (name: string): void => {
+      void io.writes.probeServer(name).then(setRowNote);
+    };
 
     /** 行内编辑表单（显示值 = describe 快照；被触字段覆盖显示）。 */
     const renderEditForm = (name: string, transport: string): ReactNode => {
@@ -653,6 +720,13 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
           createElement('button', {
             'data-mcp-action': 'remove', 'data-mcp-action-server': view.name, onClick: () => removeRow(view.name),
           }, '移除'),
+          // 失败态契约（spec FR-4）：failed 条目重试 = restart；disabled 条目探测 = probe
+          view.status.state === 'failed' ? createElement('button', {
+            'data-mcp-action': 'retry', 'data-mcp-action-server': view.name, onClick: () => retryRow(view.name),
+          }, '重试') : null,
+          view.status.state === 'disabled' ? createElement('button', {
+            'data-mcp-action': 'probe', 'data-mcp-action-server': view.name, onClick: () => probeRow(view.name),
+          }, '探测') : null,
         ] : null,
         editingName === view.name && view.configured ? renderEditForm(view.name, transports.get(view.name) ?? '') : null))),
       rowNote === undefined ? null : createElement('p', { 'data-mcp-write-note': 'note' },
@@ -728,7 +802,7 @@ export function apply(ctx: ClientContext): void {
   const body = createMcpServersBody({
     watch: (signal) => ctx.remote.mcpManager.watch(signal),
     describe: () => ctx.remote.settings.describe(),
-    writes: createMcpPanelWrites({ settings: ctx.remote.settings }, snapshot),
+    writes: createMcpPanelWrites({ settings: ctx.remote.settings, mcpManager: ctx.remote.mcpManager }, snapshot),
     snapshot,
   });
   ctx.effect(() => ctx.sidebarRightTabs.register(mcpServersTabDefinition()), 'dsh-mcp: mcp-servers tab type');

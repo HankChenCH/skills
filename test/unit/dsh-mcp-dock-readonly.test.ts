@@ -1269,3 +1269,64 @@ test('非配置条目（configured=false，清理未完成）零写操作按钮�
   );
   view.unmount();
 });
+
+// ---- 写AC4：重试契约（failed → restart Remote；disabled → probe Remote，probe 不触碰
+// live instance——官方 remote 形态 @deepseek-ai/dsh-mcp-manager lib/typert.remote-client.d.ts
+// 一手来源，探针留痕工票 Progress；结果投影官方 McpProbeResult 字面量）----
+
+test('failed 行重试：mcpManager.restart(name) 恰一次且零 settings 写调用（写AC4）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' })]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'loader', 'retry');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.restartCalls, ['loader'], 'failed 重试 = 官方 restart Remote');
+  assert.deepEqual(ctx.captured.probeCalls, [], 'failed 行不走 probe（探测归 disabled 条目）');
+  assert.deepEqual(ctx.captured.updateCalls, [], '重试零 update');
+  assert.deepEqual(ctx.captured.mutateCalls, [], '重试零 mutate（重试是 Remote 调用非配置写）');
+  view.unmount();
+});
+
+test('disabled 行探测：mcpManager.probe(name) 恰一次且不触 restart，成功结果内联官方 McpProbeResult 字面量（写AC4）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('sleeper', { state: 'disabled' })]);
+  ctx.probeAnswer({ ok: true, value: { ok: true, toolNames: ['a', 'b'], durationMs: 12, closeConfirmed: true } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'sleeper', 'probe');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.probeCalls, ['sleeper'], 'disabled 探测 = 官方 probe Remote（不触碰 live instance）');
+  assert.deepEqual(ctx.captured.restartCalls, [], 'disabled 行不走 restart（无 live 实例可重启——官方语义 probe 承载）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-write-note', 'note');
+  assert.match(textOf(note), /探测成功/, '探测成功状态内联');
+  assert.match(textOf(note), /2 个/, '工具数投影官方 toolNames 字面量（2 个键）');
+  assert.match(textOf(note), /12/, '耗时投影官方 durationMs 字面量（12ms）');
+  view.unmount();
+});
+
+test('探测失败结果内联官方 stage 与诊断 message（写AC4 失败投影）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('sleeper', { state: 'disabled' })]);
+  ctx.probeAnswer({ ok: true, value: { ok: false, stage: 'connect', message: 'ECONNREFUSED', durationMs: 5, closeConfirmed: true } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'sleeper', 'probe');
+  await view.settle();
+
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-write-note', 'note');
+  assert.match(textOf(note), /connect/, '失败阶段投影官方 stage 字面量');
+  assert.match(textOf(note), /ECONNREFUSED/, '失败诊断投影官方 message 字面量');
+  view.unmount();
+});
