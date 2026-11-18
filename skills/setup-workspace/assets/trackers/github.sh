@@ -65,3 +65,25 @@ else
   printf '%s\t%s\t%s\n' "$rel" "$num" "$url" >> "$MAP"
   echo "github: 已投影 ${rel} → issue #${num}（${url}）"
 fi
+
+# 终态投影关闭（spec 0004 修订 2026-11-19，蓝图 v1.40）：产物 status 已终态 → 同步关闭投影 issue。
+# 终态集合与关闭理由对齐 GLOSSARY 状态机；rejected 以 not_planned 关闭（实现被否走 fix 票另开）。
+# 只读 frontmatter 不做状态推断；research 无 status 行不命中。关闭失败警告留痕不阻断（exit 0），
+# 已关再关的非零同款留痕（幂等无害）。关闭是生命周期终点表达，不是清扫回删。
+status="$(grep -m1 '^status:' "$file" | awk '{print $2}')"
+case "$status" in
+  done|fulfilled|passed|accepted|superseded|approved|reviewed|reconstructed)
+    if gh issue close "$num" -R "$TRACKER_REPO" --reason completed \
+      --comment "产物已终态收口（status: ${status}），投影随终态同步关闭；盘上产物为真相源。" >/dev/null 2>&1; then
+      echo "github: issue #${num} 随产物终态 ${status} 同步关闭"
+    else
+      echo "github: issue #${num} 终态关闭失败（gh issue close 非零，可能已关闭）——投影正文已更新，关闭留待下次" >&2
+    fi ;;
+  rejected)
+    if gh issue close "$num" -R "$TRACKER_REPO" --reason not_planned \
+      --comment "产物判定 rejected（实现被否，缺陷走 fix 票另开），投影同步关闭；盘上产物为真相源。" >/dev/null 2>&1; then
+      echo "github: issue #${num} 随产物 rejected 同步关闭（not_planned）"
+    else
+      echo "github: issue #${num} 终态关闭失败（gh issue close 非零，可能已关闭）——投影正文已更新，关闭留待下次" >&2
+    fi ;;
+esac

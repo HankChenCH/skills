@@ -60,6 +60,7 @@
 3. **评审投影不改门禁**：dev-review 的 approved 评审是本方法论的重门禁（pre-push 校验，依据 review 产物的 `tickets: []`）。平台侧的 approve / approval rules / 卡点只是投影展示，不改变盘上门禁语义；适配器失败时警告跳过（产物已在盘上）。
 4. **Codeup 坐标更复杂**：GitHub 用 `owner/repo`、GitLab 用 `group/project`，Codeup 需要 organizationId + projectId（+ 代码库 ID），且工作项与合并请求跨产品。TRACKER_REPO 的取值格式与 config 字段扩展是 Codeup 适配器的第一个设计决策。
 5. **版本漂移**：GitLab issue 已迁入 work items 框架（18.7 GA）即是一例。本文检索日期 2026-10-27；适配器维护时应以当时官方文档复核端点与字段（codeup 的 CreateWorkitemV2 / CreateWorkitemComment 两端点已于 2026-10-27 按此核验）。
+6. **终态关闭（spec 0004 修订 2026-11-19）**：publish 投影成功后读产物 frontmatter `status`，终态即同步关闭投影 issue——GitHub `gh issue close --reason completed|not_planned`（rejected 走 not_planned，其余终态 completed），GitLab `glab issue close`（平台无 close reason 概念），Codeup 工作项状态流转端点未核验、关闭暂不实现。关闭失败警告跳过不阻断；对已关 issue 重复 close 的非零按失败留痕。关闭是产物生命周期终点的表达，不是清扫回删——单向投影不回删的既有拍板不变。
 
 ## 来源清单（检索日期均为 2026-10-27）
 

@@ -67,3 +67,12 @@ setup 决策 1 已支持选择 GitHub/GitLab/云效 Codeup 作为产物出口，
 ## 备注
 
 来源：need 0002（2026-10-27，用户指令"按技能蓝图，实现 tracker 适配器"触发）；平台模型唯一参考 docs/research/0001 与 setup-workspace references/tracker-platforms.md；Codeup 两端点 2026-10-27 一手核验（help.aliyun.com CreateWorkitemV2 / CreateWorkitemComment 页），核验记录见 need 0002 拍板记录 D3/D4。蓝图 v1.12（2026-10-27）先行定稿适配器契约与 §5.4/§11.1/§14 措辞。映射文件丢失仅致重复对象的风险已知悉接受（单向投影、盘上真相源兜底）。
+
+## 修订（2026-11-19，投影终态关闭；蓝图 v1.40，[trivial] 小修通道）
+
+done 后语义扩展（背景：产物全部终态后平台 issue 长期保持 open，需人工批量补关——投影只建不关，生命周期终点缺表达）：
+
+- **实现决策追加**：`publish` 投影成功（创建或更新）后读产物 frontmatter `status`，处于终态即同步关闭该投影 issue。终态集合与关闭理由对齐 GLOSSARY 状态机：`done` / `fulfilled` / `passed` / `accepted` / `superseded` / `approved` / `reviewed` / `reconstructed` → GitHub `gh issue close --reason completed`；`rejected` → `--reason not_planned`（实现被否，缺陷走 fix 票另开，投影 issue 不标完成）。活跃态（draft / confirmed / ready / in-progress / implemented / blocked）只投影不关闭。产物无 `status` 行（research）→ 不命中，行为不变。
+- **各平台要点追加**：github 关闭带一条终态注记评论；gitlab 用 `glab issue close`（平台无 close reason 概念，不带评论）；codeup 维持非目标「不做工作项状态流转」——状态端点未核验，不实现关闭，评论投影照旧。
+- **契约不变量**：关闭失败与其他投影失败同款——stderr 明确原因、脚本 exit 0 不阻断；对已关闭 issue 重复 close 的非零按失败留痕，幂等无害。适配器只读 frontmatter 不做状态推断——状态由技能序列先落盘后 publish（dev-ship §4.2、dev-execute §8.5、dev-accept passed 收口链的既有顺序已满足）。投影仍单向不回删：关闭是生命周期终点表达，清扫不回删 issue 的既有拍板（need 0014）不变。
+- **验收场景追加（工单级，替身模式同测试决策）**：① 终态产物（status: done）publish → fake 日志含 `gh issue close` 调用且带 `--reason completed`；② 活跃态产物（status: ready）publish → 无 close 调用；③ fake close 非零 → exit 0，stderr 含关闭失败原因；④ research（无 status）publish → 无 close 调用。真实凭据路径（真平台可见 issue 随 done 关闭）留验收集成级场景人工执行。

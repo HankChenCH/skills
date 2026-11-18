@@ -65,3 +65,17 @@ else
   printf '%s\t%s\t%s\n' "$rel" "$num" "${url:-}" >> "$MAP"
   echo "gitlab: 已投影 ${rel} → issue #${num}${url:+（${url}）}"
 fi
+
+# 终态投影关闭（spec 0004 修订 2026-11-19，蓝图 v1.40）：产物 status 已终态 → 同步关闭投影 issue。
+# 终态集合对齐 GLOSSARY 状态机；GitLab 无 close reason 概念，rejected 与其余终态同款关闭。
+# 只读 frontmatter 不做状态推断；research 无 status 行不命中。关闭失败警告留痕不阻断（exit 0），
+# 已关再关的非零同款留痕（幂等无害）。关闭是生命周期终点表达，不是清扫回删。
+status="$(grep -m1 '^status:' "$file" | awk '{print $2}')"
+case "$status" in
+  done|fulfilled|passed|accepted|superseded|approved|reviewed|reconstructed|rejected)
+    if glab issue close "$num" -R "$TRACKER_REPO" >/dev/null 2>&1; then
+      echo "gitlab: issue #${num} 随产物终态 ${status} 同步关闭"
+    else
+      echo "gitlab: issue #${num} 终态关闭失败（glab issue close 非零，可能已关闭）——投影正文已更新，关闭留待下次" >&2
+    fi ;;
+esac
