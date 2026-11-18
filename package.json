@@ -1,6 +1,6 @@
 {
   "name": "@hankchen/infra",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "套件资产初始化 CLI：把本仓库的技能资产安装进目标 git 项目（.agents/skills/ + agent 目录软链 + .infra-lock.json 记账）",
   "type": "module",
   "bin": {
