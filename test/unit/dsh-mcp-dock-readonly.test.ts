@@ -309,6 +309,9 @@ interface ClientStubContext {
       /** 官方 remote 写面（dsh-api-settings-controller lib/typert.remote-client.d.ts 一手来源）。 */
       update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResultStub<unknown>>;
       mutate(namespace: string, ops: readonly unknown[]): Promise<RemoteResultStub<unknown>>;
+      /** 官方 settings remote 同命名空间其余写面（哨兵：被触即记账+抛——写AC5 旁路守卫）。 */
+      replace(namespace: string, section: Record<string, unknown>): Promise<RemoteResultStub<unknown>>;
+      openSettingsDocument(signal?: AbortSignal): Promise<RemoteResultStub<unknown>>;
     };
   };
   captured: {
@@ -323,6 +326,8 @@ interface ClientStubContext {
     mutateCalls: Array<{ namespace: string; ops: unknown[] }>;
     restartCalls: string[];
     probeCalls: string[];
+    /** 旁路哨兵：官方 settings remote 其余写面被触即记账（替身契约——面板写面只许走 update/mutate）。 */
+    bypassCalls: string[];
   };
   /** 给 watch 流推下一批视图。 */
   pushViews(batch: ManagedServerViewStub[]): void;
@@ -358,6 +363,7 @@ function createClientStubContext(
     mutateCalls: [] as Array<{ namespace: string; ops: unknown[] }>,
     restartCalls: [] as string[],
     probeCalls: [] as string[],
+    bypassCalls: [] as string[],
   };
   let currentViews = initialViews.map((view) => structuredClone(view));
   let describeAnswer: RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }> | undefined;
@@ -504,6 +510,18 @@ function createClientStubContext(
         async mutate(namespace, ops) {
           captured.mutateCalls.push({ namespace, ops: structuredClone([...ops]) });
           return writeAnswer;
+        },
+        // 官方 settings remote 其余写面哨兵（dsh-api-settings-controller
+        // lib/typert.remote-client.d.ts 一手形态：replace / openSettingsDocument 同在
+        // settings 命名空间）——面板写面只许走 update/mutate，被触即记账+抛出（round 1
+        // fiber.update 哨兵先例）
+        async replace() {
+          captured.bypassCalls.push('settings.replace');
+          throw new Error('旁路哨兵：settings.replace 被调用——官方链路外写通道被禁止');
+        },
+        async openSettingsDocument() {
+          captured.bypassCalls.push('settings.openSettingsDocument');
+          throw new Error('旁路哨兵：settings.openSettingsDocument 被调用');
         },
       },
     },
@@ -1328,5 +1346,68 @@ test('探测失败结果内联官方 stage 与诊断 message（写AC4 失败投�
   const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-write-note', 'note');
   assert.match(textOf(note), /connect/, '失败阶段投影官方 stage 字面量');
   assert.match(textOf(note), /ECONNREFUSED/, '失败诊断投影官方 message 字面量');
+  view.unmount();
+});
+
+// ---- 写AC5：写路径同源（UI 写操作与 round 1 双入口共调同一管理服务单点，无旁路写路径）。
+// 断言形态 = 全动作序列 + 通道计数 + 旁路哨兵（round 1「fiber.update 必炸哨兵」先例的
+// 客户端面移植：官方 settings remote 其余写面被触即记账）。守卫型测试：被禁行为本就未
+// 发生，红语义 = 旁路一旦引入即红（期望值字面来源 = round 1 dsh-mcp-plugin.test.ts 同形字面）。
+
+test('写路径单点：添加/编辑/启停/移除/重试/探测全动作序列各通道恰一次调用、字面与 round 1 同源、旁路哨兵零触碰（写AC5）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext(
+    [connectedView('docs'), viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' }), viewOf('sleeper', { state: 'disabled' })],
+    { docs: { transport: 'stdio', command: 'npx', env: { TOKEN: '${credential:TOKEN}' }, cwd: '/work' } },
+  );
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  // ① 添加：update('mcp', {servers:{…}})——round 1 工具/命令 add 同形字面
+  let tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'searcher');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'node');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  // ② 行内编辑 docs：mutate 只含被改路径——round 1 编辑语义同形
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  changeInput(view.view().tree as ElementNode, 'data-mcp-edit-field', 'cwd', '/deploy');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  // ③ 官方 reconcile 推送含新条目批 → 停用 searcher：{op:set, enabled}——round 1 同形
+  ctx.pushViews([connectedView('docs'), connectedView('searcher'),
+    viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' }), viewOf('sleeper', { state: 'disabled' })]);
+  await view.settle();
+  clickRowAction(view.view().tree as ElementNode, 'searcher', 'disable');
+  await view.settle();
+
+  // ④ 移除 searcher：{op:unset}——round 1 同形
+  clickRowAction(view.view().tree as ElementNode, 'searcher', 'remove');
+  await view.settle();
+
+  // ⑤⑥ 重试/探测：mcpManager Remote 直调
+  clickRowAction(view.view().tree as ElementNode, 'loader', 'retry');
+  await view.settle();
+  clickRowAction(view.view().tree as ElementNode, 'sleeper', 'probe');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [
+    { namespace: 'mcp', patch: { servers: { searcher: { transport: 'stdio', command: 'node' } } } },
+  ], 'UI 添加 = round 1 双入口同一写通道字面（ns=mcp、update 深合并形态）');
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/deploy' }] },
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: false }] },
+    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'searcher'] }] },
+  ], 'UI 编辑/启停/移除 = round 1 双入口同一 ops 字面（SettingsPathOp 形态逐条同源）');
+  assert.deepEqual(ctx.captured.restartCalls, ['loader'], '重试 = restart Remote 单次');
+  assert.deepEqual(ctx.captured.probeCalls, ['sleeper'], '探测 = probe Remote 单次');
+  assert.deepEqual(ctx.captured.bypassCalls, [], '旁路哨兵零触碰（settings.replace / openSettingsDocument 未被任何 UI 动作调用——写通道单点，无旁路写路径）');
   view.unmount();
 });
