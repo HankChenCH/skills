@@ -9,7 +9,7 @@
 
 - **色板基座**：`--dsw-static-neutral-bluish-{00…1000}` 蓝灰中性阶梯（1000 档）。语义值一律经 **alias 层**引用，不直接引 static 值。
 - **主题三态**：light / dark / system（`prefers-color-surface` 解析），由 `dsh-client-ui-theme` 经 ThemeSnapshot 分发；插件 UI 只消费 token 不自管主题状态。同一 alias 在两主题下映射不同 static 值（例：`--dsw-alias-bg-base` = light `bluish-00` / dark `bluish-950`；`--dsw-alias-brand-text` = light `bluish-1000` / dark `bluish-50`）。
-- **常用 alias 面**（官方组件实况）：背景 `--dsw-alias-bg-layer-{1,2,3}`、`bg-base`；边框 `--dsw-alias-border-{l1,l2,l3,l4}`；文字 `--dsw-alias-label-{primary,tertiary,on-color}`；状态 `--dsw-alias-state-error-primary`（语义色：正常用 brand/label 系、警示用 state 系，值随主题）；按钮 `--dsw-alias-button-{primary-fill,primary-hover,ghost-*,floating-*,tool-bar-*}`。
+- **常用 alias 面**（官方组件实况）：背景 `--dsw-alias-bg-layer-{1,2,3}`、`bg-base`；边框 `--dsw-alias-border-{l1,l2,l3,l4}`；文字 `--dsw-alias-label-{primary,primary-foreground,tertiary,on-color}`（primary-fill 底的文字配对 = `label-primary-foreground`——浅 bluish-00 白 / 深 bluish-1000 黑随主题翻转，rc.5 一手取证：官方组件 `background: primary-fill` + `color: foreground` 配对先例；`label-on-color` 恒白不随主题翻转，勿配翻转底）；状态 `--dsw-alias-state-error-primary`（语义色：正常用 brand/label 系、警示用 state 系，值随主题）；按钮 `--dsw-alias-button-{primary-fill,primary-hover,ghost-*,floating-*,tool-bar-*}`。
 - **规则**：新 UI 一律 `var(--dsw-alias-*)` 取色；需要新语义色时经 `ctx.theme` 注册 alias-token override（官方机制），不硬编码色值。
 
 ## 字体

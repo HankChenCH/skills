@@ -99,13 +99,13 @@ test('深色主题按钮文字配对与 pill 兜底（验收 63b1 rejected 回�
   );
   assert.doesNotMatch(
     product,
-    /label-on-color/,
-    '零 label-on-color 消费（恒白 bluish-00 不随主题翻转，深色下与翻转浅底 ≈1:1——63b1 硬伤根因，零残留即防回归）',
+    /color:var\(--dsw-alias-label-on-color\)/,
+    '零 label-on-color 消费（恒白 bluish-00 不随主题翻转，深色下与翻转浅底 ≈1:1——63b1 硬伤根因，零残留即防回归；断言锚定消费形态而非字面，注释性提及不算消费）',
   );
   assert.match(
     product,
-    /border-radius:var\(--dsw-radius-pill,999px\)/,
-    '徽章 pill 引用带直值兜底（宿主 rc.5 主题未分发 --dsw-radius-pill，无兜底解析为直角——63b1 瑕疵根因）',
+    /border-radius:var\(--dsw-radius-pill,\s*999px\)/,
+    '徽章 pill 引用带直值兜底（宿主 rc.5 主题未分发 --dsw-radius-pill，无兜底解析为直角——63b1 瑕疵根因；\\s* 容忍排版空格，钉兜底意图不钉字面）',
   );
 });
 
