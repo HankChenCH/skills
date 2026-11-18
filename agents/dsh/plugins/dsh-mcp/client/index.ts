@@ -650,8 +650,9 @@ function toolsLabelOf(status: McpManagedServerStatus): string {
 
 /**
  * 一线之外的补充投影：connecting/reconnecting 的进行时线索以次信息行带出；failed 与
- * waiting-credentials 的失败线索以 state-error 内联块带出（决策 3 不折叠）。投影文本 =
- * describeStatus 原文（文案零变更）；已连接/已停用/已关闭一线徽章已足，无补充行（空串）。
+ * waiting-credentials 的失败线索以 state-error 内联块带出（决策 3 不折叠）；disabled 带
+ * 出条目保留括注（round 1 文案零变更，评审 9dc0 Spec-#1）。投影文本 = describeStatus 原文；
+ * 已连接/已关闭一线徽章已足（已连接的「· 工具 N 个」由 tools 列承载），无补充行（空串）。
  */
 function statusDetailOf(status: McpManagedServerStatus): string {
   switch (status.state) {
@@ -659,6 +660,7 @@ function statusDetailOf(status: McpManagedServerStatus): string {
     case 'reconnecting':
     case 'failed':
     case 'waiting-credentials':
+    case 'disabled':
       return describeStatus(status);
     default:
       return '';
@@ -853,10 +855,10 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
     // 反馈即清；并发动作的中间态显示归最后触发者，落定态不受影响）
     const setEnabled = (name: string, enabled: boolean): void => {
       setPendingAction({ server: name, kind: 'toggle' });
+      // .finally 清理不依赖「写面恒返回 value 不 reject」的跨函数不变量（评审 9dc0 建议 1）
       void io.writes.setServerEnabled(name, enabled).then((note) => {
-        setPendingAction(undefined);
         setRowNote(note);
-      });
+      }).finally(() => setPendingAction(undefined));
     };
     const removeRow = (name: string): void => {
       void io.writes.removeServer(name).then(setRowNote);
@@ -864,16 +866,14 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
     const retryRow = (name: string): void => {
       setPendingAction({ server: name, kind: 'retry' });
       void io.writes.retryServer(name).then((note) => {
-        setPendingAction(undefined);
         setRowNote(note);
-      });
+      }).finally(() => setPendingAction(undefined));
     };
     const probeRow = (name: string): void => {
       setPendingAction({ server: name, kind: 'probe' });
       void io.writes.probeServer(name).then((note) => {
-        setPendingAction(undefined);
         setRowNote(note);
-      });
+      }).finally(() => setPendingAction(undefined));
     };
 
     /** 行内编辑表单（显示值 = describe 快照；被触字段覆盖显示）。 */

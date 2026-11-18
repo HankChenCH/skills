@@ -1,7 +1,8 @@
 // 客户端产物样式契约扫描器（spec 20261118-8a57 FR-7，票 20261118-eb6a；design 0004 述标
 // approved 实现校验点）：client 产物内零 `#[0-9a-f]{3,6}` 直值色、零 `font-family:` 写死——
 // 取色全走 var(--dsw-alias-*) token，字体族只许 var() 引用（继承宿主 text/code/terminal
-// 三路用户设置）。
+// 三路用户设置）。扫描面取契约的严格超集：hex 放宽到 3–8 位（覆盖 #RRGGBBAA alpha 直值，
+// 评审 9dc0 建议 2）。
 // 断言面 = 产出代码（spec 契约）：调用方传入 prepack 同形态编译产物（removeComments 剥注释）
 // ——token 快照演示注释天然不在断言面。两面消费：① prepack 编译后 fail loud（缺陷即中止
 // 打包，scripts/prepack.ts）；② 单测对产物全扫（test/unit/dsh-mcp-client-style-contract.test.ts）。
@@ -20,8 +21,8 @@ export interface StyleContractDefect {
 /** 缺陷 snippet 的上下文半径（字符）：足以定位，不淹没 stderr。 */
 const SNIPPET_CONTEXT = 40;
 
-/** hex 直值色：3–6 位十六进制（大小写都在契约面），后随非十六进制字符（不吃更长 token）。 */
-const HEX_COLOR_PATTERN = /#[0-9a-fA-F]{3,6}(?![0-9a-fA-F])/g;
+/** hex 直值色：3–8 位十六进制（大小写都在契约面；8 位覆盖 #RRGGBBAA alpha 形态——评审 9dc0 建议 2），后随非十六进制字符（不吃更长 token）。 */
+const HEX_COLOR_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
 
 /** font-family 声明：值取到声明终结（; 或 } 或文本尾）。 */
 const FONT_FAMILY_PATTERN = /font-family\s*:\s*([^;}]+)/g;
