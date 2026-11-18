@@ -503,6 +503,26 @@ function tabInfoOf(signal: AbortSignal): () => {
   });
 }
 
+// ---- Host 面最小替身（AC5 独立性断言：客户端包缺失时双入口照常；形态 = round 1
+// dsh-mcp-plugin.test.ts 替身的注册面子集——apply 期只触碰 commands/tools/logger）----
+
+const PLUGIN_HOST_URL = new URL('../../agents/dsh/plugins/dsh-mcp/index.ts', import.meta.url);
+
+function createHostStubContext(): {
+  logger: { info(): void; warn(): void; error(): void };
+  commands: { register(definition: unknown): () => void };
+  tools: { register(definition: unknown): () => void };
+  captured: { commands: unknown[]; tools: unknown[] };
+} {
+  const captured = { commands: [] as unknown[], tools: [] as unknown[] };
+  return {
+    logger: { info() {}, warn() {}, error() {} },
+    commands: { register(definition) { captured.commands.push(definition); return () => {}; } },
+    tools: { register(definition) { captured.tools.push(definition); return () => {}; } },
+    captured,
+  };
+}
+
 // ---- 测试 harness（物化 + apply + body 挂载；每个测试独立实例）----
 
 function moduleRequireOf(runtime: { react: unknown }): (specifier: string) => unknown {
@@ -765,4 +785,88 @@ test('transport 列降级：describe 被拒时行渲染 —（辅助列显式降
   const transportCells = collectNodes(tree, (node) => node.props?.['data-mcp-server-transport'] !== undefined);
   assert.equal(textOf(transportCells[0]), '—', 'describe 被拒 → transport 列显式降级为 —');
   view.unmount();
+});
+
+// ---- AC4：空态契约（引导文案无按钮无表单入口——spec FR-5 / 拍板 D4）----
+
+test('空态渲染引导文案：/mcp add 与对话式添加指引齐备（AC4）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  assert.equal(tree.props?.['data-mcp-servers'], 'empty', '空清单以 empty 形态渲染');
+  const text = textOf(tree);
+  assert.match(text, /\/mcp add/, '引导文案含 /mcp add 指引');
+  assert.match(text, /mcp_manage/, '引导文案含对话式（自然语言调 mcp_manage 工具）指引');
+  assert.ok(text.length > 20, '引导文案非空泛（有可执行的下一步）');
+  view.unmount();
+});
+
+test('空态无按钮无表单入口（AC4 拍板 D4：不放按钮）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  const interactive = collectNodes(tree, (node) =>
+    typeof node.type === 'string' && ['button', 'input', 'select', 'textarea', 'form', 'a'].includes(node.type));
+  assert.deepEqual(
+    interactive.map((node) => node.type),
+    [],
+    '空态树中不得出现任何交互元素（button/input/select/textarea/form/a）',
+  );
+  view.unmount();
+});
+
+// ---- AC5：未加载降级（客户端包缺失 → 注册面与 keyed slot 均不出现；Host 双入口不变）----
+
+test('bundle 只注册不物化则零注册（AC5：官方 lazy-CJS 模型——注册 ≠ 激活，客户端包缺失即 loader 不物化）', () => {
+  // 只执行 bundle 脚本（注册 factory），不物化（模拟旧版包/未装：boot graph 无本包行，
+  // 官方 loader 不会执行 factory）——替身 ctx 上零注册。
+  const runtime = createReactRuntime();
+  const pendingQueue: CapturedRegistration[] = [];
+  const sandbox = {
+    window: {
+      __ModuleLoader__: {
+        load(registration: CapturedRegistration): void {
+          pendingQueue.push(registration);
+        },
+      },
+    },
+  };
+  vm.createContext(sandbox);
+  new vm.Script(wrapInFactoryShell(transpileClientBody()), { filename: 'client.test.js' }).runInContext(sandbox);
+  assert.equal(pendingQueue.length, 1, '脚本执行注册 factory（combo 载入语义）');
+  // 不调 factory(require)——对应官方 loader 从未物化本模块
+  assert.equal(typeof pendingQueue[0].factory, 'function', 'factory 在队列中未被调用（lazy 语义）');
+});
+
+test('模块顶层零副作用：不物化即无任何注册可达面（AC5 声明缺失路径）', () => {
+  // 官方 node 半区扫描语义（7504 探针留痕：decl === undefined || platform !== 'web' 即跳过）
+  // 下客户端行不存在——模块唯一可达面 = apply；本断言钉「注册只发生在 apply 内」：
+  // 物化（factory 执行）但不 apply → 替身 ctx 不可达，注册面零产出。
+  const harness = createHarness();
+  const ctx = createClientStubContext();
+  // 不调 harness.apply(ctx)——模拟官方 loader 物化模块但宿主未激活该插件（客户端 fiber
+  // 未组合本包：dsh.client 声明缺失/旧版包场景的 fiber 组合面缺失）
+  assert.equal(ctx.captured.tabDefinitions.length, 0, '未 apply → 零 tab 类型注册');
+  assert.equal(ctx.captured.slotRegisters.length, 0, '未 apply → 零 keyed slot 注册');
+  assert.equal(ctx.captured.watchCalls.length, 0, '未 apply → 零 watch 订阅');
+  // Host 侧双入口独立性：客户端面全程缺席时，Host 模块照常注册 /mcp 命令与 mcp_manage 工具
+  return (async () => {
+    const hostPlugin = (await import(PLUGIN_HOST_URL.href)) as {
+      apply(ctx: never): void;
+    };
+    const hostCtx = createHostStubContext();
+    hostPlugin.apply(hostCtx as never);
+    assert.equal(hostCtx.captured.commands.length, 1, '客户端包缺失时 /mcp 命令照常注册');
+    assert.equal(hostCtx.captured.tools.length, 1, '客户端包缺失时 mcp_manage 工具照常注册');
+  })();
 });
