@@ -1,10 +1,11 @@
 ---
 id: 20261118-0de6
-status: approved
+status: done
 need: 20261118-11f8
 round: 1
 created: 2026-11-18
 approved: 2026-11-18
+done: 2026-11-18
 ---
 # dsh MCP 管理面右栏 Dock 页 + 插件包发布核销（round 1 全 FR）
 
@@ -65,7 +66,7 @@ round 1 = need 全 FR 一轮（分轮拍板 2026-11-18：全 FR 一轮；理由�
 - [FR-5 | 工单级] Given 空清单状态，When 渲染，Then 显示引导文案（含 `/mcp add` 与对话式添加指引）且无按钮无表单入口。
 - [FR-1 | 工单级] Given 客户端未加载（未发布版或旧版包），When 检视，Then Dock 页注册不发生（客户端包缺失时 Host 注册面与 keyed slot 均不出现），会话内双入口行为不变（need 异常流 C）。
 - [FR-6 | 工单级] When 检视发布对账，Then 包内 agents 清单 = 仓库清单、禁 node_modules、bundle 五查（四要素+客户端声明）通过；双包顺序文档一致。
-- [FR-8 | 集成级 | 承载票 NNNN] Given 临时 DSH_HOME + 兼容星座真跑组合（ADR ad91 显式钉版）+ 已发布插件包，When 真实 boot dsh web 形态，Then combo 路由分发本包 client bundle（`/plugins/??…` 含本包）、Remote 数据链路断言可用（watch 返回列表、settings 写经 UI 面路径成功落盘 cordis.patch.yml、restart/probe 可调）。
+- [FR-8 | 集成级 | 承载票 NNNN] Given 临时 DSH_HOME + 兼容星座真跑组合（ADR ad91 显式钉版）+ 已发布插件包，When 真实 boot dsh web 形态，Then combo 路由分发本包 client bundle（`/plugins/??…` 含本包）、Remote 数据链路断言可用（watch 返回列表、settings 写经 UI 面路径成功落盘 cordis.patch.yml、restart/probe 可调）。〔验收边界注记（20261118-0123 蒸馏）：发布前承载物 = 本地 pack tarball 经官方 plugin add（同一打包面，verify-pack 对账保障）；发布核销后由 registry 对账 test 闭合「已发布」口径。settings 写经 UI 面 = 客户端 api 调用形态，三参 `[ns, patch/ops, expectedRevision]` 必传位（gateway 数参校验层），revision 取写前 describe 同源读值（ADR 20261118-6037）。〕
 - [FR-4 | 集成级 | 承载票 NNNN] Given 集成环境同上，When UI 面路径添加一个连不上的 server，Then watch 流推送 failed 状态与原因线索、条目保留、restart 后状态可见，全程不要求重启（need 异常流 A 沿 round 1 集成语义）。
 - [FR-6 | 集成级 | 人工：npm publish 属单向门，发布动作在验收时点由维护者执行] Given 双包发布完成，When `npm view @hankchen/dsh-mcp version` 与 `npm view @hankchen/infra` 对账，Then registry 版本与仓库包清单一致、registry 发布版对账 test 通过（round 1 残余风险 1 核销）。
 - [FR-1 | 集成级 | 人工：浏览器渲染与点击交互需真浏览器观察（D6 拍板不引入浏览器自动化）] Given dsh web 会话，When 打开右栏 Dock 页走查列含状态/添加/行内编辑/启停/空态/失败内联全操作，Then 呈现与交互符合本 spec 契约且截图留痕（need FR-8 人工段）。

@@ -59,10 +59,19 @@ need 20261117-ea73 round 1 已完整闭环（验收 20261118-ef01 passed：插�
 
 ## 假设与风险
 
-- **A1（风险）客户端 bundle 构建复刻**：官方 `clientBundle` tsdown preset 在 `packages/client/tsdown.client.ts`，不随 npm 包分发，外部包需自行复刻构建格式（lazy-CJS factory）——ced7 Q3 成本判断的核心组成；构建格式细节未在本机实证过。不确定度：中。缓解：ced7 已给出机制文档位置；实现时以官方 ui-settings-plugin-inventory 等先例包为参照。
-- **A2（风险）`sidebarRightTabs` 契约细节**：ced7 确认右栏 tab 机制存在且契约文档随包可得（docs/subsystems/sidebar-right.md），但 SlotMap/owner props 具体形态、per-Session 限制的实际行为未真跑过。不确定度：低-中。缓解：一手文档在探针包内可复核。
-- **A3（假设）桌面端共享**：ced7 F3.1「桌面与 Web 共享同一客户端栈」——形态 B 预期桌面端同享；桌面安装 runtime 版本可能滞后于 npm 官方包。5 分钟查证成本高（需桌面端真跑），转假设交验收实测。
-- **A4（风险）官方版本漂移**：沿 round 1 A3 同款（兼容星座 latest 标签错位、manager peer 精确钉版 fail-loud 已在 2d72 处置）；UI 轮新增客户端包面，官方前端产物演进可能带来新漂移。不确定度：中。缓解：照 2d72 口径——npm view 核验星座如实钉版，只依赖公开契约。
+（验收 20261118-0123 passed 后蒸馏标注：验证结果 + 残余风险折回）
+
+- **A1（风险）客户端 bundle 构建复刻**：官方 `clientBundle` tsdown preset 在 `packages/client/tsdown.client.ts`，不随 npm 包分发，外部包需自行复刻构建格式（lazy-CJS factory）——ced7 Q3 成本判断的核心组成；构建格式细节未在本机实证过。不确定度：中。缓解：ced7 已给出机制文档位置；实现时以官方 ui-settings-plugin-inventory 等先例包为参照。**验证通过**（验收 20261118-0123：复刻形态官方先例逐形态对照 + 真 boot 官方 loader 实际物化本包——combo 路由 200 含注册面与写面工厂）。
+- **A2（风险）`sidebarRightTabs` 契约细节**：ced7 确认右栏 tab 机制存在且契约文档随包可得（docs/subsystems/sidebar-right.md），但 SlotMap/owner props 具体形态、per-Session 限制的实际行为未真跑过。不确定度：低-中。缓解：一手文档在探针包内可复核。**验证通过**（读面真机走查全过；写面 settings client api 形态断裂——三参签名——曾致首轮验收 rejected，已由 fix 20261118-1dc4 修复并真机全通道复验闭合，ADR 20261118-6037 立契）。
+- **A3（假设）桌面端共享**：ced7 F3.1「桌面与 Web 共享同一客户端栈」——形态 B 预期桌面端同享；桌面安装 runtime 版本可能滞后于 npm 官方包。5 分钟查证成本高（需桌面端真跑），转假设交验收实测。**本轮未触发**（验收材料全为 web 形态，桌面无实测留痕；桌面端专项适配为 spec 非目标 4，桌面使用需求出现时随下轮实测）。
+- **A4（风险）官方版本漂移**：沿 round 1 A3 同款（兼容星座 latest 标签错位、manager peer 精确钉版 fail-loud 已在 2d72 处置）；UI 轮新增客户端包面，官方前端产物演进可能带来新漂移。不确定度：中。缓解：照 2d72 口径——npm view 核验星座如实钉版，只依赖公开契约。**验证通过**（钉版纪律生效；漂移实际发生两处——web 组合 manager 行冲突/ns 错位与 client api 三参签名——均已按先改文档再改码处置：08f8 + 1dc4，ADR 20261118-6037 收录契约）。
+
+### 残余风险（验收 20261118-0123 折回，含下一轮建议）
+
+1. **FR-6 发布核销待维护者执行**：npm publish 双包单向门未执行（0.2.0 未发布，registry E404）；registry 发布版对账 test 已就绪（发布后同 test 自动断言 registry == 0.2.0 即闭合 FR-6，clearing 验收 20261118-ef01 残余风险 1 的最终清账）。执行时点归维护者。
+2. **Dock 页视觉打磨（用户显式需求，round 2 已拍板开轮）**：运行 20261118-0de6 合并确认时点用户拍板「先合并后开轮」——Dock 页样式布局美化（原生控件、无间距层级）作为下一轮范围，走 /dev-spec（round 2，spec 20261118-0de6 非目标 5 明示视觉细节归 design，本轮未承载）。
+3. **编辑面板关闭行为瑕疵**：保存/取消后面板不自动关闭（多次复现，不影响写操作功能，重开可继续编辑）——留 round 2 UI 打磨一并处置。
+4. **A3 桌面端无实测留痕**：桌面真跑需求出现时实测（本轮非目标）。
 
 ## 范围与非目标
 
