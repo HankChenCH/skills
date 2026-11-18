@@ -66,6 +66,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertPluginPreconditions } from '../../src/kernel/dsh-command.ts';
+import { withPackLock } from './dsh-mcp-pack-lock.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PLUGIN_DIR = path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-mcp');
@@ -231,42 +232,19 @@ function assertCommandOk(step: string, result: CommandResult) {
 
 // 本地 pack 插件 tarball（发布面 prepack 两面编译经 pnpm pack 生命周期钩子自动生效，
 // postpack 还原仓库树）；产物路径显式输出到临时目录，仓库树不留 tgz。
-// prepack/postpack 钩子改写共享插件目录（index.js/client.js 进出仓库树），而 node --test
-// 默认并行跑测试文件——本文件与 round 1 dsh-mcp-e2e-integration.test.ts 并发 pack 同一
-// 插件目录时，一方 postpack 会删掉另一方刚编译的产物（竞态实证推演）。跨进程互斥用
-// O_EXCL 锁文件：拿不到就轮询等；陈锁（>5 分钟，持有者崩溃形态）强收。round 1 同锁同法。
-const PACK_LOCK_FILE = path.join(os.tmpdir(), 'dsh-mcp-plugin-pack.lock');
-
-async function acquirePackLock(): Promise<number> {
-  const deadline = Date.now() + 5 * 60 * 1000;
-  for (;;) {
-    try {
-      return fs.openSync(PACK_LOCK_FILE, 'wx');
-    } catch {
-      if (Date.now() > deadline) {
-        fs.rmSync(PACK_LOCK_FILE, { force: true }); // 陈锁强收后重抢
-        continue;
-      }
-      await sleep(200);
-    }
-  }
-}
-
+// pack 互斥 = 共享 helper dsh-mcp-pack-lock.ts（评审 137e 建议 #5 单点化：锁身份核验/
+// 陈锁阈值/退避轮询三修复单点承载，round 1 同一 helper）。
 async function packPluginTarball(t: TestContext): Promise<string> {
   const destDir = makeTempDir(t, 'dsh-mcp-web-e2e-pack-');
   const tarball = path.join(destDir, `hankchen-dsh-mcp-${PKG_MANIFEST.version}.tgz`);
-  const lockFd = await acquirePackLock();
-  try {
+  await withPackLock(() => {
     const result = runCommand('pnpm', ['pack', '--pack-destination', destDir], { timeout: INSTALL_TIMEOUT_MS, cwd: PLUGIN_DIR });
     assertCommandOk('pnpm pack（插件发布面预编译）', result);
     assert.ok(fs.existsSync(tarball), `pack 产物应在目标目录：${tarball}（输出：${result.output.slice(-500)}）`);
     // 仓库树零构建纪律的兜底核对：pack 钩子结束后包目录不应残留编译产物（postpack 已还原）
     assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'index.js')), false, 'postpack 应已还原仓库树（包目录无 index.js 残留）');
     assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'client.js')), false, 'postpack 应已还原仓库树（包目录无 client.js 残留）');
-  } finally {
-    fs.closeSync(lockFd);
-    fs.rmSync(PACK_LOCK_FILE, { force: true });
-  }
+  });
   return tarball;
 }
 
@@ -618,15 +596,21 @@ function openMuxStream(port: number, cookie: string): Promise<MuxStream> {
 async function waitForWatchItem(
   stream: MuxStream,
   predicate: (views: Array<Record<string, unknown>>) => boolean,
-  options: { what: string; timeoutMs: number },
+  options: { timeoutMs: number; fromIndex?: number },
 ): Promise<{ matched: boolean; lastSeen: string }> {
   const deadline = Date.now() + options.timeoutMs;
-  let index = 0;
+  // 起始偏移（评审 137e 阻断 4）：restart 类「此后应发生」断言由调用方快照帧位传入，
+  // 只对快照后帧求值——从流头重扫会被 restart 前 stale 帧满足，断言空转失效。
+  let index = options.fromIndex ?? 0;
   let lastSeen = '（无 item 帧）';
   while (Date.now() < deadline) {
     while (index < stream.frames.length) {
       const frame = stream.frames[index];
       index += 1;
+      // error 帧提前 fail（评审 137e 建议 #8）：流级失败不可能再被 item 满足，带详情即返
+      if (frame.type === 'error') {
+        return { matched: false, lastSeen: `mux 流 error 帧：${JSON.stringify(frame.error)}` };
+      }
       if (frame.type !== 'item' || !Array.isArray(frame.value)) continue;
       const views = frame.value as Array<Record<string, unknown>>;
       lastSeen = JSON.stringify(views);
@@ -739,10 +723,15 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
   const watch = await openMuxStream(port, cookie);
   t.after(() => watch.close());
   watch.send({ type: 'open', streamId: 'e2e-watch', endpoint: 'mcpManager/watch', payload: { args: {} } });
-  const initial = await waitForWatchItem(watch, () => true, { what: 'watch 首个全量批次', timeoutMs: CONNECT_TIMEOUT_MS });
+  const initial = await waitForWatchItem(watch, () => true, { timeoutMs: CONNECT_TIMEOUT_MS });
   assert.ok(initial.matched, `watch 流订阅应推送全量列表批次（${CONNECT_TIMEOUT_MS / 1000}s 内无 item 帧）`);
   const initialViews = JSON.parse(initial.lastSeen) as Array<Record<string, unknown>>;
-  assert.ok(Array.isArray(initialViews), `watch 首批应为视图数组：${initial.lastSeen.slice(0, 300)}`);
+  // 首批内容契约（评审 137e 建议 #9 内容级替换永真断言）：每项具备官方 McpManagedServerView
+  // 的关键字段形（dsh-mcp-manager types 一手形状）
+  assert.ok(
+    initialViews.every((view) => typeof view['name'] === 'string' && 'configured' in view && view['status'] !== null && typeof view['status'] === 'object'),
+    `watch 首批应符合 McpManagedServerView 形：${initial.lastSeen.slice(0, 400)}`,
+  );
 
   // —— settings 写腿（同一模块通道）：describe 派生域真跑 update（08f8 后插件写面同一派生
   // 语义：唯一 servers 域；测试另钉字面 mcp-manager = 官方组合契约独立期望值）→ watch 推送
@@ -772,17 +761,20 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
   const connected = await waitForWatchItem(
     watch,
     (views) => statusOf(viewOf(views, SERVER_NAME))?.state === 'connected',
-    { what: `${SERVER_NAME} connected`, timeoutMs: CONNECT_TIMEOUT_MS },
+    { timeoutMs: CONNECT_TIMEOUT_MS },
   );
   assert.ok(connected.matched, `${SERVER_NAME} 应经官方 reconcile 连接成功（watch 推送）——末帧：${connected.lastSeen.slice(0, 500)}`);
 
   // —— restart/probe 腿（同一模块通道的 mcpManager Remote 面）——
   const restartResult = await rpcCall(port, cookie, 'mcpManager/restart', { name: SERVER_NAME });
   assert.ok(restartResult.ok, `mcpManager/restart(${SERVER_NAME}) 应可调且成功：${JSON.stringify(restartResult.error)}`);
+  // restart 前快照帧位（评审 137e 阻断 4）：重建断言只对快照后帧求值——restart 前已投递的
+  // connected 帧（写腿阶段）不得满足「restart 后重建」
+  const framesBeforeRestart = watch.frames.length;
   const rebuilt = await waitForWatchItem(
     watch,
     (views) => statusOf(viewOf(views, SERVER_NAME))?.state === 'connected',
-    { what: `${SERVER_NAME} restart 后重建连接`, timeoutMs: CONNECT_TIMEOUT_MS },
+    { timeoutMs: CONNECT_TIMEOUT_MS, fromIndex: framesBeforeRestart },
   );
   assert.ok(rebuilt.matched, `restart 后 ${SERVER_NAME} 应重建连接（watch 推送）——末帧：${rebuilt.lastSeen.slice(0, 500)}`);
   const probeResult = await rpcCall(port, cookie, 'mcpManager/probe', { name: SERVER_NAME });
@@ -822,7 +814,7 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
       const status = statusOf(viewOf(views, DEAD_NAME));
       return status?.state === 'failed' && status?.reason === 'gave-up';
     },
-    { what: `${DEAD_NAME} failed(gave-up)`, timeoutMs: GAVEUP_TIMEOUT_MS },
+    { timeoutMs: GAVEUP_TIMEOUT_MS },
   );
   assert.ok(failed.matched, `${DEAD_NAME} 应投 failed(gave-up)（官方重连预算耗尽）——末帧：${failed.lastSeen.slice(0, 600)}`);
   const failedViews = JSON.parse(failed.lastSeen) as Array<Record<string, unknown>>;
@@ -838,16 +830,19 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
   assert.ok(deadPersisted, `${DEAD_NAME} 条目应持久化到 profile cordis.patch.yml：\n${JSON.stringify(deadPersisted)}`);
   assert.equal(deadPersisted['url'], 'http://127.0.0.1:9/mcp', `${DEAD_NAME} 持久化条目应保留不可达 url 原样：${JSON.stringify(deadPersisted)}`);
 
-  // restart 后状态可见（同一 Remote 面可调，不重启宿主）：新预算 → connecting/reconnecting 周期重推
+  // restart 后状态可见（同一 Remote 面可调，不重启宿主）：新预算 → connecting/reconnecting
+  // 周期重推；同样 restart 前快照帧位——restart 前 failed(gave-up) 帧（含 connecting 历史）
+  // 不得满足「restart 后状态可见」（评审 137e 阻断 4 第二调用点）
   const deadRestart = await rpcCall(port, cookie, 'mcpManager/restart', { name: DEAD_NAME });
   assert.ok(deadRestart.ok, `mcpManager/restart(${DEAD_NAME}) 应可调：${JSON.stringify(deadRestart.error)}`);
+  const framesBeforeDeadRestart = watch.frames.length;
   const visible = await waitForWatchItem(
     watch,
     (views) => {
       const state = statusOf(viewOf(views, DEAD_NAME))?.state;
       return state === 'connecting' || state === 'reconnecting';
     },
-    { what: `${DEAD_NAME} restart 后新预算状态可见`, timeoutMs: RESTART_VISIBLE_TIMEOUT_MS },
+    { timeoutMs: RESTART_VISIBLE_TIMEOUT_MS, fromIndex: framesBeforeDeadRestart },
   );
   assert.ok(visible.matched, `restart 后 ${DEAD_NAME} 应以新预算重投连接周期（watch 推送可见）——末帧：${visible.lastSeen.slice(0, 500)}`);
 });

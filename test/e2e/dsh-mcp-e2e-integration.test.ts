@@ -50,6 +50,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertPluginPreconditions } from '../../src/kernel/dsh-command.ts';
+import { withPackLock } from './dsh-mcp-pack-lock.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PLUGIN_DIR = path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-mcp');
@@ -76,10 +77,6 @@ function makeTempDir(t: TestContext, prefix: string) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   return dir;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // 集成 PATH = node bin 目录 + 标准系统目录（先例 dsh-plugin-integration 同款）：npx/pnpm/env
@@ -223,41 +220,20 @@ function assertCommandOk(step: string, result: CommandResult) {
 
 // 本地 pack 插件 tarball（发布面 prepack 预编译经 pnpm pack 生命周期钩子自动生效，
 // postpack 还原仓库树）；产物路径显式输出到临时目录，仓库树不留 tgz。
-// prepack/postpack 钩子改写共享插件目录（index.js 进出仓库树），而 node --test 默认并行
-// 跑测试文件——本文件与 dsh-mcp-web-e2e-integration.test.ts（票 20261118-6df0）并发 pack
-// 同一插件目录时，一方 postpack 会删掉另一方刚编译的产物（竞态实证推演）。跨进程互斥用
-// O_EXCL 锁文件：拿不到就轮询等；陈锁（>5 分钟，持有者崩溃形态）强收。web 形态文件同锁同法。
-const PACK_LOCK_FILE = path.join(os.tmpdir(), 'dsh-mcp-plugin-pack.lock');
-
-async function acquirePackLock(): Promise<number> {
-  const deadline = Date.now() + 5 * 60 * 1000;
-  for (;;) {
-    try {
-      return fs.openSync(PACK_LOCK_FILE, 'wx');
-    } catch {
-      if (Date.now() > deadline) {
-        fs.rmSync(PACK_LOCK_FILE, { force: true }); // 陈锁强收后重抢
-        continue;
-      }
-      await sleep(200);
-    }
-  }
-}
-
+// pack 互斥 = 共享 helper dsh-mcp-pack-lock.ts（评审 137e 建议 #5 单点化：锁身份核验/
+// 陈锁阈值/退避轮询三修复单点承载，web 形态文件同一 helper）。
 async function packPluginTarball(t: TestContext): Promise<string> {
   const destDir = makeTempDir(t, 'dsh-mcp-e2e-pack-');
   const tarball = path.join(destDir, `hankchen-dsh-mcp-${PKG_MANIFEST.version}.tgz`);
-  const lockFd = await acquirePackLock();
-  try {
+  await withPackLock(() => {
     const result = runCommand('pnpm', ['pack', '--pack-destination', destDir], { timeout: INSTALL_TIMEOUT_MS, cwd: PLUGIN_DIR });
     assertCommandOk('pnpm pack（插件发布面预编译）', result);
     assert.ok(fs.existsSync(tarball), `pack 产物应在目标目录：${tarball}（输出：${result.output.slice(-500)}）`);
-    // 仓库树零构建纪律的兜底核对：pack 钩子结束后包目录不应残留编译产物（postpack 已还原）
+    // 仓库树零构建纪律的兜底核对：pack 钩子结束后包目录不应残留编译产物（postpack 已还原；
+    // 08f8 起发布面含客户端面 client.js，两产物同断言——评审 137e 建议 #6）
     assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'index.js')), false, 'postpack 应已还原仓库树（包目录无 index.js 残留）');
-  } finally {
-    fs.closeSync(lockFd);
-    fs.rmSync(PACK_LOCK_FILE, { force: true });
-  }
+    assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'client.js')), false, 'postpack 应已还原仓库树（包目录无 client.js 残留）');
+  });
   return tarball;
 }
 
