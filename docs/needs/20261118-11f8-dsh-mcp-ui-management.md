@@ -1,8 +1,9 @@
 ---
 id: 20261118-11f8
-status: confirmed
+status: fulfilled
 created: 2026-11-18
 confirmed: 2026-11-18
+fulfilled: 2026-11-18
 ---
 # dsh MCP 管理面图形界面（右栏 Dock 页）+ 插件包发布核销
 
@@ -68,7 +69,7 @@ need 20261117-ea73 round 1 已完整闭环（验收 20261118-ef01 passed：插�
 
 ### 残余风险（验收 20261118-0123 折回，含下一轮建议）
 
-1. **FR-6 发布核销待维护者执行**：npm publish 双包单向门未执行（0.2.0 未发布，registry E404）；registry 发布版对账 test 已就绪（发布后同 test 自动断言 registry == 0.2.0 即闭合 FR-6，clearing 验收 20261118-ef01 残余风险 1 的最终清账）。执行时点归维护者。
+1. **FR-6 发布核销：已核销（20261118 fulfilled 门，用户显式授权发布）**——双包顺序发布完成：`@hankchen/dsh-mcp@0.2.0`（首发，pack → verify-bundle 五查 → publish）+ `@hankchen/infra@0.2.2`（bump，verify:pack 三查 → publish，annotated tag v0.2.2）；registry 对账一致（dsh-mcp 0.2.0 / infra 0.2.2）+ registry 发布版对账 test 真跑通过（2 pass / 0 skip，skip 门解除）。round 1 验收 20261118-ef01 残余风险 1 **清账**。
 2. **Dock 页视觉打磨（用户显式需求，round 2 已拍板开轮）**：运行 20261118-0de6 合并确认时点用户拍板「先合并后开轮」——Dock 页样式布局美化（原生控件、无间距层级）作为下一轮范围，走 /dev-spec（round 2，spec 20261118-0de6 非目标 5 明示视觉细节归 design，本轮未承载）。
 3. **编辑面板关闭行为瑕疵**：保存/取消后面板不自动关闭（多次复现，不影响写操作功能，重开可继续编辑）——留 round 2 UI 打磨一并处置。
 4. **A3 桌面端无实测留痕**：桌面真跑需求出现时实测（本轮非目标）。
