@@ -642,3 +642,127 @@ test('body 激活即开 watch 流且订阅 signal = tab.signal，渲染树携带
   );
   view.unmount();
 });
+
+// ---- 渲染树断言辅助（先序遍历 + 子树文本聚合）----
+
+function collectNodes(root: ElementChild, predicate: (node: ElementNode) => boolean): ElementNode[] {
+  const found: ElementNode[] = [];
+  const walk = (node: ElementChild): void => {
+    if (!isElement(node)) return;
+    if (predicate(node)) found.push(node);
+    for (const child of node.children) walk(child);
+  };
+  walk(root);
+  return found;
+}
+
+function textOf(root: ElementChild): string {
+  if (!isElement(root)) return typeof root === 'string' ? root : '';
+  return root.children.map(textOf).join('');
+}
+
+// ---- AC3：列表与状态投影（watch 订阅渲染 + 失败/凭据内联 + transport 列）----
+
+test('列表投影：watch 首批视图渲染名称/transport/状态/工具数（AC3，官方状态字面量独立来源）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([
+    viewOf('github', { state: 'connected', toolCount: 3, connectedAt: 1 }),
+    viewOf('docs', { state: 'connecting', attempt: 2 }),
+  ], { github: { transport: 'stdio' }, docs: { transport: 'streamable-http' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  assert.equal(tree.props?.['data-mcp-servers'], 'list', '非空清单以 list 形态渲染');
+  const rows = collectNodes(tree, (node) => node.props?.['data-mcp-server'] !== undefined);
+  assert.deepEqual(
+    rows.map((row) => row.props?.['data-mcp-server']),
+    ['github', 'docs'],
+    '行按 watch 批序渲染，行键 = server 名',
+  );
+  assert.match(textOf(rows[0]), /github/, '行含名称');
+  assert.match(textOf(rows[0]), /stdio/, '行含 transport（settings.describe 的 ns=mcp 视图投影）');
+  assert.match(textOf(rows[0]), /已连接/, '行含状态投影');
+  assert.match(textOf(rows[0]), /工具 3 个/, '行含官方 toolCount 字段值（字面量 3 独立于实现）');
+  assert.match(textOf(rows[1]), /streamable-http/, 'docs 行 transport = streamable-http');
+  assert.match(textOf(rows[1]), /第 2 次尝试/, 'connecting 行含官方 attempt 字段值');
+  view.unmount();
+});
+
+test('watch 续推：push 第二批视图后渲染更新（AC3 订阅续推语义，官方常驻流替身承载）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+  assert.equal((view.view().tree as ElementNode).props?.['data-mcp-servers'], 'empty', '空清单先渲染空态');
+
+  ctx.pushViews([
+    viewOf('late', { state: 'connected', toolCount: 7, connectedAt: 2 }),
+  ]);
+  await view.settle();
+  const tree = view.view().tree as ElementNode;
+  assert.equal(tree.props?.['data-mcp-servers'], 'list', '续推后切换到 list 形态');
+  assert.match(textOf(tree), /late/, '续推行出现');
+  assert.match(textOf(tree), /工具 7 个/, '续推行状态为官方字面量 toolCount=7');
+  view.unmount();
+});
+
+test('failed 行内联原因线索：load.lastError 与 cleanup 结果原样带出（AC3+FR-4，官方状态字面量）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([
+    viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' }),
+    viewOf('dirty', { state: 'failed', reason: 'cleanup', result: { closeConfirmed: false, cleanupError: 'close timed out' } }),
+  ]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  const rows = collectNodes(tree, (node) => node.props?.['data-mcp-server'] !== undefined);
+  assert.match(textOf(rows[0]), /spawn ENOENT/, 'failed(load) 行内联官方 lastError 字面量');
+  assert.match(textOf(rows[0]), /失败/, 'failed 行含失败状态词');
+  assert.match(textOf(rows[1]), /close timed out/, 'failed(cleanup) 行内联官方 cleanupError 字面量');
+  assert.match(textOf(rows[1]), /closeConfirmed=false/, 'failed(cleanup) 行内联官方 closeConfirmed 结果');
+  view.unmount();
+});
+
+test('waiting-credentials 行内联凭据缺失线索（AC3+FR-4，官方 lastError 字面量）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([
+    viewOf('credless', { state: 'waiting-credentials', lastError: 'credential GITHUB_TOKEN 未配置' }),
+  ]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  assert.match(textOf(tree), /等待凭据/, 'waiting-credentials 行含状态投影');
+  assert.match(textOf(tree), /credential GITHUB_TOKEN 未配置/, '行内联官方 lastError 字面量');
+  view.unmount();
+});
+
+test('transport 列降级：describe 被拒时行渲染 —（辅助列显式降级，主列照常）（AC3）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([
+    viewOf('solo', { state: 'connected', toolCount: 1, connectedAt: 1 }),
+  ]);
+  ctx.describeAnswer({ ok: false, error: {} });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  assert.ok(ctx.captured.describeCalls >= 1, 'describe 被调用（transport 列数据源）');
+  assert.match(textOf(tree), /solo/, '主列（名称）照常');
+  assert.match(textOf(tree), /已连接/, '状态列照常');
+  const transportCells = collectNodes(tree, (node) => node.props?.['data-mcp-server-transport'] !== undefined);
+  assert.equal(textOf(transportCells[0]), '—', 'describe 被拒 → transport 列显式降级为 —');
+  view.unmount();
+});
