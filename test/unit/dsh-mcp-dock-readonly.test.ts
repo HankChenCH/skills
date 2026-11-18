@@ -122,8 +122,6 @@ function isElement(node: unknown): node is ElementNode {
 interface RenderedView {
   /** 最近一轮渲染的元素树根。 */
   tree: ElementChild;
-  /** 本轮渲染收集到的 effect 尚未运行的原始函数（调试用；flush 由驱动器承担）。 */
-  effectCount: number;
 }
 
 /**
@@ -141,9 +139,7 @@ function createReactRuntime() {
   let memoDeps: Array<readonly unknown[] | undefined> = [];
   const memoValues: Array<unknown> = [];
   let pending = false;
-  let latest: RenderedView = { tree: null, effectCount: 0 };
-  let renderListeners: Array<() => void> = [];
-  void latest.effectCount;
+  let latest: RenderedView = { tree: null };
 
   /** 官方依赖数组浅比较（Object.is 逐位）。 */
   const shallowEqual = (left: readonly unknown[], right: readonly unknown[]): boolean =>
@@ -209,7 +205,6 @@ function createReactRuntime() {
     queueMicrotask(() => {
       pending = false;
       renderBound?.();
-      for (const listener of renderListeners.splice(0)) listener();
     });
   }
 
@@ -219,7 +214,7 @@ function createReactRuntime() {
     bind(component: (p: never) => unknown, props: never) {
       const renderWith = (): RenderedView => {
         hookCursor = 0;
-        latest = { tree: component(props) as ElementChild, effectCount: 0 };
+        latest = { tree: component(props) as ElementChild };
         return latest;
       };
       return {
@@ -300,9 +295,18 @@ interface ClientStubContext {
   remote: {
     mcpManager: {
       watch(signal?: AbortSignal): WatchStreamStub['handle'];
+      /** 官方 remote 重试面（dsh-mcp-manager lib/typert.remote-client.d.ts 一手来源，探针留痕票 Progress）。 */
+      restart(name: string): Promise<RemoteResultStub<unknown>>;
+      probe(name: string, signal?: AbortSignal): Promise<RemoteResultStub<unknown>>;
     };
     settings: {
       describe(): Promise<RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }>>;
+      /** 官方 remote 写面（dsh-api-settings-controller lib/typert.remote-client.d.ts 一手来源）。 */
+      update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResultStub<unknown>>;
+      mutate(namespace: string, ops: readonly unknown[]): Promise<RemoteResultStub<unknown>>;
+      /** 官方 settings remote 同命名空间其余写面（哨兵：被触即记账+抛——写AC5 旁路守卫）。 */
+      replace(namespace: string, section: Record<string, unknown>): Promise<RemoteResultStub<unknown>>;
+      openSettingsDocument(signal?: AbortSignal): Promise<RemoteResultStub<unknown>>;
     };
   };
   captured: {
@@ -312,12 +316,24 @@ interface ClientStubContext {
     slotRegisters: Array<{ options: Record<string, unknown>; component: unknown }>;
     watchCalls: Array<{ signal: AbortSignal | undefined; stream: WatchStreamStub }>;
     describeCalls: number;
+    /** 写通道捕获：add = update 形态；编辑/启停/移除 = mutate ops 形态（round 1 同源字面）。 */
+    updateCalls: Array<{ namespace: string; patch: Record<string, unknown> }>;
+    mutateCalls: Array<{ namespace: string; ops: unknown[] }>;
+    restartCalls: string[];
+    probeCalls: string[];
+    /** 旁路哨兵：官方 settings remote 其余写面被触即记账（替身契约——面板写面只许走 update/mutate）。 */
+    bypassCalls: string[];
   };
   /** 给 watch 流推下一批视图。 */
   pushViews(batch: ManagedServerViewStub[]): void;
   /** 设置 describe 的答复（缺省 = ns 'mcp' 视图按 serversWithTransport 构造）。 */
   describeAnswer(answer: RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }> | undefined): void;
-  setViews(batch: ManagedServerViewStub[]): void;
+  /** 设置 update/mutate 的答复（缺省 ok；拒写形态 = {ok:false, error:{message}}）。 */
+  refuseWrites(message: string): void;
+  /** 设置 restart 的答复（缺省 ok）。 */
+  restartAnswer(answer: RemoteResultStub<unknown>): void;
+  /** 设置 probe 的答复（缺省 ok:true 空结果）。 */
+  probeAnswer(answer: RemoteResultStub<unknown>): void;
 }
 
 function viewOf(name: string, status: unknown, configured = true): ManagedServerViewStub {
@@ -326,7 +342,9 @@ function viewOf(name: string, status: unknown, configured = true): ManagedServer
 
 function createClientStubContext(
   initialViews: ManagedServerViewStub[] = [],
-  serversWithTransport: Record<string, { transport: string }> = {},
+  // ns 'mcp' 的 describe 读值条目（官方读值恒 redact——dsh-settings types.d.ts；本 ns 的
+  // Config schema 无 secret role 声明，模板串原样在场即非秘密引用形态，探针留痕票 Progress）
+  serversWithTransport: Record<string, unknown> = {},
 ): ClientStubContext {
   const captured = {
     effects: [] as Array<{ label?: string; heldDisposer: unknown }>,
@@ -335,9 +353,17 @@ function createClientStubContext(
     slotRegisters: [] as Array<{ options: Record<string, unknown>; component: unknown }>,
     watchCalls: [] as Array<{ signal: AbortSignal | undefined; stream: WatchStreamStub }>,
     describeCalls: 0,
+    updateCalls: [] as Array<{ namespace: string; patch: Record<string, unknown> }>,
+    mutateCalls: [] as Array<{ namespace: string; ops: unknown[] }>,
+    restartCalls: [] as string[],
+    probeCalls: [] as string[],
+    bypassCalls: [] as string[],
   };
   let currentViews = initialViews.map((view) => structuredClone(view));
   let describeAnswer: RemoteResultStub<{ namespaces: SettingsNamespaceViewStub[] }> | undefined;
+  let writeAnswer: RemoteResultStub<unknown> = { ok: true, value: {} };
+  let restartAnswer: RemoteResultStub<unknown> = { ok: true, value: undefined };
+  let probeAnswer: RemoteResultStub<unknown> | undefined;
   const ids = new Set<string>();
   const kinds = new Map<string, Record<string, unknown>>();
   const streams: WatchStreamStub[] = [];
@@ -368,7 +394,7 @@ function createClientStubContext(
           const onAbort = (): void => wake();
           signal?.addEventListener('abort', onAbort, { once: true });
           try {
-            if (currentViews.length >= 0 && queue.length === 0 && !ended && !aborted()) {
+            if (queue.length === 0 && !ended && !aborted()) {
               yield currentViews.map((view) => structuredClone(view));
             }
             while (!ended && !aborted()) {
@@ -423,13 +449,10 @@ function createClientStubContext(
         captured.slotInjects.push({ name, label });
         // 官方为服务就绪后回调；替身同步执行（替身契约，文件头第 3 条）。
         // inject 返回 disposer（官方先例：sidebar-right src/client/index.ts
-        // `const disposeSeat = ctx.slots.inject(...)` 一手形态），释放其管理的注册。
+        // `const disposeSeat = ctx.slots.inject(...)` 一手形态）；本替身注册面为
+        // 捕获记录（只增不删），disposer 仅承载「函数形态」契约。
         factory();
-        let released = false;
-        return () => {
-          released = true;
-          void released;
-        };
+        return () => {};
       },
       register(options, component) {
         captured.slotRegisters.push({ options, component });
@@ -442,6 +465,14 @@ function createClientStubContext(
           const stream = makeWatchStream(signal);
           captured.watchCalls.push({ signal, stream });
           return stream.handle;
+        },
+        async restart(name) {
+          captured.restartCalls.push(name);
+          return restartAnswer;
+        },
+        async probe(name) {
+          captured.probeCalls.push(name);
+          return probeAnswer ?? { ok: true, value: { ok: true, toolNames: [], durationMs: 0, closeConfirmed: true } };
         },
       },
       settings: {
@@ -460,6 +491,29 @@ function createClientStubContext(
             },
           };
         },
+        // 官方 remote 写面形态（dsh-api-settings-controller lib/typert.remote-client.d.ts）：
+        // 拒写经 {ok:false, error} 显式返回非抛出；捕获记录不落盘。捕获即结构克隆——
+        // vm 沙箱对象与宿主原型隔离，克隆让断言面统一为宿主原型（替身契约钉死点）
+        async update(namespace, patch) {
+          captured.updateCalls.push({ namespace, patch: structuredClone(patch) });
+          return writeAnswer;
+        },
+        async mutate(namespace, ops) {
+          captured.mutateCalls.push({ namespace, ops: structuredClone([...ops]) });
+          return writeAnswer;
+        },
+        // 官方 settings remote 其余写面哨兵（dsh-api-settings-controller
+        // lib/typert.remote-client.d.ts 一手形态：replace / openSettingsDocument 同在
+        // settings 命名空间）——面板写面只许走 update/mutate，被触即记账+抛出（round 1
+        // fiber.update 哨兵先例）
+        async replace() {
+          captured.bypassCalls.push('settings.replace');
+          throw new Error('旁路哨兵：settings.replace 被调用——官方链路外写通道被禁止');
+        },
+        async openSettingsDocument() {
+          captured.bypassCalls.push('settings.openSettingsDocument');
+          throw new Error('旁路哨兵：settings.openSettingsDocument 被调用');
+        },
       },
     },
     captured,
@@ -470,8 +524,14 @@ function createClientStubContext(
     describeAnswer(answer) {
       describeAnswer = answer;
     },
-    setViews(batch) {
-      currentViews = batch.map((view) => structuredClone(view));
+    refuseWrites(message) {
+      writeAnswer = { ok: false, error: { message } };
+    },
+    restartAnswer(answer) {
+      restartAnswer = answer;
+    },
+    probeAnswer(answer) {
+      probeAnswer = answer;
     },
   };
 }
@@ -869,4 +929,557 @@ test('模块顶层零副作用：不物化即无任何注册可达面（AC5 声�
     assert.equal(hostCtx.captured.commands.length, 1, '客户端包缺失时 /mcp 命令照常注册');
     assert.equal(hostCtx.captured.tools.length, 1, '客户端包缺失时 mcp_manage 工具照常注册');
   })();
+});
+
+// =====================================================================================
+// 写操作面（票 20261118-322a：spec FR-2/FR-3/FR-4 工单级契约）——在本文件替身 harness 上扩展：
+// 交互辅助（点击/改值直接调元素 props 处理器）+ 写通道捕获替身（上方 ctx 扩展）。
+// 期望值来源 = round 1 dsh-mcp-plugin.test.ts 同源字面（官方 settings update/mutate 形态）
+// + 官方 remote 一手探针（restart/probe 形态，票 Progress 留痕）。
+// =====================================================================================
+
+/** 按 data-* 属性值取节点（行内交互定位；找不到即断言失败——行为未实现红得其所）。 */
+function nodeWith(tree: ElementChild, attr: string, value: string): ElementNode {
+  const found = collectNodes(tree, (node) => node.props?.[attr] === value);
+  assert.ok(found.length > 0, `交互定位失败：${attr}=${value} 的元素不在渲染树中（行为缺失即红）`);
+  return found[0];
+}
+
+/** 模拟点击（props.onClick 直接调用——替身元素树即交互面）。 */
+function clickButton(tree: ElementChild, attr: string, value: string): void {
+  const node = nodeWith(tree, attr, value);
+  const handler = node.props?.onClick as (() => void) | undefined;
+  assert.equal(typeof handler, 'function', `${attr}=${value} 缺 onClick 处理器`);
+  assert.ok(handler);
+  handler();
+}
+
+/** 模拟输入（受控 onChange + {target:{value}} 事件字面量——react 受控输入惯例形态）。 */
+function changeInput(tree: ElementChild, attr: string, value: string, inputValue: string): void {
+  const node = nodeWith(tree, attr, value);
+  const handler = node.props?.onChange as ((event: { target: { value: string } }) => void) | undefined;
+  assert.equal(typeof handler, 'function', `${attr}=${value} 缺 onChange 处理器`);
+  assert.ok(handler);
+  handler({ target: { value: inputValue } });
+}
+
+/** 已连上条目的 watch 视图样本（官方 connected 字面量；非配置守卫另用 configured=false 变体）。 */
+function connectedView(name: string): ManagedServerViewStub {
+  return viewOf(name, { state: 'connected', toolCount: 2, connectedAt: 1 });
+}
+
+// ---- 写AC1：添加提交契约（stdio/远程两形态、update 形态、模板串透传、冲突与轻校验守卫）----
+
+test('添加表单 stdio 提交：settings.update("mcp", {servers:{…}}) 恰一次，条目只含非空字段且 ${credential:REF} 模板串原样透传（写AC1）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('github')], { github: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'deployer');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'npx');
+  changeInput(tree, 'data-mcp-add-field', 'args', '-y mcp-server');
+  changeInput(tree, 'data-mcp-add-field', 'env', 'GITHUB_TOKEN=${credential:GITHUB_TOKEN}');
+  changeInput(tree, 'data-mcp-add-field', 'cwd', '/work');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [
+    {
+      namespace: 'mcp',
+      patch: {
+        servers: {
+          deployer: {
+            transport: 'stdio',
+            command: 'npx',
+            args: ['-y', 'mcp-server'],
+            env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}' },
+            cwd: '/work',
+          },
+        },
+      },
+    },
+  ], '添加 = settings.update 深合并形态、命名空间 = 挂载行 entry id mcp（round 1 add 同源字面）；模板串原样透传不展开（展开归官方 mcp-client 运行时）');
+  assert.deepEqual(ctx.captured.mutateCalls, [], '添加不经 mutate（round 1 add = update 形态，写通道语义同源）');
+  view.unmount();
+});
+
+test('添加表单远程提交：url/headers 形态 update，headers 模板串透传（写AC1）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('github')], { github: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-transport', 'stdio', 'streamable-http');
+  await view.settle();
+  const switched = view.view().tree as ElementNode;
+  changeInput(switched, 'data-mcp-add-field', 'name', 'remote1');
+  changeInput(switched, 'data-mcp-add-field', 'url', 'https://mcp.example.com/mcp');
+  changeInput(switched, 'data-mcp-add-field', 'headers', 'Authorization=${credential:AUTH}');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [
+    {
+      namespace: 'mcp',
+      patch: {
+        servers: {
+          remote1: {
+            transport: 'streamable-http',
+            url: 'https://mcp.example.com/mcp',
+            headers: { Authorization: '${credential:AUTH}' },
+          },
+        },
+      },
+    },
+  ], '远程形态 = transport streamable-http + url/headers（round 1 add remote 同源字面）；headers 模板串原样透传');
+  view.unmount();
+});
+
+test('添加重名拒绝：零写调用且内联报错点名 server（写AC1 冲突守卫，round 1「名称已被既有条目占用」同语义）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('github')], { github: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'github');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'npx');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [], '重名提交不产生任何 settings 写调用（update 深合并会静默覆写——round 1 冲突守卫同语义）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-note', 'note');
+  assert.match(textOf(note), /github/, '内联报错点名冲突 server 名');
+  view.unmount();
+});
+
+test('添加非法名拒绝（官方命名规则 [A-Za-z0-9_-]{1,32}）：零写调用（写AC1 轻校验）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('github')], { github: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'bad name!');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'npx');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [], '非法名提交零写调用（官方 SERVER_NAME_PATTERN 镜像，官方写时校验仍是后盾）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-note', 'note');
+  assert.match(textOf(note), /命名规则/, '内联报错说明命名规则');
+  view.unmount();
+});
+
+test('stdio 缺 command 拒绝：零写调用（写AC1 必填守卫）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('github')], { github: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'empty');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [], '缺 command 零写调用（a stdio server requires "command"，官方校验镜像）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-note', 'note');
+  assert.match(textOf(note), /command/, '内联报错指明缺失字段');
+  view.unmount();
+});
+
+// ---- 写AC2：行内编辑契约（mutate ops 只含被改路径；凭据未重输不进 ops——官方 mutate
+// 「Apply field edits without restating redacted secrets」保留语义，dsh-settings lib/index.js
+// mutate docstring 一手出处）----
+
+/** 编辑态样本：stdio 条目含凭据模板 env 值（官方 describe 读值形态——mcp ns 无 secret role，模板串原样在场）。 */
+function editSampleServers(): Record<string, unknown> {
+  return {
+    docs: {
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', 'srv'],
+      env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}', LOG_KEY: 'info', OLD_KEY: 'x' },
+      cwd: '/work',
+    },
+  };
+}
+
+/** 按行操作定位并点击（data-mcp-action + data-mcp-action-server 双键定位——多行同名按钮）。 */
+function clickRowAction(tree: ElementChild, server: string, action: string): void {
+  const found = collectNodes(tree, (node) =>
+    node.props?.['data-mcp-action'] === action && node.props?.['data-mcp-action-server'] === server);
+  assert.ok(found.length > 0, `行操作定位失败：server=${server} action=${action} 不在渲染树中（行为缺失即红）`);
+  const handler = found[0].props?.onClick as (() => void) | undefined;
+  assert.ok(handler, `行操作 server=${server} action=${action} 缺 onClick 处理器`);
+  handler();
+}
+
+test('打开编辑：表单显示 describe 读值（凭据 env 以 K=V 每行一行投影），零改动保存零写调用并提示无变更（写AC2）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], editSampleServers());
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+
+  const envNode = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-field', 'env');
+  assert.equal(
+    envNode.props?.value,
+    'GITHUB_TOKEN=${credential:GITHUB_TOKEN}\nLOG_KEY=info\nOLD_KEY=x',
+    '编辑表单 env 显示 describe 读值（官方读值投影；凭据字段以模板串在场即脱敏形态）',
+  );
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [], '零改动不产生 update');
+  assert.deepEqual(ctx.captured.mutateCalls, [], '零改动不产生 mutate——未重输的凭据不重传（保留语义的不变量：无 touched 即无 op）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-note', 'note');
+  assert.match(textOf(note), /无变更/, '零改动保存提示无变更');
+  view.unmount();
+});
+
+test('编辑只改 cwd：mutate ops 恰一条 set 且路径 = servers.docs.cwd，凭据 env 路径不在 ops（写AC2 只含被改路径）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], editSampleServers());
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  changeInput(view.view().tree as ElementNode, 'data-mcp-edit-field', 'cwd', '/new');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/new' }] },
+  ], '编辑 = mutate(ns, ops[]) 且只含被改路径（round 1 官方 ops 形态）；凭据 env 未重输 → 零 env op（官方保留语义）');
+  assert.deepEqual(ctx.captured.updateCalls, [], '编辑不经 update（round 1 编辑 = mutate 形态）');
+  view.unmount();
+});
+
+test('编辑 env 触碰：改值/新增行产 per-key set、删行产 unset，保留行同值零 op（写AC2 字典 per-key ops）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], editSampleServers());
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  // 触碰 env 域：凭据行原样保留（未重输）、改 LOG_KEY 值、增 NEW_KEY、删 OLD_KEY 行
+  changeInput(view.view().tree as ElementNode, 'data-mcp-edit-field', 'env',
+    'GITHUB_TOKEN=${credential:GITHUB_TOKEN}\nLOG_KEY=debug\nNEW_KEY=v2\n');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    {
+      namespace: 'mcp',
+      ops: [
+        { op: 'set', path: ['servers', 'docs', 'env', 'LOG_KEY'], value: 'debug' },
+        { op: 'set', path: ['servers', 'docs', 'env', 'NEW_KEY'], value: 'v2' },
+        { op: 'unset', path: ['servers', 'docs', 'env', 'OLD_KEY'] },
+      ],
+    },
+  ], '字典域 per-key ops：被改键 set、新增键 set、被删键 unset；凭据行同值保留 → 零凭据 op（不重传）');
+  view.unmount();
+});
+
+// ---- 写AC3：启停/移除契约（官方 ops 形态 {op:'set', enabled} / {op:'unset'}；
+// 生效语义 = 官方 reconcile：禁用卸载保条目、移除消失——round 1 同源字面）----
+
+test('停用/启用：mutate [{op:"set", path:["servers",名,"enabled"], value:布尔}] 官方形态恰一次（写AC3）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], { docs: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'disable');
+  await view.settle();
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: false }] },
+  ], '停用 = 官方 set 只写 servers.<名>.enabled 持久意图字段（禁用卸载保条目语义的写形态）');
+
+  // 官方 reconcile 推送停用后状态 → 行操作切换为启用
+  ctx.pushViews([viewOf('docs', { state: 'disabled' })]);
+  await view.settle();
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'enable');
+  await view.settle();
+  assert.deepEqual(ctx.captured.mutateCalls[1], {
+    namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'enabled'], value: true }],
+  }, '启用 = 同形 set op，value: true');
+  assert.equal(ctx.captured.mutateCalls.length, 2, '两次启停恰两次 mutate（写通道单点）');
+  view.unmount();
+});
+
+test('移除：mutate [{op:"unset", path:["servers",名]}] 官方删键形态恰一次（写AC3；value:null 是写 null 非删键——round 1 钉死点）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], { docs: { transport: 'stdio' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'remove');
+  await view.settle();
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'docs'] }] },
+  ], '移除 = 官方 SettingsPathOp unset 删键（生效语义 = 官方 reconcile 卸载并消失）');
+  assert.deepEqual(ctx.captured.updateCalls, [], '移除不经 update');
+  view.unmount();
+});
+
+test('非配置条目（configured=false，清理未完成）零写操作按钮（写AC3 生效语义守卫）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('ghost', { state: 'closed', result: { closeConfirmed: true } }, false)]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  const actions = collectNodes(tree, (node) => node.props?.['data-mcp-action'] !== undefined);
+  assert.deepEqual(
+    actions.map((node) => node.props?.['data-mcp-action-server']),
+    [],
+    '清理未完成的条目不得出现任何写操作按钮（编辑/启停/移除——round 1 removeServer 同守卫语义）',
+  );
+  view.unmount();
+});
+
+// ---- 写AC4：重试契约（failed → restart Remote；disabled → probe Remote，probe 不触碰
+// live instance——官方 remote 形态 @deepseek-ai/dsh-mcp-manager lib/typert.remote-client.d.ts
+// 一手来源，探针留痕工票 Progress；结果投影官方 McpProbeResult 字面量）----
+
+test('failed 行重试：mcpManager.restart(name) 恰一次且零 settings 写调用（写AC4）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' })]);
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'loader', 'retry');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.restartCalls, ['loader'], 'failed 重试 = 官方 restart Remote');
+  assert.deepEqual(ctx.captured.probeCalls, [], 'failed 行不走 probe（探测归 disabled 条目）');
+  assert.deepEqual(ctx.captured.updateCalls, [], '重试零 update');
+  assert.deepEqual(ctx.captured.mutateCalls, [], '重试零 mutate（重试是 Remote 调用非配置写）');
+  view.unmount();
+});
+
+test('disabled 行探测：mcpManager.probe(name) 恰一次且不触 restart，成功结果内联官方 McpProbeResult 字面量（写AC4）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('sleeper', { state: 'disabled' })]);
+  ctx.probeAnswer({ ok: true, value: { ok: true, toolNames: ['a', 'b'], durationMs: 12, closeConfirmed: true } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'sleeper', 'probe');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.probeCalls, ['sleeper'], 'disabled 探测 = 官方 probe Remote（不触碰 live instance）');
+  assert.deepEqual(ctx.captured.restartCalls, [], 'disabled 行不走 restart（无 live 实例可重启——官方语义 probe 承载）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-write-note', 'note');
+  assert.match(textOf(note), /探测成功/, '探测成功状态内联');
+  assert.match(textOf(note), /2 个/, '工具数投影官方 toolNames 字面量（2 个键）');
+  assert.match(textOf(note), /12/, '耗时投影官方 durationMs 字面量（12ms）');
+  view.unmount();
+});
+
+test('探测失败结果内联官方 stage 与诊断 message（写AC4 失败投影）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('sleeper', { state: 'disabled' })]);
+  ctx.probeAnswer({ ok: true, value: { ok: false, stage: 'connect', message: 'ECONNREFUSED', durationMs: 5, closeConfirmed: true } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'sleeper', 'probe');
+  await view.settle();
+
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-write-note', 'note');
+  assert.match(textOf(note), /connect/, '失败阶段投影官方 stage 字面量');
+  assert.match(textOf(note), /ECONNREFUSED/, '失败诊断投影官方 message 字面量');
+  view.unmount();
+});
+
+// ---- 写AC5：写路径同源（UI 写操作与 round 1 双入口共调同一管理服务单点，无旁路写路径）。
+// 断言形态 = 全动作序列 + 通道计数 + 旁路哨兵（round 1「fiber.update 必炸哨兵」先例的
+// 客户端面移植：官方 settings remote 其余写面被触即记账）。守卫型测试：被禁行为本就未
+// 发生，红语义 = 旁路一旦引入即红（期望值字面来源 = round 1 dsh-mcp-plugin.test.ts 同形字面）。
+
+test('写路径单点：添加/编辑/启停/移除/重试/探测全动作序列各通道恰一次调用、字面与 round 1 同源、旁路哨兵零触碰（写AC5）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext(
+    [connectedView('docs'), viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' }), viewOf('sleeper', { state: 'disabled' })],
+    { docs: { transport: 'stdio', command: 'npx', env: { TOKEN: '${credential:TOKEN}' }, cwd: '/work' } },
+  );
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  // ① 添加：update('mcp', {servers:{…}})——round 1 工具/命令 add 同形字面
+  let tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'searcher');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'node');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  // ② 行内编辑 docs：mutate 只含被改路径——round 1 编辑语义同形
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  changeInput(view.view().tree as ElementNode, 'data-mcp-edit-field', 'cwd', '/deploy');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  // ③ 官方 reconcile 推送含新条目批 → 停用 searcher：{op:set, enabled}——round 1 同形
+  ctx.pushViews([connectedView('docs'), connectedView('searcher'),
+    viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' }), viewOf('sleeper', { state: 'disabled' })]);
+  await view.settle();
+  clickRowAction(view.view().tree as ElementNode, 'searcher', 'disable');
+  await view.settle();
+
+  // ④ 移除 searcher：{op:unset}——round 1 同形
+  clickRowAction(view.view().tree as ElementNode, 'searcher', 'remove');
+  await view.settle();
+
+  // ⑤⑥ 重试/探测：mcpManager Remote 直调
+  clickRowAction(view.view().tree as ElementNode, 'loader', 'retry');
+  await view.settle();
+  clickRowAction(view.view().tree as ElementNode, 'sleeper', 'probe');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [
+    { namespace: 'mcp', patch: { servers: { searcher: { transport: 'stdio', command: 'node' } } } },
+  ], 'UI 添加 = round 1 双入口同一写通道字面（ns=mcp、update 深合并形态）');
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/deploy' }] },
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'searcher', 'enabled'], value: false }] },
+    { namespace: 'mcp', ops: [{ op: 'unset', path: ['servers', 'searcher'] }] },
+  ], 'UI 编辑/启停/移除 = round 1 双入口同一 ops 字面（SettingsPathOp 形态逐条同源）');
+  assert.deepEqual(ctx.captured.restartCalls, ['loader'], '重试 = restart Remote 单次');
+  assert.deepEqual(ctx.captured.probeCalls, ['sleeper'], '探测 = probe Remote 单次');
+  assert.deepEqual(ctx.captured.bypassCalls, [], '旁路哨兵零触碰（settings.replace / openSettingsDocument 未被任何 UI 动作调用——写通道单点，无旁路写路径）');
+  view.unmount();
+});
+
+// ---- 拒绝/失败支路覆盖（评审 20261118-2fb3 阻断条目修复：refuseWrites / restartAnswer
+// 两个替身旋钮接线——写面全部官方拒绝/失败分支的错误归宿：内联报错点名官方原因 +
+// 零后续写副作用；「若回归把官方拒写误当成功，这些测试红」）----
+
+test('官方拒写：添加提交被 {ok:false} 拒 → 内联报错点名官方原因、草稿保留、恰一次写尝试零后续写（写AC1 拒写支路）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('github')], { github: { transport: 'stdio' } });
+  ctx.refuseWrites('官方校验器拒绝该条目');
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  const tree = view.view().tree as ElementNode;
+  changeInput(tree, 'data-mcp-add-field', 'name', 'deployer');
+  changeInput(tree, 'data-mcp-add-field', 'command', 'npx');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-add-submit', 'submit');
+  await view.settle();
+
+  assert.deepEqual(
+    ctx.captured.updateCalls.map((call) => call.namespace),
+    ['mcp'],
+    '恰一次写尝试（官方拒写不触发重试/换通道 fallback 写）',
+  );
+  assert.deepEqual(ctx.captured.mutateCalls, [], '拒写零后续写副作用（不经 mutate 兜底）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-note', 'note');
+  const noteText = textOf(note);
+  assert.match(noteText, /settings 写被拒/, '内联报错点名拒写通道（官方校验/revision 校验）');
+  assert.match(noteText, /官方校验器拒绝该条目/, '官方 error.message 原样带出（不吞不加工）');
+  const nameInput = nodeWith(view.view().tree as ElementNode, 'data-mcp-add-field', 'name');
+  assert.equal(nameInput.props?.value, 'deployer', '拒写不清草稿——用户输入保留可修正重提');
+  view.unmount();
+});
+
+test('restart 拒绝：failed 行重试被 {ok:false} 拒 → 内联报错点名 Remote 原因、零 settings 写（写AC4 restart 拒绝支路）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([viewOf('loader', { state: 'failed', reason: 'load', lastError: 'spawn ENOENT' })]);
+  ctx.restartAnswer({ ok: false, error: { message: '远程端不可达' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'loader', 'retry');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.restartCalls, ['loader'], '重试恰一次 Remote 调用');
+  assert.deepEqual(ctx.captured.updateCalls, [], 'Remote 拒绝不落 settings 写');
+  assert.deepEqual(ctx.captured.mutateCalls, [], 'Remote 拒绝不落 settings 写');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-write-note', 'note');
+  const noteText = textOf(note);
+  assert.match(noteText, /重试被拒/, '内联报错点名 restart Remote 拒绝');
+  assert.match(noteText, /远程端不可达/, '官方 error.message 原样带出');
+  view.unmount();
+});
+
+test('describe 被拒：打开编辑与保存均内联「当前配置不可读」点名官方原因、零写调用（写AC2 describe 失败支路）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], { docs: { transport: 'stdio', command: 'npx' } });
+  ctx.describeAnswer({ ok: false, error: { message: '会话已过期' } });
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  // 打开编辑：openEdit 的 describe 被拒支路 → 行内注记点名
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  const openNote = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-note', 'note');
+  const openText = textOf(openNote);
+  assert.match(openText, /当前配置不可读/, '打开编辑即内联报错（不吞 describe 拒绝）');
+  assert.match(openText, /会话已过期/, '官方 error.message 原样带出');
+
+  // 保存：editServer 的 describe 被拒支路（ops 基线读失败拒绝写）→ 同点名零写
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+  const saveNote = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-note', 'note');
+  assert.match(textOf(saveNote), /当前配置不可读/, '保存路径同一守卫（describe 读失败不产写）');
+  assert.deepEqual(ctx.captured.mutateCalls, [], 'describe 被拒零 mutate（diff 基线缺失即拒写）');
+  assert.deepEqual(ctx.captured.updateCalls, [], 'describe 被拒零 update');
+  view.unmount();
 });
