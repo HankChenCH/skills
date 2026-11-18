@@ -122,8 +122,6 @@ function isElement(node: unknown): node is ElementNode {
 interface RenderedView {
   /** 最近一轮渲染的元素树根。 */
   tree: ElementChild;
-  /** 本轮渲染收集到的 effect 尚未运行的原始函数（调试用；flush 由驱动器承担）。 */
-  effectCount: number;
 }
 
 /**
@@ -141,9 +139,7 @@ function createReactRuntime() {
   let memoDeps: Array<readonly unknown[] | undefined> = [];
   const memoValues: Array<unknown> = [];
   let pending = false;
-  let latest: RenderedView = { tree: null, effectCount: 0 };
-  let renderListeners: Array<() => void> = [];
-  void latest.effectCount;
+  let latest: RenderedView = { tree: null };
 
   /** 官方依赖数组浅比较（Object.is 逐位）。 */
   const shallowEqual = (left: readonly unknown[], right: readonly unknown[]): boolean =>
@@ -209,7 +205,6 @@ function createReactRuntime() {
     queueMicrotask(() => {
       pending = false;
       renderBound?.();
-      for (const listener of renderListeners.splice(0)) listener();
     });
   }
 
@@ -219,7 +214,7 @@ function createReactRuntime() {
     bind(component: (p: never) => unknown, props: never) {
       const renderWith = (): RenderedView => {
         hookCursor = 0;
-        latest = { tree: component(props) as ElementChild, effectCount: 0 };
+        latest = { tree: component(props) as ElementChild };
         return latest;
       };
       return {
@@ -339,7 +334,6 @@ interface ClientStubContext {
   restartAnswer(answer: RemoteResultStub<unknown>): void;
   /** 设置 probe 的答复（缺省 ok:true 空结果）。 */
   probeAnswer(answer: RemoteResultStub<unknown>): void;
-  setViews(batch: ManagedServerViewStub[]): void;
 }
 
 function viewOf(name: string, status: unknown, configured = true): ManagedServerViewStub {
@@ -400,7 +394,7 @@ function createClientStubContext(
           const onAbort = (): void => wake();
           signal?.addEventListener('abort', onAbort, { once: true });
           try {
-            if (currentViews.length >= 0 && queue.length === 0 && !ended && !aborted()) {
+            if (queue.length === 0 && !ended && !aborted()) {
               yield currentViews.map((view) => structuredClone(view));
             }
             while (!ended && !aborted()) {
@@ -455,13 +449,10 @@ function createClientStubContext(
         captured.slotInjects.push({ name, label });
         // 官方为服务就绪后回调；替身同步执行（替身契约，文件头第 3 条）。
         // inject 返回 disposer（官方先例：sidebar-right src/client/index.ts
-        // `const disposeSeat = ctx.slots.inject(...)` 一手形态），释放其管理的注册。
+        // `const disposeSeat = ctx.slots.inject(...)` 一手形态）；本替身注册面为
+        // 捕获记录（只增不删），disposer 仅承载「函数形态」契约。
         factory();
-        let released = false;
-        return () => {
-          released = true;
-          void released;
-        };
+        return () => {};
       },
       register(options, component) {
         captured.slotRegisters.push({ options, component });
@@ -541,9 +532,6 @@ function createClientStubContext(
     },
     probeAnswer(answer) {
       probeAnswer = answer;
-    },
-    setViews(batch) {
-      currentViews = batch.map((view) => structuredClone(view));
     },
   };
 }
