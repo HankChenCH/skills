@@ -53,6 +53,8 @@
 node scripts/verify-bundle.ts --tarball <插件包 tarball>   # main 指 .js、files 白名单两件、无 .ts 源码、四要素齐备
 ```
 
+**发布通道注记（2026-11-18，0.3.0/0.3.1 两版实证）**：`pnpm publish` 对 `@hankchen/dsh-mcp` 的 PUT 被 registry 以 404 `{"error":"Not found"}` 拒绝（账号/owner/registry 指向均核验正常：whoami hankchen、owner 同人、registry npmjs）；同 tarball 经 `npm publish <tgz> --access public` 成功——本仓插件包发布走 **npm CLI tarball 通道**（与根包 bin 门三步法同形态：`pnpm pack` → `verify-bundle --tarball` → `npm publish <tgz>`）。pnpm 侧 404 成因未深究（客户端 PUT 形态差异疑似），两道 git 门仍由 pnpm 前置把关时适用（干净树/分支门在 pnpm publish 路径上；npm publish 路径以提交前门禁与维护者纪律对齐）。
+
 **双包发布顺序 = 先插件包，后初始化器。** 初始化器的菜单条目与安装转发都以 registry 包名为准——先发初始化器、插件包未上 registry，使用者勾选即装失败。命令序列（RQ2 件 2；`--access public` 必带，scope 包默认 restricted）：
 
 ```bash
