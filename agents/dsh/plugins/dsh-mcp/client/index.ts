@@ -28,6 +28,7 @@
 //   （prepack 对多文件产物 fail loud）。
 // 测试：test/unit/dsh-mcp-dock-readonly.test.ts（vm 官方物化形态替身 + 客户端 ctx 替身）。
 import { createElement, useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 // ---- 官方形状（type-only 本地镜像；形状来源逐条标注）----
 
@@ -126,6 +127,7 @@ interface ClientContext {
     settings: {
       describe(): Promise<RemoteResult<SettingsDescribeValue>>;
       update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResult<unknown>>;
+      mutate(namespace: string, ops: readonly SettingsPathOp[]): Promise<RemoteResult<unknown>>;
     };
   };
 }
@@ -155,6 +157,7 @@ type SettingsPathOp =
 interface SettingsWriteFace {
   describe(): Promise<RemoteResult<SettingsDescribeValue>>;
   update(namespace: string, patch: Record<string, unknown>): Promise<RemoteResult<unknown>>;
+  mutate(namespace: string, ops: readonly SettingsPathOp[]): Promise<RemoteResult<unknown>>;
 }
 
 /** 官方 SERVER_NAME_PATTERN（@deepseek-ai/dsh-mcp-client src/index.ts 一手来源，与 Host 面 index.ts 逐字同值）。 */
@@ -175,9 +178,25 @@ interface AddFormDraft {
   headersText: string;
 }
 
+/**
+ * 行内编辑提交草稿 = touched 集合（仅被用户改过的字段在场；未触字段零 op——官方 mutate
+ * 「Apply field edits without restating redacted secrets」保留语义：未重输的凭据不重传，
+ * dsh-settings lib/index.js mutate docstring 一手出处）。transport 不在编辑面（换 transport
+ * = 移除重加，见工票 Progress 决策）。
+ */
+interface EditFormDraft {
+  command?: string;
+  argsText?: string;
+  cwd?: string;
+  url?: string;
+  envText?: string;
+  headersText?: string;
+}
+
 /** 面板写面（UI 唯一写通道：与 round 1 双入口共调同一官方 settings 写链路，无旁路写路径）。 */
 interface McpPanelWrites {
   addServer(draft: AddFormDraft): Promise<WriteFeedback>;
+  editServer(name: string, draft: EditFormDraft): Promise<WriteFeedback>;
 }
 
 /**
@@ -194,6 +213,55 @@ function parseDictText(text: string): Record<string, string> | string {
     dict[trimmed.slice(0, separator).trim()] = trimmed.slice(separator + 1).trim();
   }
   return dict;
+}
+
+/**
+ * 编辑保存的 ops 组装（写面单点）：touched 字段逐一 diff 官方 describe 读值，只对实际
+ * 变化的路径产 op——「mutate(ns, ops[]) 只含被改路径」。字典域（env/headers）per-key：
+ * 触碰域内逐行 diff（同值行零 op——凭据行原样保留即不重传）、缺失行 unset；值空白行 =
+ * 清除意图（键存在即 unset）。返回 string = 拒绝（必填字段被清空/字典行格式错）。
+ */
+function editOps(name: string, current: Record<string, unknown>, draft: EditFormDraft): SettingsPathOp[] | string {
+  const ops: SettingsPathOp[] = [];
+  const fieldPath = (field: string): string[] => ['servers', name, field];
+  if (draft.command !== undefined) {
+    const value = draft.command.trim();
+    if (value === '') return `server "${name}"：stdio 必填 "command"（不可清空）`;
+    ops.push({ op: 'set', path: fieldPath('command'), value });
+  }
+  if (draft.url !== undefined) {
+    const value = draft.url.trim();
+    if (value === '') return `server "${name}"：streamable-http 必填 "url"（不可清空）`;
+    ops.push({ op: 'set', path: fieldPath('url'), value });
+  }
+  if (draft.cwd !== undefined) {
+    const value = draft.cwd.trim();
+    ops.push(value === '' ? { op: 'unset', path: fieldPath('cwd') } : { op: 'set', path: fieldPath('cwd'), value });
+  }
+  if (draft.argsText !== undefined) {
+    const args = draft.argsText.trim().split(/\s+/).filter((token) => token.length > 0);
+    ops.push(args.length === 0 ? { op: 'unset', path: fieldPath('args') } : { op: 'set', path: fieldPath('args'), value: args });
+  }
+  for (const [field, text] of [['env', draft.envText], ['headers', draft.headersText]] as const) {
+    if (text === undefined) continue;
+    const touched = parseDictText(text);
+    if (typeof touched === 'string') return `server "${name}"：${touched}`;
+    const currentDict = (typeof current[field] === 'object' && current[field] !== null
+      ? current[field] : {}) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(touched)) {
+      const path = [...fieldPath(field), key];
+      if (value === '') {
+        if (key in currentDict) ops.push({ op: 'unset', path });
+        continue;
+      }
+      if (currentDict[key] !== value) ops.push({ op: 'set', path, value });
+    }
+    for (const key of Object.keys(currentDict)) {
+      if (key in touched) continue;
+      ops.push({ op: 'unset', path: [...fieldPath(field), key] });
+    }
+  }
+  return ops;
 }
 
 /**
@@ -245,6 +313,34 @@ function createMcpPanelWrites(
         const refused = writeRefused(await channels.settings.update('mcp', { servers: { [name]: entry } }));
         if (refused !== '') return { ok: false, error: refused };
         return { ok: true, message: `已提交 server "${name}"（${draft.transport}）——官方 reconcile 即时生效` };
+      } catch (error) {
+        return { ok: false, error: `settings 写失败：${error instanceof Error ? error.message : String(error)}` };
+      }
+    },
+
+    async editServer(name, draft) {
+      // ops 组装的 diff 基线 = 保存时点的官方 describe 读值（权威当前值，非组件打开表单
+      // 时的快照——期间他人改动以最新读值为准；读值恒 redact，本 ns 凭据以模板串在场）
+      let described: RemoteResult<SettingsDescribeValue>;
+      try {
+        described = await channels.settings.describe();
+      } catch (error) {
+        return { ok: false, error: `当前配置不可读（settings.describe 失败）：${error instanceof Error ? error.message : String(error)}` };
+      }
+      if (described.ok === false) {
+        return { ok: false, error: `当前配置不可读（settings.describe 被拒）：${described.error.message ?? '未知原因'}` };
+      }
+      const namespace = described.value.namespaces.find((row) => row.ns === 'mcp');
+      const servers = (namespace?.value as { servers?: Record<string, Record<string, unknown>> } | undefined)?.servers;
+      const current = servers?.[name];
+      if (current === undefined) return { ok: false, error: `server "${name}"：无配置条目可编辑（/mcp list 查看现存 server）` };
+      const ops = editOps(name, current, draft);
+      if (typeof ops === 'string') return { ok: false, error: ops };
+      if (ops.length === 0) return { ok: true, message: '无变更——未改任何字段，官方配置保持原样' };
+      try {
+        const refused = writeRefused(await channels.settings.mutate('mcp', ops));
+        if (refused !== '') return { ok: false, error: refused };
+        return { ok: true, message: `已提交 server "${name}" 的编辑（${String(ops.length)} 项变更）——官方 reconcile 即时生效（字段变化重建单实例）` };
       } catch (error) {
         return { ok: false, error: `settings 写失败：${error instanceof Error ? error.message : String(error)}` };
       }
@@ -336,6 +432,10 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
     const [addTransport, setAddTransport] = useState<'stdio' | 'streamable-http'>('stdio');
     const [addDraft, setAddDraft] = useState<Record<string, string>>({});
     const [addNote, setAddNote] = useState<WriteFeedback | undefined>(undefined);
+    const [editingName, setEditingName] = useState<string | undefined>(undefined);
+    const [editDraft, setEditDraft] = useState<Record<string, string>>({});
+    const [editCurrent, setEditCurrent] = useState<Record<string, unknown> | undefined>(undefined);
+    const [editNote, setEditNote] = useState<WriteFeedback | undefined>(undefined);
     const applyBatch = useCallback((batch: McpManagedServerView[]): void => {
       setViews(batch);
       io.snapshot.views = batch;
@@ -391,6 +491,92 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
       if (feedback.ok === true) setAddDraft({});
     }, [io, addTransport, addDraft]);
 
+    /** 打开行内编辑：表单显示值取 describe 一次性读的快照（ops 基线仍归写面保存时再读）。 */
+    const openEdit = (view: McpManagedServerView): void => {
+      setEditingName(view.name);
+      setEditDraft({});
+      setEditNote(undefined);
+      void io.describe().then((answer) => {
+        if (answer.ok === false) {
+          setEditNote({ ok: false, error: `当前配置不可读（settings.describe 被拒）：${answer.error.message ?? '未知原因'}` });
+          return;
+        }
+        const namespace = answer.value.namespaces.find((row) => row.ns === 'mcp');
+        const servers = (namespace?.value as { servers?: Record<string, Record<string, unknown>> } | undefined)?.servers;
+        setEditCurrent(servers?.[view.name]);
+      }).catch(() => {
+        setEditNote({ ok: false, error: '当前配置不可读（settings.describe 失败）' });
+      });
+    };
+    const closeEdit = (): void => {
+      setEditingName(undefined);
+      setEditDraft({});
+      setEditNote(undefined);
+      setEditCurrent(undefined);
+    };
+    const changeEditField = (field: string): ((event: InputEventLike) => void) =>
+      // touched 模型：只记被改过的字段；未触字段不进草稿（ops 只含被改路径的前提）
+      (event) => setEditDraft((previous) => ({ ...previous, [field]: event.target.value }));
+    const submitEdit = useCallback(async (): Promise<void> => {
+      if (editingName === undefined) return;
+      const feedback = await io.writes.editServer(editingName, {
+        command: editDraft.command,
+        argsText: editDraft.args,
+        cwd: editDraft.cwd,
+        url: editDraft.url,
+        envText: editDraft.env,
+        headersText: editDraft.headers,
+      });
+      setEditNote(feedback);
+    }, [io, editingName, editDraft]);
+
+    /** 行内编辑表单（显示值 = describe 快照；被触字段覆盖显示）。 */
+    const renderEditForm = (name: string, transport: string): ReactNode => {
+      const entry = editCurrent ?? {};
+      const currentText = (field: string): string => typeof entry[field] === 'string' ? entry[field] as string : '';
+      const argsText = Array.isArray(entry.args) ? (entry.args as unknown[]).map(String).join(' ') : '';
+      const dictText = (field: string): string => {
+        const dict = typeof entry[field] === 'object' && entry[field] !== null ? entry[field] as Record<string, unknown> : {};
+        return Object.entries(dict).map(([key, value]) => `${key}=${String(value)}`).join('\n');
+      };
+      const isStdio = transport === 'stdio';
+      return createElement('div', { 'data-mcp-edit-form': name },
+        createElement('span', null, `编辑 ${name}（transport ${transport} 只读；换 transport 请移除后重加）`),
+        isStdio ? [
+          createElement('input', {
+            'data-mcp-edit-field': 'command', value: editDraft.command ?? currentText('command'),
+            placeholder: 'command（不可清空）', onChange: changeEditField('command'),
+          }),
+          createElement('input', {
+            'data-mcp-edit-field': 'args', value: editDraft.args ?? argsText,
+            placeholder: '参数（空白分隔；清空 = 移除参数）', onChange: changeEditField('args'),
+          }),
+          createElement('input', {
+            'data-mcp-edit-field': 'cwd', value: editDraft.cwd ?? currentText('cwd'),
+            placeholder: '工作目录（清空 = 移除）', onChange: changeEditField('cwd'),
+          }),
+          createElement('textarea', {
+            'data-mcp-edit-field': 'env', value: editDraft.env ?? dictText('env'),
+            placeholder: '环境变量，每行 K=V；未改的行（含凭据模板串）保存时保留不重传；删行 = 移除该键；清空值 = 移除该键',
+            onChange: changeEditField('env'),
+          }),
+        ] : [
+          createElement('input', {
+            'data-mcp-edit-field': 'url', value: editDraft.url ?? currentText('url'),
+            placeholder: 'MCP 端点 URL（不可清空）', onChange: changeEditField('url'),
+          }),
+          createElement('textarea', {
+            'data-mcp-edit-field': 'headers', value: editDraft.headers ?? dictText('headers'),
+            placeholder: '请求头，每行 K=V；未改的行（含凭据模板串）保存时保留不重传；删行 = 移除该键；清空值 = 移除该键',
+            onChange: changeEditField('headers'),
+          }),
+        ],
+        createElement('button', { 'data-mcp-edit-save': name, onClick: () => void submitEdit() }, '保存'),
+        createElement('button', { 'data-mcp-edit-cancel': name, onClick: closeEdit }, '取消'),
+        editNote === undefined ? null : createElement('p', { 'data-mcp-edit-note': 'note' },
+          editNote.ok === true ? editNote.message : editNote.error));
+    };
+
     if (streamError !== undefined) {
       return createElement('div', { 'data-mcp-servers': 'error', 'data-mcp-tab-id': tab.id },
         createElement('p', null, `MCP server 列表暂不可读：${streamError}`),
@@ -408,7 +594,11 @@ function createMcpServersBody(io: McpServersIo): (props: { useTabInfo(): Sidebar
         createElement('span', { 'data-mcp-server-name': view.name }, view.name),
         createElement('span', { 'data-mcp-server-transport': view.name }, transports.get(view.name) ?? '—'),
         createElement('span', { 'data-mcp-server-status': view.name }, describeStatus(view.status)),
-        view.configured ? null : createElement('span', null, '（非配置条目：已移除但清理未完成）')))),
+        view.configured ? null : createElement('span', null, '（非配置条目：已移除但清理未完成）'),
+        view.configured ? createElement('button', {
+          'data-mcp-action': 'edit', 'data-mcp-action-server': view.name, onClick: () => openEdit(view),
+        }, '编辑') : null,
+        editingName === view.name && view.configured ? renderEditForm(view.name, transports.get(view.name) ?? '') : null))),
       createElement('div', { 'data-mcp-add-form': 'form' },
         createElement('select', {
           'data-mcp-add-transport': addTransport,

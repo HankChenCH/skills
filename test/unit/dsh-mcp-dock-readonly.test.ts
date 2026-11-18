@@ -1099,3 +1099,109 @@ test('stdio 缺 command 拒绝：零写调用（写AC1 必填守卫）', async (
   assert.match(textOf(note), /command/, '内联报错指明缺失字段');
   view.unmount();
 });
+
+// ---- 写AC2：行内编辑契约（mutate ops 只含被改路径；凭据未重输不进 ops——官方 mutate
+// 「Apply field edits without restating redacted secrets」保留语义，dsh-settings lib/index.js
+// mutate docstring 一手出处）----
+
+/** 编辑态样本：stdio 条目含凭据模板 env 值（官方 describe 读值形态——mcp ns 无 secret role，模板串原样在场）。 */
+function editSampleServers(): Record<string, unknown> {
+  return {
+    docs: {
+      transport: 'stdio',
+      command: 'npx',
+      args: ['-y', 'srv'],
+      env: { GITHUB_TOKEN: '${credential:GITHUB_TOKEN}', LOG_KEY: 'info', OLD_KEY: 'x' },
+      cwd: '/work',
+    },
+  };
+}
+
+/** 按行操作定位并点击（data-mcp-action + data-mcp-action-server 双键定位——多行同名按钮）。 */
+function clickRowAction(tree: ElementChild, server: string, action: string): void {
+  const found = collectNodes(tree, (node) =>
+    node.props?.['data-mcp-action'] === action && node.props?.['data-mcp-action-server'] === server);
+  assert.ok(found.length > 0, `行操作定位失败：server=${server} action=${action} 不在渲染树中（行为缺失即红）`);
+  const handler = found[0].props?.onClick as (() => void) | undefined;
+  assert.ok(handler, `行操作 server=${server} action=${action} 缺 onClick 处理器`);
+  handler();
+}
+
+test('打开编辑：表单显示 describe 读值（凭据 env 以 K=V 每行一行投影），零改动保存零写调用并提示无变更（写AC2）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], editSampleServers());
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+
+  const envNode = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-field', 'env');
+  assert.equal(
+    envNode.props?.value,
+    'GITHUB_TOKEN=${credential:GITHUB_TOKEN}\nLOG_KEY=info\nOLD_KEY=x',
+    '编辑表单 env 显示 describe 读值（官方读值投影；凭据字段以模板串在场即脱敏形态）',
+  );
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.updateCalls, [], '零改动不产生 update');
+  assert.deepEqual(ctx.captured.mutateCalls, [], '零改动不产生 mutate——未重输的凭据不重传（保留语义的不变量：无 touched 即无 op）');
+  const note = nodeWith(view.view().tree as ElementNode, 'data-mcp-edit-note', 'note');
+  assert.match(textOf(note), /无变更/, '零改动保存提示无变更');
+  view.unmount();
+});
+
+test('编辑只改 cwd：mutate ops 恰一条 set 且路径 = servers.docs.cwd，凭据 env 路径不在 ops（写AC2 只含被改路径）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], editSampleServers());
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  changeInput(view.view().tree as ElementNode, 'data-mcp-edit-field', 'cwd', '/new');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    { namespace: 'mcp', ops: [{ op: 'set', path: ['servers', 'docs', 'cwd'], value: '/new' }] },
+  ], '编辑 = mutate(ns, ops[]) 且只含被改路径（round 1 官方 ops 形态）；凭据 env 未重输 → 零 env op（官方保留语义）');
+  assert.deepEqual(ctx.captured.updateCalls, [], '编辑不经 update（round 1 编辑 = mutate 形态）');
+  view.unmount();
+});
+
+test('编辑 env 触碰：改值/新增行产 per-key set、删行产 unset，保留行同值零 op（写AC2 字典 per-key ops）', async () => {
+  const harness = createHarness();
+  const ctx = createClientStubContext([connectedView('docs')], editSampleServers());
+  harness.apply(ctx);
+  const view = harness.mountBody(ctx, new AbortController().signal);
+  view.mount();
+  await view.settle();
+
+  clickRowAction(view.view().tree as ElementNode, 'docs', 'edit');
+  await view.settle();
+  // 触碰 env 域：凭据行原样保留（未重输）、改 LOG_KEY 值、增 NEW_KEY、删 OLD_KEY 行
+  changeInput(view.view().tree as ElementNode, 'data-mcp-edit-field', 'env',
+    'GITHUB_TOKEN=${credential:GITHUB_TOKEN}\nLOG_KEY=debug\nNEW_KEY=v2\n');
+  await view.settle();
+  clickButton(view.view().tree as ElementNode, 'data-mcp-edit-save', 'docs');
+  await view.settle();
+
+  assert.deepEqual(ctx.captured.mutateCalls, [
+    {
+      namespace: 'mcp',
+      ops: [
+        { op: 'set', path: ['servers', 'docs', 'env', 'LOG_KEY'], value: 'debug' },
+        { op: 'set', path: ['servers', 'docs', 'env', 'NEW_KEY'], value: 'v2' },
+        { op: 'unset', path: ['servers', 'docs', 'env', 'OLD_KEY'] },
+      ],
+    },
+  ], '字典域 per-key ops：被改键 set、新增键 set、被删键 unset；凭据行同值保留 → 零凭据 op（不重传）');
+  view.unmount();
+});
