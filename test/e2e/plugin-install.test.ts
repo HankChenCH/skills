@@ -292,7 +292,9 @@ test('[FR-4] plugin add 不存在的插件名：报错列可用插件清单、�
   assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false);
 });
 
-test('[FR-4] --profile desktop：拒装并说明官方保留名，不执行任何官方命令', (t) => {
+// desktop 放行（spec 20261119-7a9a FR-3，票 20261119-443c）：官方 CLI 已放行 desktop 插件管理
+// （2026-11-19 实证），保留名拒装移除——带名路径与 dev profile 全链同款：转发形态、两落点、记账。
+test('[FR-3] --profile desktop：照常转发官方命令、两落点对账与锁文件记账', (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['desktop']);
   const shimDir = makeShimDir(t, ['dsh']);
@@ -303,12 +305,21 @@ test('[FR-4] --profile desktop：拒装并说明官方保留名，不执行任�
     DSH_SHIM_LOG: shimLog,
     PATH: `${shimDir}${path.delimiter}${process.env.PATH}`,
   });
-  const output = stdout + stderr; // 安装失败经 clack 呈现（与技能失败路径同流）
-  assert.equal(code, 1, 'desktop 应拒装');
-  assert.match(output, /desktop/);
-  assert.match(output, /保留/);
-  assert.equal(fs.existsSync(shimLog), false, '拒装不得执行任何官方命令');
-  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '拒装不得写锁文件');
+  assert.equal(code, 0, `desktop 应照常安装：${stdout}${stderr}`);
+  // 执行体收到的命令形态（官方命令转发替身形态，进程边界断言）
+  assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'desktop', 'add', PKG]]);
+  // profile 两落点齐备（shim 按官方语义写入）
+  const profilePkg = JSON.parse(fs.readFileSync(path.join(dshHome, 'profiles', 'desktop', 'package.json'), 'utf8'));
+  assert.equal(profilePkg.dependencies[PKG], PLUGIN_VERSION);
+  assert.deepEqual(profilePkg.dsh.profile.bundles, [PKG]);
+  // 锁文件插件区记账照旧
+  const lockfile = readLockfileAt(project);
+  assert.deepEqual(lockfile.plugins[PKG], {
+    version: PLUGIN_VERSION,
+    profile: 'desktop',
+    installedAt: lockfile.plugins[PKG].installedAt,
+  });
+  assert.match(lockfile.plugins[PKG].installedAt, /^\d{4}-\d{2}-\d{2}T/);
 });
 
 test('[FR-3] 非 TTY plugin add 无参：守卫文案报错、退出 1、零落盘（双命令齐验之 plugin 侧）', (t) => {
@@ -337,6 +348,9 @@ test('[FR-1] 顶层 --help 含 plugin add 用法示例、不含旧旗标名', (t
   for (const retired of ['--skills', '--plugins']) {
     assert.equal(stdout.includes(retired), false, `顶层帮助不得含旧旗标名 ${retired}`);
   }
+  // desktop 放行（spec 20261119-7a9a FR-3）：帮助文案不再含 desktop 拒装表述——desktop 已是
+  // 普通 profile 名，帮助对其零表述。
+  assert.equal(stdout.includes('desktop'), false, '顶层帮助不得再含 desktop 拒装表述');
 });
 
 test('[FR-1] plugin add --help 打印命令级帮助：用法与示例、不含旧旗标名、退出码 0', (t) => {
@@ -350,6 +364,7 @@ test('[FR-1] plugin add --help 打印命令级帮助：用法与示例、不含�
   for (const retired of ['--skills', '--plugins']) {
     assert.equal(stdout.includes(retired), false, `plugin add --help 不得含旧旗标名 ${retired}`);
   }
+  assert.equal(stdout.includes('desktop'), false, 'plugin add 帮助不得再含 desktop 拒装表述');
 });
 
 test('[FR-1] plugin 无动词打印该命令帮助、退出码 0', (t) => {
@@ -450,7 +465,9 @@ test('[FR-1] PTY plugin add 条目以正名呈现、提示为包 description，�
   );
 });
 
-test('[FR-4] PTY plugin add 选 desktop profile：拒装并说明官方保留名、零官方调用、零锁文件', async (t) => {
+// desktop 放行（spec 20261119-7a9a FR-3，票 20261119-443c）：交互勾选 desktop 同样放行——
+// 交互菜单流程中不再呈现「desktop 拒装」文案（前置保留名报错已随分支删除），安装走完整链。
+test('[FR-3] PTY plugin add 交互勾选选 desktop profile：照常安装、shim 调用与所选组合一致、锁文件记账', async (t) => {
   const project = makeProject(t);
   const dshHome = makeDshHome(t, ['desktop', 'dev']); // 按名排序 desktop 居首，回车即选中它
   const shimDir = makeShimDir(t, ['dsh']);
@@ -463,12 +480,14 @@ test('[FR-4] PTY plugin add 选 desktop profile：拒装并说明官方保留名
     ['选择要安装的插件', '', '选择目标 dsh profile'],
     'plugin add',
   );
-  const output = picked.output.replace(ANSI_RE, '');
-  assert.equal(picked.code, 1, '交互选 desktop 应拒装（退出码 1）');
-  assert.match(output, /desktop/);
-  assert.match(output, /保留/, '应说明官方保留名行为');
-  assert.equal(fs.existsSync(shimLog), false, '拒装不得执行任何官方命令');
-  assert.equal(fs.existsSync(path.join(project, '.infra-lock.json')), false, '拒装不得写锁文件');
+  assert.equal(picked.code, 0, '交互勾选 desktop 应照常安装成功');
+  const plain = plainText(picked.output);
+  assert.match(plain, /已安装插件/, '应走完安装并呈现完成摘要');
+  assert.equal(plain.includes('保留名'), false, '交互流程不得再呈现 desktop 拒装文案');
+  assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'desktop', 'add', PKG]]);
+  const lockfile = readLockfileAt(project);
+  assert.deepEqual(lockfile.plugins[PKG].profile, 'desktop');
+  assert.deepEqual(lockfile.plugins[PKG].version, PLUGIN_VERSION);
 });
 
 // ---------- [FR-3] PTY 取消/空选（评审增量 #2，与 skill 侧 install.test 同款口径）----------

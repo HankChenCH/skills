@@ -31,7 +31,7 @@ export function renderTopHelp(): string {
 
 命令：
   skill add [名...] [--all]           安装技能；名字空格或逗号分隔均可，--all 全装，无参进交互勾选
-  plugin add [名...] --profile <名>   安装插件进 dsh profile；无参进交互勾选（desktop 为官方保留名拒装）
+  plugin add [名...] --profile <名>   安装插件进 dsh profile；无参进交互勾选
   -h, --help                          显示对应层级帮助
 
 行为：

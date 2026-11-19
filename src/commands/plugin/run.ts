@@ -29,7 +29,8 @@ export type PluginInteractivePick =
 // 取消（Ctrl-C）与空选确认 → 提示后返回 cancel，调用方按 0 退出、零落盘（现行交互纪律）。
 // presetProfile 非空时跳过 profile 提示（spec：`plugin add --profile dev` 无名进交互
 // 仅提示插件多选、不再提示 profile）；否则既有 profile 单选、无既有项输入新名。
-// desktop 在列表中出现但选它会在安装前置被拒（官方保留名，异常流 B）。
+// desktop 与其他 profile 同一流程（保留名拒装已随官方 CLI 放行 desktop 插件管理移除——
+// spec 20261119-7a9a，票 20261119-443c）。
 export async function selectPluginsInteractive(
   context: ProgramContext,
   presetProfile: string | undefined,
