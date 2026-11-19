@@ -270,11 +270,11 @@ const NPX_EXECUTOR: Executor = { command: 'npx', launcher: ['--yes', '@deepseek-
 const testPackageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // 探测替身：记录调用并按桩返回 --version 探测结果（模拟官方 CLI 输出形态）
-function makeProbeStub(t: TestContext, reply: { status: number; stdout: string }) {
+function makeProbeStub(t: TestContext, reply: { status: number; stdout: string; stderr?: string }) {
   const calls: { command: string; args: string[] }[] = [];
-  const run = ({ command, args }: { command: string; args: string[] }) => {
+  const run: CommandRunner = ({ command, args }) => {
     calls.push({ command, args });
-    return reply;
+    return { status: reply.status, stdout: reply.stdout, stderr: reply.stderr ?? '' };
   };
   return { calls, run };
 }
