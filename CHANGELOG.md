@@ -3,6 +3,17 @@
 本项目的所有显著变更记录于此。
 格式遵循 Keep a Changelog（https://keepachangelog.com），版本遵循语义化版本。
 
+## [v0.2.4] - 2026-11-19
+
+### Changed
+
+- 随包插件树与流程文档更新：spec 20261119-7a9a（manager 依赖与宿主运行时解耦 round 2）批准落盘（issue #301）；README「已知边界」补 manager 版本对齐三联征与恢复配方、desktop 直装放行修正（c6a4a83）；design 0004 间距注记修订（53c113c）
+
+### Fixed
+
+- `@hankchen/dsh-mcp` 0.3.2：Dock 页面板卡外边距 8px——宿主侧栏容器自身零 padding，面板卡贴边呈现、边距 ≈0（用户截图实测；53c113c，样式契约断言钉值防回归）
+- `@hankchen/dsh-mcp` 0.3.2：`/mcp add` 选项值含引号在添加期拒收并提示复杂值入口——此前引号原样入库、值内空格劈裂选项，失败延迟到连接期才暴露（7a25c54，red-green 单测）
+
 ## [v0.2.1] - 2026-11-17
 
 ### Fixed
