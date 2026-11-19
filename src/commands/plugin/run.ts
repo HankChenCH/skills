@@ -10,11 +10,13 @@ import * as clack from '@clack/prompts';
 import type { ProgramContext } from '../../context.ts';
 import { ASSET_MAP, PLUGINS_TYPE, findRow } from '../../kernel/asset-map.ts';
 import { listPlugins } from '../../kernel/catalog.ts';
-import { commandExists, DSH_COMMAND } from '../../kernel/dsh-command.ts';
+import { commandExists, DSH_COMMAND, resolveExecutor } from '../../kernel/dsh-command.ts';
 import { listProfiles, profilesRoot } from '../../kernel/dsh-profiles.ts';
-import { installPlugins } from '../../kernel/plugin-install.ts';
+import { installPlugins, runCommand } from '../../kernel/plugin-install.ts';
 import type { InstallPluginsResult } from '../../kernel/plugin-install.ts';
 import { LOCKFILE_NAME } from '../../kernel/lockfile.ts';
+import { checkManagerReadiness, MANAGER_PACKAGE, managerPrescriptionLines, READINESS_TRIGGER_PLUGIN } from '../../kernel/readiness.ts';
+import type { ReadinessOutcome } from '../../kernel/readiness.ts';
 import { skillOptions } from '../../kernel/menu.ts';
 
 // 交互勾选结果（评审 20261116-ccfb 增量修正）：编目失败可区分返回，调用方走 ✗ 通道 +
@@ -121,17 +123,31 @@ export async function installPluginsAndRender({
 
   const spinner = clack.spinner();
   spinner.start(`正在安装 ${plugins.length} 项插件 → profile ${profile}…`);
+  const profilePath = path.join(profilesRoot(), profile);
+  const dshInPath = commandExists(DSH_COMMAND);
   try {
     const result = installPlugins({
       profile,
       plugins,
-      profilePath: path.join(profilesRoot(), profile),
-      dshInPath: commandExists(DSH_COMMAND),
+      profilePath,
+      dshInPath,
       projectRoot: process.cwd(),
       packageVersion: context.packageVersion,
       now: new Date().toISOString(),
     });
     spinner.stop(`安装完成（${result.installed.length} 项）`);
+    // 装后就绪核验（spec 20261119-7a9a 就绪核验契约，票 20261119-9bd3）：只对 manager 供给
+    // 契约的宿主插件核验（其余插件安装与 manager 无关）；探测沿安装同款执行体（runCommand）。
+    // fail-loud 分支处方已呈现 → 退出 1；探测失败降级警告继续（退出 0、不虚构通过）。
+    if (plugins.includes(READINESS_TRIGGER_PLUGIN)) {
+      const outcome = checkManagerReadiness({ profilePath, executor: resolveExecutor(dshInPath), run: runCommand });
+      const render = renderManagerReadiness(outcome, profilePath);
+      if (render.kind === 'fail') {
+        return 1;
+      }
+      renderPluginSummary(context, result, render.kind === 'pass' ? render.summaryLine : undefined);
+      return 0;
+    }
     renderPluginSummary(context, result);
     return 0;
   } catch (err) {
@@ -141,11 +157,54 @@ export async function installPluginsAndRender({
   }
 }
 
-function renderPluginSummary(context: ProgramContext, result: InstallPluginsResult): void {
+// 核验结果呈现（呈现归命令层、判定归内核）：fail-loud = ✗ 头行报告两版本号/缺副本 +
+// 三段可复制处方；pass = 完成摘要追加「核验通过」行（报告两版本号）；探测失败 = 降级警告
+// + 手工核验途径（README「已知边界」boot 日志金标准），无「核验通过」行——不虚构通过。
+type ReadinessRender =
+  | { kind: 'fail' }
+  | { kind: 'pass'; summaryLine: string }
+  | { kind: 'degraded' };
+
+function renderManagerReadiness(outcome: ReadinessOutcome, profilePath: string): ReadinessRender {
+  switch (outcome.kind) {
+    case 'mismatch':
+    case 'missing': {
+      const headline =
+        outcome.kind === 'mismatch'
+          ? `运行时 dsh ${outcome.runtimeVersion} 与 manager 解析版 ${outcome.managerVersion} 不同版（宿主要求精确同 rc）`
+          : `profile 依赖树缺 ${MANAGER_PACKAGE} 解析副本（运行时 dsh ${outcome.runtimeVersion}）`;
+      console.error(
+        `✗ 装后就绪核验未通过：${headline}——安装已完成并记账，` +
+          `但宿主 boot 兼容门将静默禁用 manager 行（装成 ≠ 跑得起来）。按以下三段处方修复：`,
+      );
+      for (const line of managerPrescriptionLines({ profilePath, runtimeVersion: outcome.runtimeVersion })) {
+        console.error(line);
+      }
+      return { kind: 'fail' };
+    }
+    case 'pass':
+      return {
+        kind: 'pass',
+        summaryLine: `就绪核验通过：运行时 dsh ${outcome.runtimeVersion} ≡ manager ${outcome.managerVersion}（peer 精确同版）。`,
+      };
+    case 'probe-unavailable':
+      console.error('⚠ 运行时 dsh 版本探测失败（--version 无可用输出）——跳过装后就绪核验，安装继续。');
+      console.error(
+        '  手工核验途径：对照 agents/dsh/plugins/dsh-mcp/README.md「已知边界」（boot 日志金标准 + 恢复配方），' +
+          '或重启宿主后确认 /mcp 入口可用。',
+      );
+      return { kind: 'degraded' };
+  }
+}
+
+function renderPluginSummary(context: ProgramContext, result: InstallPluginsResult, readinessLine?: string): void {
   const lines = result.installed.map(
     (entry) =>
       `已安装插件 ${entry.name}@${entry.version} → dsh profile ${result.profile}（对账：依赖行 + bundles 行齐备）`,
   );
+  if (readinessLine !== undefined) {
+    lines.push(readinessLine);
+  }
   lines.push(`记账：${LOCKFILE_NAME}（包版本 ${context.packageVersion}）；重跑本命令即按官方幂等语义刷新安装。`);
   clack.outro(lines.join('\n'));
 }

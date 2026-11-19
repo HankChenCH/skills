@@ -2,7 +2,7 @@
 //
 // 断言 spec 20261116-2c58 的分层拍板在仓库树上成立：
 //   1. 三层在位——程序装配层（src/program.ts）、命令定义层（src/commands/<名>/，每子命令
-//      一目录）、安装内核层（src/kernel/ 十模块，票 20261116-1875 归位）。
+//      一目录）、安装内核层（src/kernel/ 模块清单见 KERNEL_MODULES）。
 //   2. 方向单一——内核零上行依赖（只准 intra-kernel './' 导入）；命令定义层经叶模块
 //      src/context.ts 取上下文，不反向 import 装配层。
 //   3. 「新增子命令 = 加命令目录 + 装配层注册一处」口径——commands/*/index.ts（命令工厂）
@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const readSource = (rel: string): string => fs.readFileSync(path.join(packageRoot, rel), 'utf8');
 
-// 安装内核十模块清单（票 20261116-1875 归位时的既定事实）
+// 安装内核模块清单（票 20261116-1875 归位十模块；readiness 由票 20261119-9bd3 就绪核验入列）
 const KERNEL_MODULES = [
   'agent-dirs',
   'asset-map',
@@ -30,6 +30,7 @@ const KERNEL_MODULES = [
   'lockfile',
   'menu',
   'plugin-install',
+  'readiness',
   'reconcile',
 ];
 
@@ -72,7 +73,7 @@ test('三层在位：程序装配层、命令定义层（每子命令一目录�
   assert.deepEqual(
     kernelFiles,
     KERNEL_MODULES.map((m) => `${m}.ts`),
-    '安装内核层应为十模块（票 20261116-1875 归位清单）',
+    '安装内核层模块清单应与 KERNEL_MODULES 清单一致（票 20261116-1875 归位 + 20261119-9bd3 readiness）',
   );
 });
 
