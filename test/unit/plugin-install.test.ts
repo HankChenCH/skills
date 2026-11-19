@@ -270,7 +270,7 @@ const NPX_EXECUTOR: Executor = { command: 'npx', launcher: ['--yes', '@deepseek-
 const testPackageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // 探测替身：记录调用并按桩返回 --version 探测结果（模拟官方 CLI 输出形态）
-function makeProbeStub(t: TestContext, reply: { status: number; stdout: string; stderr?: string }) {
+function makeProbeStub(reply: { status: number; stdout: string; stderr?: string }) {
   const calls: { command: string; args: string[] }[] = [];
   const run: CommandRunner = ({ command, args }) => {
     calls.push({ command, args });
@@ -280,13 +280,13 @@ function makeProbeStub(t: TestContext, reply: { status: number; stdout: string; 
 }
 
 // manager 解析副本替身：按官方 pnpm 安装语义把 manager 写进 profile 依赖树
-function makeManagerCopy(t: TestContext, profilePath: string, version: string): void {
+function makeManagerCopy(profilePath: string, version: string): void {
   const dir = path.join(profilePath, 'node_modules', '@deepseek-ai', 'dsh-mcp-manager');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: MANAGER_PACKAGE, version }));
 }
 
-function readiness(t: TestContext, { profilePath, executor = DIRECT_EXECUTOR, run }: {
+function readiness({ profilePath, executor = DIRECT_EXECUTOR, run }: {
   profilePath: string;
   executor?: Executor;
   run: CommandRunner;
@@ -296,10 +296,10 @@ function readiness(t: TestContext, { profilePath, executor = DIRECT_EXECUTOR, ru
 
 test('就绪核验（同 rc）：探测走安装同款执行体 --version、通过并返回两版本号', (t) => {
   const profilePath = makeProfileDir(t);
-  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
-  const probe = makeProbeStub(t, { status: 0, stdout: '0.2.2-rc.5\n' });
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
 
-  const outcome = readiness(t, { profilePath, run: probe.run });
+  const outcome = readiness({ profilePath, run: probe.run });
 
   assert.deepEqual(outcome, { kind: 'pass', runtimeVersion: '0.2.2-rc.5', managerVersion: '0.2.2-rc.5' });
   assert.deepEqual(probe.calls, [{ command: 'dsh', args: ['--version'] }], '探测应沿安装同款执行体发 --version');
@@ -307,19 +307,19 @@ test('就绪核验（同 rc）：探测走安装同款执行体 --version、通�
 
 test('就绪核验（异 rc）：mismatch 携带运行时与 manager 两版本号', (t) => {
   const profilePath = makeProfileDir(t);
-  makeManagerCopy(t, profilePath, '0.2.2-rc.2');
-  const probe = makeProbeStub(t, { status: 0, stdout: '0.2.2-rc.5\n' });
+  makeManagerCopy(profilePath, '0.2.2-rc.2');
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
 
-  const outcome = readiness(t, { profilePath, run: probe.run });
+  const outcome = readiness({ profilePath, run: probe.run });
 
   assert.deepEqual(outcome, { kind: 'mismatch', runtimeVersion: '0.2.2-rc.5', managerVersion: '0.2.2-rc.2' });
 });
 
 test('就绪核验（缺副本）：profile 依赖树无 manager 解析副本即 missing、带运行时版本', (t) => {
   const profilePath = makeProfileDir(t);
-  const probe = makeProbeStub(t, { status: 0, stdout: '0.2.2-rc.5\n' });
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
 
-  const outcome = readiness(t, { profilePath, run: probe.run });
+  const outcome = readiness({ profilePath, run: probe.run });
 
   assert.deepEqual(outcome, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'absent' });
 });
@@ -329,42 +329,42 @@ test('就绪核验（缺副本）：profile 依赖树无 manager 解析副本即
 //（同归 missing fail-loud），只改报因粒度（ref-implementation #4 错误处理显式）。
 test('就绪核验（缺副本报因粒度）：不可读与损坏各报实因', (t) => {
   const profilePath = makeProfileDir(t);
-  const probe = makeProbeStub(t, { status: 0, stdout: '0.2.2-rc.5\n' });
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
   const managerPkgFile = path.join(profilePath, 'node_modules', '@deepseek-ai', 'dsh-mcp-manager', 'package.json');
 
   // 副本在但 package.json 落成目录 → 读 EISDIR = unreadable
   fs.mkdirSync(managerPkgFile, { recursive: true });
-  const unreadable = readiness(t, { profilePath, run: probe.run });
+  const unreadable = readiness({ profilePath, run: probe.run });
   assert.deepEqual(unreadable, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'unreadable' });
 
   // 坏 JSON = corrupt（先清掉上一形态落成目录的 package.json 再写文件）
   fs.rmSync(managerPkgFile, { recursive: true, force: true });
-  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
   fs.writeFileSync(managerPkgFile, '{ not-json');
-  const corruptJson = readiness(t, { profilePath, run: probe.run });
+  const corruptJson = readiness({ profilePath, run: probe.run });
   assert.deepEqual(corruptJson, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'corrupt' });
 
   // JSON 合法但 version 缺失 = corrupt（副本损坏口径）
   fs.writeFileSync(managerPkgFile, JSON.stringify({ name: MANAGER_PACKAGE }));
-  const corruptVersion = readiness(t, { profilePath, run: probe.run });
+  const corruptVersion = readiness({ profilePath, run: probe.run });
   assert.deepEqual(corruptVersion, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'corrupt' });
 });
 
 test('就绪核验（探测失败·非零退出）：probe-unavailable，不虚构版本', (t) => {
   const profilePath = makeProfileDir(t);
-  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
-  const probe = makeProbeStub(t, { status: 1, stdout: '', stderr: 'npm error' });
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 1, stdout: '', stderr: 'npm error' });
 
-  const outcome = readiness(t, { profilePath, run: probe.run });
+  const outcome = readiness({ profilePath, run: probe.run });
 
   assert.deepEqual(outcome, { kind: 'probe-unavailable' });
 });
 
 test('就绪核验（探测失败·输出不可解析）：probe-unavailable', (t) => {
   const profilePath = makeProfileDir(t);
-  const probe = makeProbeStub(t, { status: 0, stdout: 'dsh: unrecognized option\n' });
+  const probe = makeProbeStub({ status: 0, stdout: 'dsh: unrecognized option\n' });
 
-  const outcome = readiness(t, { profilePath, run: probe.run });
+  const outcome = readiness({ profilePath, run: probe.run });
 
   assert.deepEqual(outcome, { kind: 'probe-unavailable' });
 });
@@ -373,11 +373,11 @@ test('就绪核验（探测失败·输出不可解析）：probe-unavailable', (
 // probe-unavailable、分支带尾锚）——四段版本不得截段、日期横幅不得错位命中。
 test('就绪核验（探测失败·输出非法变体）：四段版本不截段、日期横幅不错位', (t) => {
   const profilePath = makeProfileDir(t);
-  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
   const illegal = ['1.2.3.4\n', '2026.11.19 dsh 0.2.2-rc.5\n'];
   for (const stdout of illegal) {
-    const probe = makeProbeStub(t, { status: 0, stdout });
-    const outcome = readiness(t, { profilePath, run: probe.run });
+    const probe = makeProbeStub({ status: 0, stdout });
+    const outcome = readiness({ profilePath, run: probe.run });
     assert.deepEqual(outcome, { kind: 'probe-unavailable' }, `输出 ${JSON.stringify(stdout)} 应落探测失败，不得静默接受为版本`);
   }
 });
@@ -386,20 +386,20 @@ test('就绪核验（探测失败·输出非法变体）：四段版本不截段
 // 横幅行 + 裸版本行共存时取裸版本行；v 前缀与行首尾空白容忍、整行非版本不命中。
 test('就绪核验（探测·裸行形态）：多行取首个命中行，v 前缀与首尾空白可解析', (t) => {
   const profilePath = makeProfileDir(t);
-  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
-  const probe = makeProbeStub(t, { status: 0, stdout: '2026.11.19 dsh\n v0.2.2-rc.5 \n' });
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 0, stdout: '2026.11.19 dsh\n v0.2.2-rc.5 \n' });
 
-  const outcome = readiness(t, { profilePath, run: probe.run });
+  const outcome = readiness({ profilePath, run: probe.run });
 
   assert.deepEqual(outcome, { kind: 'pass', runtimeVersion: '0.2.2-rc.5', managerVersion: '0.2.2-rc.5' });
 });
 
 test('就绪核验：dsh 不在 PATH 时探测沿 npx 执行体同款 launcher', (t) => {
   const profilePath = makeProfileDir(t);
-  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
-  const probe = makeProbeStub(t, { status: 0, stdout: '0.2.2-rc.5\n' });
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
 
-  readiness(t, { profilePath, executor: NPX_EXECUTOR, run: probe.run });
+  readiness({ profilePath, executor: NPX_EXECUTOR, run: probe.run });
 
   assert.deepEqual(probe.calls, [{ command: 'npx', args: ['--yes', '@deepseek-ai/dsh', '--version'] }]);
 });
