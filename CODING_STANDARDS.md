@@ -15,6 +15,7 @@
 - [node-test-skip-gate.md](docs/standards/node-test-skip-gate.md) —— node:test 前置门跳过纪律：t.skip 只标注不截断，环境门须返回 boolean + 测试体内联 return，禁把 skip 封在不截断的 helper 里。
 - [falsified-form-gate.md](docs/standards/falsified-form-gate.md) —— 证伪形态常驻门：被真实协作者证伪的发布形态固化为发布门常驻拒绝 fixture（skip 是本轮不跑、门是永不放行）；双态资产校验判定单点。
 - [first-party-api-probing.md](docs/standards/first-party-api-probing.md) —— 外部协作者 API 形态的一手源码探针实证：调研/文档转述只作线索，开工前探针实证、替身契约照真实签名镜像、形态断裂按设计级阻断处置（源自 dsh-mcp 运行 20261117-34d4 实录）。
+- [commit-channel-selection.md](docs/standards/commit-channel-selection.md) —— 提交通道判定：[trivial] 限 typo 与纯文档，小但真改代码走快通道（need/spec 三件套），判据 = 动不动 docs 产物之外的文件（源自 20261119-6698 retro 滥用实录）。
 
 ## 兜底基线
 
