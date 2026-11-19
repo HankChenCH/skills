@@ -355,6 +355,19 @@ test('命令 add stdio 与工具同调：settings.update("mcp", …) 调用形�
   }], '命令入口与工具入口产出同一写通道调用（--env/--cwd 选项测试见凭据透传批）');
 });
 
+test('命令 add 选项值含引号：添加期拒收并提示复杂值入口，settings 零调用（2026-11-19 会话实测：引号原样入库 + 空格劈裂延迟到连接期才失败）', async () => {
+  const plugin = await loadPlugin();
+  const ctx = createStubContext();
+  plugin.apply(ctx);
+  const command = ctx.captured.commands[0];
+
+  const reply = await command.handler(mcpInvocation('add remote searcher https://mcp.example.com/mcp --header=Authorization="Bearer tok"'));
+  assert.equal(reply.kind, 'error', '带引号选项值在添加期拒收（失败不延迟到连接期）');
+  assert.match(reply.text ?? '', /引号/, '拒绝信息点名引号问题');
+  assert.match(reply.text ?? '', /mcp_manage|面板/, '拒绝信息给出复杂值替代入口');
+  assert.deepEqual(ctx.captured.settingsCalls, [], '拒收路径 settings 零调用');
+});
+
 test('工具 remove 成功：settings.mutate("mcp", [{op:"unset", path:["servers", 名]}])（AC3 官方 ops 数组形态）', async () => {
   const plugin = await loadPlugin();
   const ctx = createStubContext([viewOf('searcher', { state: 'connected', toolCount: 1, connectedAt: 1 })]);

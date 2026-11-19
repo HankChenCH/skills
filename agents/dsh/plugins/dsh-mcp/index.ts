@@ -445,7 +445,8 @@ const MCP_USAGE = [
   '  /mcp remove <name>',
   '  /mcp enable <name> | /mcp disable <name>',
   '说明：`--` 之后的 token 全部作为 server 参数（含 -- 开头者）；选项值与参数值不含空格，',
-  '含空格或复杂值请用 mcp_manage 工具入口。敏感值用 ${credential:REF} 模板引用',
+  '且值含引号会被拒收（本命令不做引号剥离）。含空格/引号的复杂值请用 mcp_manage 工具或右栏面板入口。',
+  '敏感值用 ${credential:REF} 模板引用',
   '（env/headers/command/args/cwd/url 均可），优先于明文。',
 ].join('\n');
 
@@ -473,6 +474,10 @@ function parseAddOptions(tokens: string[], allowedKeys: ReadonlySet<string>): Pa
       const value = separator === -1 ? undefined : withoutDashes.slice(separator + 1);
       if (!allowedKeys.has(key) || value === undefined || value.length === 0) {
         return `未知或不完整选项 "${token}"——可用：${[...allowedKeys].map((name) => `--${name}=<值>`).join(' ')}（裸 -- 之后的 token 全部作为 server 参数）`;
+      }
+      if (/["']/.test(value)) {
+        return `选项 --${key}=<值> 的值含引号——本命令不做引号剥离，引号会原样入库（值内空格还会把选项劈裂，失败延迟到连接期才暴露）；` +
+          `含空格/引号的复杂值请改用 mcp_manage 工具或右栏面板入口，敏感值优先 \${credential:REF} 模板`;
       }
       if (key === 'cwd') {
         parsed.cwd = value;
