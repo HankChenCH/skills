@@ -102,3 +102,39 @@ test('分发副本逐字同文：codeup.sh 活本与 assets 分发副本', () =>
   const asset = read(path.join('skills', 'setup-workspace', 'assets', 'trackers', 'codeup.sh'));
   assert.equal(asset, live, 'codeup.sh 活本与 assets 分发副本应逐字一致');
 });
+
+// 七技能 publish 步骤引用话术（spec 实现决策 1：只引用投影约定 + 会话自查 MCP，不复制判定树全文）。
+// 话术全库唯一出处 = 本常量与七份 SKILL.md；METHOD §7.1 是约定本体，技能层只保留这一句引用。
+const PUBLISH_CITATION =
+  '投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。';
+const SEVEN_SKILLS = [
+  'dev-clarify',
+  'dev-spec',
+  'dev-plan',
+  'dev-accept',
+  'dev-ship',
+  'dev-fix',
+  'dev-quick-implement',
+] as const;
+
+test('七技能 publish 步骤：投影约定引用 + MCP 自查话术逐字齐备', () => {
+  for (const skill of SEVEN_SKILLS) {
+    const text = read(path.join('skills', skill, 'SKILL.md'));
+    assert.ok(text.includes(PUBLISH_CITATION), `${skill} publish 步骤应含投影约定引用话术`);
+  }
+});
+
+test('七技能不复制判定树全文（发现链与终态映射细节不出技能层）', () => {
+  for (const skill of SEVEN_SKILLS) {
+    const text = read(path.join('skills', skill, 'SKILL.md'));
+    for (const token of [
+      'get_current_organization_info',
+      'search_projects',
+      'get_work_item_types',
+      '100014',
+      '141230',
+    ]) {
+      assert.equal(text.includes(token), false, `${skill} 不得复制判定树细节 ${token}`);
+    }
+  }
+});

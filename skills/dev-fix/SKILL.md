@@ -54,6 +54,7 @@ description: 为缺陷开 fix 工单并送入实现链。入口先分诊定级�
    占位文件（frontmatter `id` 填文件名的 ID 段，`type: fix`，`spec` 必填），跑
    `.sdlc/check.sh validate <占位路径>` 必须通过，再跑
    `publish <占位路径>`。开票提交带 `[trivial]`（流程产物落盘）。
+   投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
 2. **处置 = 排期或不修** → 票留盘（ready）或把不修理由写进 Progress，停，
    不送实现链。
 3. **处置 = 现在修** → **立即用 Skill 工具调用 dev-implement** 实现这张票：

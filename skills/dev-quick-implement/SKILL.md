@@ -135,6 +135,7 @@ created: <date>
 - **显式批准** → 一次推进三态：need → `confirmed`（追加 `confirmed: <今日>`）+
   spec → `approved`（追加 `approved: <今日>`）+ 票保持 `ready`，三张各
   `check.sh publish`，然后进 §6。不再各停一次。
+  投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
 - **沉默不算确认**：等不到显式答复就停在这里，不推进任何状态。
 - **拒绝** → 三件套以草稿态留盘不废弃、实现不开始，指路："/dev-spec 修订续走完整链"。
 
