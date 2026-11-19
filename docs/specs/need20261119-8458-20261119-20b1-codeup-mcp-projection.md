@@ -40,6 +40,7 @@ created: 2026-11-19
 seam 清单（先例：spec 0004 以 PATH 替身断言适配器调用面；该套件形态已随测试框架迁移演进，本轮新落执行器）：
 - **适配器进程级替身**：以假 curl（PATH 前置或本地 HTTP 替身）断言 codeup 适配器外部可观察行为——exit 码、stderr 文案、HTTP 调用序列（创建 category=Req / 评论 / 终态关闭三段）、映射文件写入与幂等追加；含三项配置缺失逐项警告跳过、票与独立知识档跳过、终态/活跃态关闭分支。
 - **技能与文档同步静态断言**：七个技能 publish 步骤含投影约定引用与 MCP 自查话术、决策 1 新话术、METHOD publish 行、GLOSSARY「投影」词条、蓝图 v1.41 修订记录——静态文本守护（先例：ci-workflow.test.ts 对工作流的静态守护、docs-surface.test.ts 的文档面守护）。
+- **legacy 守护套件同批重指向**：`skills/setup-workspace/tests/`（经 config.sh CHECK_TEST 接入 check.sh all）的 codeup 节既有断言同批重指向新受理面契约——need 夹具建单/评论/映射/幂等 + 无谱系知识档跳过，保留既有 case id 与流结构，非删测非改弱（AGENTS.md「改行为必须同步过守护测试」同批纪律；round 1 实现期缺口处置，见备注）。
 - **集成级人工段**：真实云效凭据 + 真实 MCP 会话环境下投影、幂等、终态关闭的人工验收（CI 无法复现真实凭据与 MCP 会话）。
 
 ## 验收场景
@@ -76,3 +77,4 @@ seam 清单（先例：spec 0004 以 PATH 替身断言适配器调用面；该�
 - 本 spec 取代 spec 0004 的 codeup 腿口径（全产物独立 Task 单 → need 建单/知识档评论/票不投）；github/gitlab 腿契约不变。spec 0004 已 done，按 need 0002 既有非目标与 v1.40 修订记录演进，无活文档冲突。
 - A2 靶心查证记录（2026-11-19 一手来源）：需求工作流六态经 MCP `get_work_item_workflow` 实探（默认需求工作流：待处理 100005 / 设计中 156603 / 开发中 142838 / 测试中 100012 / 已完成 100014 / 已取消 141230）；终态关闭 REST 调用面 `PUT /organization/{org}/workitem/{id}` body `{"status":"<ID>"}` 经官方文档核验（help.aliyun.com UpdateWorkitem）；需求类 category 标识 `Req` 经 `get_work_item_types` 响应证实（categoryId 字段）。
 - 空间自动匹配为用户拍板（全零配置形态），代价已知悉：匹配歧义时以问人收口，回写记忆化降低重复询问。
+- round 1 实现期缺口处置（2026-11-20，无人值守自主决策留痕）：票改动面漏列 legacy 守护套件 skills/setup-workspace/tests/legacy_stream.py——其 codeup 节 12 条断言中 5 条（case id run-tests.sh:884/885/886/888/890）在新受理面下必红（夹具为无谱系旧格式 adr，新契约下跳过不投影）。处置=收编入票改动面并同批重指向新契约（候选：拒绝上报停机问人 / 收编入面修订；所选=收编，理由=AGENTS.md「改行为必须同步过守护测试」同批纪律 + 受理面变更必然波及旧夹具断言，非删测非改弱）；测试决策补 legacy 重指向条目。
