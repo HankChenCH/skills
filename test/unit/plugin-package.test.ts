@@ -270,8 +270,9 @@ test('dsh-mcp 依赖面：dependencies 不含 manager，兼容意图 = manager �
 });
 
 test('dsh-mcp 实装观测：profile 工作区（auto-install-peers=false）装本插件后依赖树无 manager 副本', async (t) => {
-  // 前置门（node-test-skip-gate 纪律）：门函数返回 boolean，不可用 t.skip 报因后调用方
-  // 内联 return 截断；pnpm 可用属环境事实，探测失败是环境问题非回归。
+  // 前置门（node-test-skip-gate 纪律）：门函数返回 boolean 报因 + 调用方内联 return 截断
+  // （skip 只做标注）；禁把 skip 封在不截断的 helper 里。pnpm 可用属环境事实，探测失败是
+  // 环境问题非回归。
   const probe = spawnSync('pnpm', ['--version'], { encoding: 'utf8', timeout: 30_000 });
   if (probe.status !== 0) {
     const reason = probe.error?.message ?? probe.stderr?.trim() ?? `退出码 ${probe.status}`;
