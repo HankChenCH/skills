@@ -27,6 +27,11 @@ const PLUGIN_VERSION = JSON.parse(
 const MCP_VERSION = JSON.parse(
   fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-mcp', 'package.json'), 'utf8'),
 ).version;
+// shim 模拟官方 CLI 的运行时版本缺省值单源（Fowler 重复代码基线）：SHIM_BODY 两处缺省
+// 与各断言共用同一常量——两处缺省若被各自改动，「同 rc 通过形态」会静默破形；
+// SHIM_RUNTIME_VERSION_RE 为正则插值形态（点号转义）。
+const SHIM_RUNTIME_VERSION = '0.2.2-rc.5';
+const SHIM_RUNTIME_VERSION_RE = SHIM_RUNTIME_VERSION.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // shim 模拟官方命令（docs/plugin-assets.md §2.3 两落点语义 + §2.4 运行时版本面）：
 // 记录完整 argv；`--version` 探测按 DSH_SHIM_CLI_VERSION 应答（DSH_SHIM_VERSION_FAIL=1
@@ -49,7 +54,7 @@ if (argv.includes('--version')) {
   if (process.env.DSH_SHIM_VERSION_FAIL) {
     process.exit(1);
   }
-  process.stdout.write((process.env.DSH_SHIM_CLI_VERSION || '0.2.2-rc.5') + '\\n');
+  process.stdout.write((process.env.DSH_SHIM_CLI_VERSION || ${JSON.stringify(SHIM_RUNTIME_VERSION)}) + '\\n');
   process.exit(0);
 }
 const idx = argv.indexOf('plugin');
@@ -69,7 +74,7 @@ if (idx !== -1) {
     fs.mkdirSync(mgrDir, { recursive: true });
     const body = process.env.DSH_SHIM_MANAGER_VERSION === 'corrupt'
       ? '{ not-json'
-      : JSON.stringify({ name: '@deepseek-ai/dsh-mcp-manager', version: process.env.DSH_SHIM_MANAGER_VERSION || process.env.DSH_SHIM_CLI_VERSION || '0.2.2-rc.5' }, null, 2);
+      : JSON.stringify({ name: '@deepseek-ai/dsh-mcp-manager', version: process.env.DSH_SHIM_MANAGER_VERSION || process.env.DSH_SHIM_CLI_VERSION || ${JSON.stringify(SHIM_RUNTIME_VERSION)} }, null, 2);
     fs.writeFileSync(path.join(mgrDir, 'package.json'), body);
   }
 }
@@ -651,11 +656,11 @@ test('[FR-4] plugin add @hankchen/dsh-mcp（同 rc）：完成摘要含运行时
   assert.equal(code, 0, `同 rc 安装应成功退出：${stdout}${stderr}`);
   // shim 收到两笔调用：先官方安装、后 --version 探测（探测沿安装同款执行体）
   assert.deepEqual(readShimCalls(shimLog), [['plugin', '--profile', 'dev', 'add', MCP], ['--version']]);
-  // 完成摘要报告两版本号（shim 缺省：CLI 探测值 = manager 副本版本 = 0.2.2-rc.5）
+  // 完成摘要报告两版本号（shim 缺省：CLI 探测值 = manager 副本版本 = SHIM_RUNTIME_VERSION）
   const plain = plainText(stdout);
   assert.ok(plain.includes('就绪核验通过'), `摘要应含就绪核验通过：${stdout}`);
-  assert.ok(plain.includes('运行时dsh0.2.2-rc.5'), '摘要应含运行时版本号');
-  assert.ok(plain.includes('manager0.2.2-rc.5'), '摘要应含 manager 解析版本号');
+  assert.ok(plain.includes(`运行时dsh${SHIM_RUNTIME_VERSION}`), '摘要应含运行时版本号');
+  assert.ok(plain.includes(`manager${SHIM_RUNTIME_VERSION}`), '摘要应含 manager 解析版本号');
 });
 
 test('[FR-5] plugin add @hankchen/dsh-mcp（异 rc）：退出非零 + 三段处方与 README 恢复配方逐段一致', (t) => {
@@ -672,13 +677,13 @@ test('[FR-5] plugin add @hankchen/dsh-mcp（异 rc）：退出非零 + 三段处
   });
   assert.equal(code, 1, '异 rc 应 fail-loud 退出非零');
   assert.match(stderr, /✗ 装后就绪核验未通过/, '应经 ✗ 通道点名核验未通过');
-  assert.match(stderr, /运行时 dsh 0\.2\.2-rc\.5 与 manager 解析版 0\.2\.2-rc\.2 不同版/, '头行应报告两版本号');
+  assert.match(stderr, new RegExp(`运行时 dsh ${SHIM_RUNTIME_VERSION_RE} 与 manager 解析版 0\\.2\\.2-rc\\.2 不同版`), '头行应报告两版本号');
   // 三段处方（段 1 覆盖写法 / 段 2 补装并重装依赖 / 段 3 重载指引）——锚词与可复制替换值
   assert.match(stderr, /overrides:/, '段 1 应含覆盖配置写法');
-  assert.match(stderr, /'@deepseek-ai\/dsh-mcp-manager': 0\.2\.2-rc\.5/, '段 1 应钉运行时同版（可复制 YAML）');
+  assert.match(stderr, new RegExp(`'@deepseek-ai/dsh-mcp-manager': ${SHIM_RUNTIME_VERSION_RE}`), '段 1 应钉运行时同版（可复制 YAML）');
   assert.match(stderr, /重装 profile 依赖/, '段 2 应含 README 段 2 锚词');
   assert.ok(
-    stderr.includes(`pnpm --dir "${dshHome}${path.sep}profiles${path.sep}dev" add @deepseek-ai/dsh-mcp-manager@0.2.2-rc.5`),
+    stderr.includes(`pnpm --dir "${dshHome}${path.sep}profiles${path.sep}dev" add @deepseek-ai/dsh-mcp-manager@${SHIM_RUNTIME_VERSION}`),
     '段 2 应是可复制命令（profile 实路径 + 运行时同版）',
   );
   assert.match(stderr, /plugin_manager set_plugin/, '段 3 应含重载指引工具路径');
@@ -705,9 +710,9 @@ test('[FR-5] plugin add @hankchen/dsh-mcp（缺副本）：退出非零 + 三段
   });
   assert.equal(code, 1, '缺 manager 副本应 fail-loud 退出非零');
   assert.match(stderr, /✗ 装后就绪核验未通过/, '应经 ✗ 通道点名核验未通过');
-  assert.match(stderr, /缺 @deepseek-ai\/dsh-mcp-manager 解析副本.*运行时 dsh 0\.2\.2-rc\.5/, '头行应点名缺副本并带运行时版本');
+  assert.match(stderr, new RegExp(`缺 @deepseek-ai/dsh-mcp-manager 解析副本.*运行时 dsh ${SHIM_RUNTIME_VERSION_RE}`), '头行应点名缺副本并带运行时版本');
   assert.match(stderr, /overrides:/, '段 1 应含覆盖配置写法');
-  assert.match(stderr, /add @deepseek-ai\/dsh-mcp-manager@0\.2\.2-rc\.5/, '段 2 补装应钉运行时同版');
+  assert.match(stderr, new RegExp(`add @deepseek-ai/dsh-mcp-manager@${SHIM_RUNTIME_VERSION_RE}`), '段 2 补装应钉运行时同版');
   assert.match(stderr, /plugin_manager set_plugin/, '段 3 应含重载指引');
   const lockfile = readLockfileAt(project);
   assert.equal(lockfile.plugins[MCP].profile, 'dev', '安装应已记账（缺副本也是装后事实）');
@@ -727,7 +732,7 @@ test('[FR-5] plugin add @hankchen/dsh-mcp（副本损坏）：退出非零 + hea
   });
   assert.equal(code, 1, '副本损坏应 fail-loud 退出非零');
   assert.match(stderr, /✗ 装后就绪核验未通过/, '应经 ✗ 通道点名核验未通过');
-  assert.match(stderr, /解析副本损坏.*运行时 dsh 0\.2\.2-rc\.5/, '头行应按实报因（副本损坏）并带运行时版本');
+  assert.match(stderr, new RegExp(`解析副本损坏.*运行时 dsh ${SHIM_RUNTIME_VERSION_RE}`), '头行应按实报因（副本损坏）并带运行时版本');
   assert.match(stderr, /overrides:/, '处方照常呈现');
   assert.equal(stdout.includes('核验通过') || stderr.includes('核验通过'), false, '失败路径全文不得含「核验通过」');
   const lockfile = readLockfileAt(project);
