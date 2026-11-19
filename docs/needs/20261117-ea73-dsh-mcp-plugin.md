@@ -2,7 +2,7 @@
 id: 20261117-ea73
 status: fulfilled
 created: 2026-11-17
-fulfilled: 2026-11-18
+fulfilled: 2026-11-20
 confirmed: 2026-11-17
 ---
 # infra 第二款 dsh 插件：MCP 对话内管理插件（对标 zcode 配置体验）
