@@ -343,6 +343,31 @@ test('就绪核验（探测失败·输出不可解析）：probe-unavailable', (
   assert.deepEqual(outcome, { kind: 'probe-unavailable' });
 });
 
+// 非法变体逐个喂解析入口（parse-normalization 规则 3/4 自查口径：解析失败显式落
+// probe-unavailable、分支带尾锚）——四段版本不得截段、日期横幅不得错位命中。
+test('就绪核验（探测失败·输出非法变体）：四段版本不截段、日期横幅不错位', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
+  const illegal = ['1.2.3.4\n', '2026.11.19 dsh 0.2.2-rc.5\n'];
+  for (const stdout of illegal) {
+    const probe = makeProbeStub(t, { status: 0, stdout });
+    const outcome = readiness(t, { profilePath, run: probe.run });
+    assert.deepEqual(outcome, { kind: 'probe-unavailable' }, `输出 ${JSON.stringify(stdout)} 应落探测失败，不得静默接受为版本`);
+  }
+});
+
+// 裸行形态（探针实证：官方 --version 输出 '0.2.2-rc.5\n' 裸行）逐行锚定取首个命中行：
+// 横幅行 + 裸版本行共存时取裸版本行；v 前缀与行首尾空白容忍、整行非版本不命中。
+test('就绪核验（探测·裸行形态）：多行取首个命中行，v 前缀与首尾空白可解析', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub(t, { status: 0, stdout: '2026.11.19 dsh\n v0.2.2-rc.5 \n' });
+
+  const outcome = readiness(t, { profilePath, run: probe.run });
+
+  assert.deepEqual(outcome, { kind: 'pass', runtimeVersion: '0.2.2-rc.5', managerVersion: '0.2.2-rc.5' });
+});
+
 test('就绪核验：dsh 不在 PATH 时探测沿 npx 执行体同款 launcher', (t) => {
   const profilePath = makeProfileDir(t);
   makeManagerCopy(t, profilePath, '0.2.2-rc.5');

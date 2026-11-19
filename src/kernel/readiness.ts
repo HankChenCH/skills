@@ -25,11 +25,19 @@ export type ReadinessOutcome =
   | { kind: 'missing'; runtimeVersion: string }
   | { kind: 'probe-unavailable' };
 
-// 从官方 CLI --version 输出提取版本：取首个 semver 形 token（判定单点，parse-normalization）；
-// 无可解析 token = 探测失败（输出形态漂移同因同位报「不可得」，不猜）。
+// 从官方 CLI --version 输出提取版本：按裸版本行判定（判定单点，parse-normalization）。
+// 逐行 trim 后整行锚定取首个命中行（探针实证 2026-11-19 留痕票 Progress：官方
+// `--version` 输出 '0.2.2-rc.5\n' 裸行形态）；整行尾锚挡截段与错位——'1.2.3.4' 截段、
+// '2026.11.19 … 0.2.2-rc.5' 横幅错位等非法变体不得静默接受为版本（parse-normalization
+// 规则 4：新形态分支带尾锚），无命中行 = 探测失败，同因同位报「不可得」，不猜。
 function parseRuntimeVersion(stdout: string): string | undefined {
-  const match = stdout.match(/\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?/);
-  return match === null ? undefined : match[0];
+  for (const line of stdout.split('\n')) {
+    // v 前缀在锚内容忍（node --version 风格输出），归约产出纯 semver 值——
+    // 前缀剥离归解析单点，精确比对消费方拿到的键无 v/无 v 之别。
+    const match = line.trim().match(/^v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$/);
+    if (match !== null) return match[1];
+  }
+  return undefined;
 }
 
 // manager 解析副本版本：读 profile 依赖树中 manager 包的 package.json（官方 pnpm 安装落点）。
