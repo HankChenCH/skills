@@ -21,6 +21,7 @@ interface FixturePluginPackage {
   name?: string;
   type?: string;
   files?: string[];
+  dependencies?: Record<string, string>;
   exports?: Record<string, unknown>;
   dsh?: { bundle?: { patch?: string }; client?: Record<string, unknown> };
 }
@@ -162,6 +163,44 @@ test('patch 文件为顶层数组但 insert 元素缺 id 即拒绝，缺陷点�
   assert.equal(defects.length, 1, `应只报缺 id 一项，实际：${JSON.stringify(defects)}`);
   assert.match(defects[0], /insert/);
   assert.match(defects[0], /\bid\b/);
+});
+
+// ---------- 依赖面拒绝校验（票 20261119-f3e4，评审 20261119-47e1 阻断 1；源码态口径）----------
+// 证伪形态常驻门（docs/standards/falsified-form-gate.md）：dependencies 携带
+// @deepseek-ai/dsh-mcp-manager 副本是被真实协作者证伪的发布形态——2026-11-19 desktop 事故
+// （插件依赖副本被 profile 供应链门解析到过旧版、劫持官方预挂 manager 行的模块解析，宿主
+// 静默禁用官方行）。判定单点 collectBundleDefectsFor 两态同查：源码态直测在本文件，发布态
+// （目录态 + tarball 态）在 verify-bundle-publish.test.ts；verify-pack 发布对账（查 2）复用
+// 同一判定函数，一处加门即同时武装发布对账。先例 FR-7 证伪形态落 verify-bundle 发布态拒绝。
+
+test('dependencies 携带 @deepseek-ai/dsh-mcp-manager 即拒绝（2026-11-19 desktop 事故证伪形态常驻拒绝）', async (t) => {
+  const dir = await writeValidPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    pkg.dependencies = { '@deepseek-ai/dsh-mcp-manager': '^0.2.2-rc.2' };
+  });
+  const defects = collectBundleDefects(dir);
+  assert.ok(
+    defects.some((defect) => /dependencies/.test(defect) && /dsh-mcp-manager/.test(defect)),
+    `应拒绝 dependencies 携带 manager 副本，实际：${JSON.stringify(defects)}`,
+  );
+  assert.match(
+    defects.join('\n'),
+    /desktop 事故/,
+    '缺陷信息应引用 2026-11-19 desktop 事故（falsified-form-gate：缺陷信息引用证伪报告）',
+  );
+});
+
+test('dependencies 不含 manager 的普通依赖放行（拒绝门只针对 manager 副本）', async (t) => {
+  const dir = await writeValidPlugin(await makeTempRoot(t));
+  await rewritePackageJson(dir, (pkg) => {
+    pkg.dependencies = { 'js-yaml': '^4.1.0' };
+  });
+  const defects = collectBundleDefects(dir);
+  assert.deepEqual(
+    defects,
+    [],
+    `不含 manager 的普通 dependencies 不应报缺陷，实际：${JSON.stringify(defects)}`,
+  );
 });
 
 // .ts 形态插件包（spec 20261115-f650 demo 插件 .ts 化契约：main 直指 .ts 模块）。

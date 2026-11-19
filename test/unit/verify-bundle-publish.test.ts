@@ -268,3 +268,35 @@ test('发布态 tarball 客户端载体齐备通过（真实 tar 布局）', asy
   assert.equal(pack.status, 0, `fixture tar 打包应成功：${pack.stderr}`);
   assert.deepEqual(collectTarballBundleDefects(tarball), []);
 });
+
+// ---------- 依赖面拒绝校验（票 20261119-f3e4，评审 20261119-47e1 阻断 1；发布态口径）----------
+// 证伪形态常驻门（docs/standards/falsified-form-gate.md，先例 FR-7 证伪形态落发布态拒绝）：
+// dependencies 携带 @deepseek-ai/dsh-mcp-manager 是 2026-11-19 desktop 事故证伪的发布形态
+// （插件依赖副本被 profile 供应链门解析到过旧版、劫持官方预挂 manager 行的模块解析，宿主
+// 静默禁用官方行），且该形态已随 0.3.2 烧进 registry——发布面必须常驻拦截。目录态与 tarball
+// 态同断言（同一判定单点 collectBundleDefectsFor；verify-pack 发布对账查 2 亦复用之）。
+
+test('发布态 dependencies 携带 @deepseek-ai/dsh-mcp-manager 即拒绝（desktop 事故证伪形态），目录态与 tarball 态同拒', async (t) => {
+  const root = await makeTempRoot(t);
+  const tarball = await stagePublishTarball(root, {
+    mutate: (pkg) => {
+      pkg.dependencies = { '@deepseek-ai/dsh-mcp-manager': '^0.2.2-rc.2' };
+    },
+  });
+  const tarballDefects = collectTarballBundleDefects(tarball);
+  assert.ok(
+    tarballDefects.some((defect) => /dependencies/.test(defect) && /dsh-mcp-manager/.test(defect)),
+    `发布态 tarball 应拒绝 dependencies 携带 manager，实际：${JSON.stringify(tarballDefects)}`,
+  );
+  assert.match(
+    tarballDefects.join('\n'),
+    /desktop 事故/,
+    '缺陷信息应引用 2026-11-19 desktop 事故（falsified-form-gate：缺陷信息引用证伪报告）',
+  );
+  // 目录态（解包等价口径，同一判定单点）
+  const dirDefects = collectPublishedBundleDefects(path.join(root, 'package'));
+  assert.ok(
+    dirDefects.some((defect) => /dependencies/.test(defect) && /dsh-mcp-manager/.test(defect)),
+    `发布态目录应拒绝 dependencies 携带 manager，实际：${JSON.stringify(dirDefects)}`,
+  );
+});

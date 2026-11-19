@@ -17,8 +17,13 @@
     "prepack": "node scripts/prepack.ts",
     "postpack": "node scripts/postpack.ts"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@deepseek-ai/dsh-mcp-manager": "^0.2.2-rc.2"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-mcp-manager": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "typescript": "^5.9.3"
