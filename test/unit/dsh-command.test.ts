@@ -73,18 +73,13 @@ test('node 恰在基线 24.9.0：放行（>= 判定）', () => {
   assert.doesNotThrow(() => assertPluginPreconditions({ nodeVersion: 'v24.9.0', profile: 'dev' }));
 });
 
-test('目标 profile 为 desktop：拒装并说明官方保留名行为', () => {
-  assert.throws(
-    () => assertPluginPreconditions({ nodeVersion: 'v24.22.1', profile: 'desktop' }),
-    (err) => {
-      assert.match((err as Error).message, /desktop/);
-      assert.match((err as Error).message, /保留/);
-      return true;
-    },
-  );
+// desktop 放行（spec 20261119-7a9a FR-3，票 20261119-443c）：官方 CLI 已放行 desktop 插件
+// 管理（2026-11-19 实证），保留名拒装分支移除——desktop 过前置不再被拒。
+test('目标 profile 为 desktop：前置放行，不再抛保留名错误', () => {
+  assert.doesNotThrow(() => assertPluginPreconditions({ nodeVersion: 'v24.22.1', profile: 'desktop' }));
 });
 
-test('node 与 profile 双不满足：node 前置先行（第一时刻拦截）', () => {
+test('node 低于基线且 profile 为 desktop：node 前置照常拦截（第一时刻）', () => {
   assert.throws(
     () => assertPluginPreconditions({ nodeVersion: 'v22.23.4', profile: 'desktop' }),
     (err) => (err as Error).message.includes('22.23.4'),
