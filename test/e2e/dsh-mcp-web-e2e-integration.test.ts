@@ -870,8 +870,8 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
 //    一手文本：pnpm --dir "<profile>" add manager@<运行时版>）——供给责任移交安装流
 //    （spec 方案 2），供给后钉实装版本 = 运行时同版。
 //
-// 前置门四条件（ad91 形态映射，工单 AC4）：node 版本 ≥24.9.0 / registry 可达 / 兼容星座
-// 可达——复用上方 assertGate 三探测，各 skip 留因（版本家族正则沿既有 rc 宽松匹配，不硬钉）；
+// 前置门四条件（ad91 形态映射，工单 AC4）：assertGate 三探测 = node 版本 ≥24.9.0 / pnpm /
+// registry+兼容星座（合并探测），各 skip 留因（版本家族正则沿既有 rc 宽松匹配，不硬钉）；
 // 「包已 pack」= 本地 pack 真跑（tarball 形态不依赖 registry 发布，ad91「包未发布」条件的
 // 本形态映射，round 1 sdk 用例同款口径），pack 命令失败 skip 留输出尾；仓库树残留核对在
 // skip 捕获面之外保持真失败（postpack 还原被破坏 = 永不放行形态，falsified-form-gate 纪律）。
@@ -928,12 +928,19 @@ async function packTarballOrSkip(t: TestContext): Promise<string | null> {
 // （实装插件清单 dependencies——剥依赖产物经 pack→官方装往返的工件级锚）。
 function scanManagerCopies(root: string): string[] {
   const hits: string[] = [];
-  const walk = (dir: string): void => {
+  // 错误纪律（评审 20261120-27ea 阻断 1）：只容忍根调用点 ENOENT（node_modules 目录缺席 =
+  // 无副本）；其余 IO 错（EACCES/EIO/EMFILE/ENOTDIR 等）带路径与原因上抛真失败——本遍历是
+  // FR-1 集成级唯一守卫，IO 失败静默降级 = 假绿（同族先例 dsh-mcp-pack-lock.ts：只把
+  // EEXIST 当锁被占，其余上抛）。
+  const walk = (dir: string, isRoot: boolean): void => {
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return; // 目录不存在（无 node_modules）= 无副本
+    } catch (err) {
+      if (!isRoot || (err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw err; // 非根 ENOENT 或其余 IO 错：ErrnoException 自带 path/code，上抛即真失败
+      }
+      return; // 根调用点目录不存在（无 node_modules）= 无副本
     }
     for (const entry of entries) {
       if (!entry.isDirectory()) continue;
@@ -942,10 +949,10 @@ function scanManagerCopies(root: string): string[] {
         hits.push(path.relative(root, full));
         continue; // 副本内部不再下钻
       }
-      walk(full);
+      walk(full, false);
     }
   };
-  walk(root);
+  walk(root, true);
   return hits;
 }
 
@@ -977,6 +984,22 @@ function assertProfileTreeWithoutManagerCopy(dshHome: string): void {
     '实装插件包清单 dependencies 不应含 manager（剥依赖产物经 pack→官方装往返存活）',
   );
 }
+
+// FR-1 集成守卫的证伪形态（评审 20261120-27ea 阻断 1 红绿环）：镜像 assertProfileTreeWithoutManagerCopy
+// 的真实调用形态——以 profile 的 node_modules 路径为根调用；该根是普通文件而非目录时
+// readdirSync(根) 抛 ENOTDIR（非 ENOENT）——守卫必须带路径上抛真失败，不得吞成「无副本」
+// 假绿（本遍历是 FR-1 集成级唯一自动守卫，静默降级恰坏在本票核心负断言上；同族先例
+// dsh-mcp-pack-lock.ts：只把 EEXIST 当锁被占，其余 IO 错带路径与原因上抛）。
+test(`[FR-7|集成级] scanManagerCopies 守卫对非 ENOENT 的 IO 错不假绿：根 node_modules 为普通文件（readdirSync ENOTDIR）应带路径上抛真失败`, (t) => {
+  const parent = makeTempDir(t, 'dsh-mcp-web-fr1-guard-');
+  const root = path.join(parent, 'node_modules');
+  fs.writeFileSync(root, 'not a directory', 'utf8');
+  assert.throws(
+    () => scanManagerCopies(root),
+    (err: NodeJS.ErrnoException) => err.code === 'ENOTDIR' && err.path === root,
+    'scanManagerCopies 对非 ENOENT 的 IO 错应带路径上抛（FR-1 集成守卫不得静默降级为「无副本」）',
+  );
+});
 
 // manager 供给（就绪核验处方段 2 同形态，供给责任移交安装流）：pnpm --dir "<profile>" add
 // manager@<运行时版>；供给后钉实装版本 = 兼容星座同版（boot 兼容门 peer 精确钉同 rc）。
@@ -1120,8 +1143,8 @@ async function expectObserverSignature(readLog: () => string, pattern: RegExp, w
 }
 
 test(`[FR-7|集成级] ${PKG} 剥依赖后真跑回归：官方命令装进 web profile → 真 boot → /mcp 命令与 mcp_manage 工具注册可用、官方 manager 行 active、安装后依赖树无 manager 副本`, async (t) => {
-  // 前置门四条件：node 版本 / pnpm / registry / 兼容星座（assertGate 内各 skip 留因）+
-  // 包已 pack（packTarballOrSkip skip 留输出尾）
+  // 前置门四条件：assertGate 三探测 = node 版本 / pnpm / registry+兼容星座（合并探测，
+  // 各 skip 留因）+「包已 pack」（packTarballOrSkip skip 留输出尾）
   if (!assertGate(t)) return;
 
   // —— 准备段：临时 DSH_HOME（绝不指向 ~/.dsh）+ 官方链路装剥依赖插件（无供给步骤）——
@@ -1171,9 +1194,8 @@ test(`[FR-7|集成级] ${PKG} 剥依赖后真跑回归：官方命令装进 web 
   t.after(() => watch.close());
   watch.send({ type: 'open', streamId: 'fr7-watch', endpoint: 'mcpManager/watch', payload: { args: {} } });
   const initial = await waitForWatchItem(watch, () => true, { timeoutMs: CONNECT_TIMEOUT_MS });
+  // matched=true 由 waitForWatchItem 的 item 帧判定（frame.type==='item' 且 Array.isArray(frame.value)
+  // 才写 lastSeen）——「收到数组批次」已被钉；首批内容契约归 FR-8 用例（本用例文件头声明不
+  // 重复承载），不再重复断言（评审 20261120-27ea 建议 2：永真断言删除）。
   assert.ok(initial.matched, `mcpManager/watch 订阅应推送全量列表批次（官方 manager 行 Remote 面真活；${CONNECT_TIMEOUT_MS / 1000}s 内无 item 帧）——末帧：${initial.lastSeen.slice(0, 400)}`);
-  assert.ok(
-    Array.isArray(JSON.parse(initial.lastSeen) as unknown),
-    `watch 首批应为 McpManagedServerView 全量数组：${initial.lastSeen.slice(0, 200)}`,
-  );
 });
