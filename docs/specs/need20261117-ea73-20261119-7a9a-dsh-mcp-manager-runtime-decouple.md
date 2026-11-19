@@ -1,10 +1,11 @@
 ---
 id: 20261119-7a9a
-status: approved
+status: done
 need: 20261117-ea73
 round: 2
 created: 2026-11-19
 approved: 2026-11-19
+done: 2026-11-20
 ---
 # manager 依赖与宿主运行时解耦 round 2：依赖副本剥离 + 安装流就绪核验
 
@@ -54,8 +55,8 @@ round 2 = 依赖解耦 + 安装流就绪核验（分轮拍板 2026-11-19：用�
 - [FR-1 | 工单级] Given 插件包目录，When 检视 package.json，Then `dependencies` 不含 `@deepseek-ai/dsh-mcp-manager`，可选 peer 声明在场且 optional 元数据正确；Given 常规安装路径（profile 工作区 `autoInstallPeers: false`），When 安装本插件，Then profile 依赖树不出现 manager 副本。
 - [FR-2 | 工单级] Given 两面编译发布态，When verify-bundle / verify-pack，Then 四要素与三查通过，包内插件清单不变。
 - [FR-3 | 工单级] Given 初始化器 `plugin add`，When 目标 profile 为 desktop（带名与交互勾选两路径），Then 不再拒装、转发官方命令成功、两落点对账与锁文件记账照旧；保留名清单为空或不含 desktop。
-- [FR-4 | 工单级] Given 目标 profile 运行时 dsh 版本与 manager 解析版同 rc，When 装后就绪核验，Then 核验通过并在完成摘要中报告两版本号。
-- [FR-5 | 工单级] Given 运行时 rc.X 而 manager 解析版 rc.Y（X≠Y）或缺 manager 副本，When 装后就绪核验，Then 进程退出非零、输出三段处方（依赖覆盖写法 / 补装命令 / 重载指引），三段均可复制执行且与 README 恢复配方一致。
+- [FR-4 | 工单级] Given 目标 profile 运行时 dsh 版本与 manager 解析版精确同版（蒸馏 20261120-83bf 按实际边界行为修订：实现镜像宿主 boot 兼容门「peer 精确钉同 rc」形态采用精确比对，较原文「同 rc」字面收紧、fail-loud 安全；范围拍板见 ADR 20261120-5606），When 装后就绪核验，Then 核验通过并在完成摘要中报告两版本号。
+- [FR-5 | 工单级] Given 运行时与 manager 解析版非精确同版（或缺 manager 副本；原文「rc.X ≠ rc.Y」为精确比对在 prerelease 域的子集，验收 20261120-83bf 裁决不构成走样），When 装后就绪核验，Then 进程退出非零、输出三段处方（依赖覆盖写法 / 补装命令 / 重载指引），三段均可复制执行且与 README 恢复配方一致。
 - [FR-6 | 工单级] Given 运行时版本探测失败（无可用来源），When 装后就绪核验，Then 输出警告并继续完成安装（退出零），警告含手工核验途径，不输出「核验通过」字样。
 - [FR-7 | 集成级 | 承载票 NNNN] Given 兼容星座真跑组合（ADR ad91 集成前置门形态）web 形态，When 真实 boot 并安装修订后插件，Then `/mcp` 命令与 `mcp_manage` 工具注册可用、官方 manager 行 active、profile 依赖树无 manager 副本（8a57 FR-8 既有集成测试零修改通过为回归基线）。
 - [FR-8 | 集成级 | 人工：desktop 运行时归 Electron app 独占，CLI 无法驱动真实 desktop boot] Given desktop profile 走完整安装流（初始化器直装 + 就绪核验），When app 重启加载，Then manager 行与本插件行双 active、`/mcp list` 与右栏面板可用——2026-11-19 事故三联征不复现；操作截图与 boot 日志留痕。

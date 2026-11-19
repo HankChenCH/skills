@@ -59,16 +59,22 @@ confirmed: 2026-11-17
 
 ## 假设与风险
 
-- **A1（风险→已归置）持久化机制选型**【验证通过（验收 20261118-ef01）：官方 Settings→ConfigEditor 链路实测成立，零自管文件，stage2 重启自动重连实证】：对话内变更落到哪——Cordis `fiber.update()` 官方持久化链路，还是插件自管一份独立配置文件？影响 FR-3 实现路线；选错则迁移成本高。**已转 FR-9 调研交付物**（dev-research：mcp-manager 的 Volatile 配置写入路径 + Cordis commit waterfall 的持久化落点 + dsh-hmr 对 patch 文件改动的反应）。
-- **A2（风险→已归置）命令入口在各运行形态的可用性**【验证通过（验收 20261118-ef01）：sdk 形态下 /mcp 命令与工具双入口全链真跑可用；headless/acp 无官方触发面为既定事实（非目标）】：两类入口在 web / tui / headless 各形态的可见性与交互约束（headless 一次性任务里人类命令无意义）。影响 FR-1 交互面范围。**已转 FR-9 调研交付物**。
-- **A3（风险）官方组件版本漂移**【验证通过（验收 20261118-ef01）：漂移风险显形过一次并被处置——manager peer 精确钉兄弟 rc、主包 latest（rc.1）与兼容星座（next=rc.4）错位，插件 engines.dsh>=0.2.2-rc.2 如实钉版 fail-loud（ADR 20261118-ad91）；错配组合被官方安装门显式拒绝，集成真跑在兼容星座下全绿】：三件套中 mcp-resources 尚在 0.1.6-alpha、manager 0.2.2-rc.2 与 CLI latest（0.2.2-rc.1）版本错位，接口仍在快跑。代价：插件 pin 的引擎范围与 config 形态需跟进；不确定度：中。缓解：照 339e A2 同款收敛——只依赖官方公开 Config schema（config-catalog 生成物），不自实现落盘逻辑。
-- **A4（假设）`engines.dsh` 校验对依赖包的适用面**【验证通过（验收 20261118-ef01，spec 实测结论）：官方 allow-version 豁免不覆盖错配依赖——boot 兼容门再禁用 manager 行 + peer 解析缺导出（975b 探针四步实证）；如实钉版为唯一正确缓解】：插件依赖 mcp-manager 后，版本豁免语义是否同样覆盖依赖包，以官方行为为准。5 分钟查证成本高（需真跑），转假设交 spec 实测。
+- **A1（风险→已归置）持久化机制选型**【验证通过（验收 20261118-ef01）：官方 Settings→ConfigEditor 链路实测成立，零自管文件，stage2 重启自动重连实证】：对话内变更落到哪——Cordis `fiber.update()` 官方持久化链路，还是插件自管一份独立配置文件？影响 FR-3 实现路线；选错则迁移成本高。**已转 FR-9 调研交付物**（dev-research：mcp-manager 的 Volatile 配置写入路径 + Cordis commit waterfall 的持久化落点 + dsh-hmr 对 patch 文件改动的反应）。**round 2（验收 20261120-83bf）：本轮未触发**——round 2 未触碰持久化机制，cordis.patch.yml 两行结构与写通道保持 round 1 形态，假设前提无变化。
+- **A2（风险→已归置）命令入口在各运行形态的可用性**【验证通过（验收 20261118-ef01）：sdk 形态下 /mcp 命令与工具双入口全链真跑可用；headless/acp 无官方触发面为既定事实（非目标）】：两类入口在 web / tui / headless 各形态的可见性与交互约束（headless 一次性任务里人类命令无意义）。影响 FR-1 交互面范围。**已转 FR-9 调研交付物**。**round 2（验收 20261120-83bf）：本轮未触发**——入口面未改；FR-7 自动化段 /mcp 与 mcp_manage 注册断言全绿佐证入口面未被本轮改动破坏。
+- **A3（风险）官方组件版本漂移**【验证通过（验收 20261118-ef01）：漂移风险显形过一次并被处置——manager peer 精确钉兄弟 rc、主包 latest（rc.1）与兼容星座（next=rc.4）错位，插件 engines.dsh>=0.2.2-rc.2 如实钉版 fail-loud（ADR 20261118-ad91）；错配组合被官方安装门显式拒绝，集成真跑在兼容星座下全绿】：三件套中 mcp-resources 尚在 0.1.6-alpha、manager 0.2.2-rc.2 与 CLI latest（0.2.2-rc.1）版本错位，接口仍在快跑。代价：插件 pin 的引擎范围与 config 形态需跟进；不确定度：中。缓解：照 339e A2 同款收敛——只依赖官方公开 Config schema（config-catalog 生成物），不自实现落盘逻辑。**round 2（验收 20261120-83bf）：验证通过（本轮触发并处置）**——desktop 事故即 A3 再显形：宿主强制 manager ≡ 运行时同 rc，发布期静态版本范围无法跨宿主保证（ADR 20261118-ad91 决策 1 被证伪）。round 2 机制性缓解成立并经真跑核销：插件依赖副本剥离（可选 peer 零副本）+ 装后就绪核验把版本决策移到安装时点 + desktop 探针实证裁决探测源（详见 ADR 20261120-5606）。
+- **A4（假设）`engines.dsh` 校验对依赖包的适用面**【验证通过（验收 20261118-ef01，spec 实测结论）：官方 allow-version 豁免不覆盖错配依赖——boot 兼容门再禁用 manager 行 + peer 解析缺导出（975b 探针四步实证）；如实钉版为唯一正确缓解】：插件依赖 mcp-manager 后，版本豁免语义是否同样覆盖依赖包，以官方行为为准。5 分钟查证成本高（需真跑），转假设交 spec 实测。**round 2（验收 20261120-83bf）：验证通过（风险面随本轮交付消除）**——依赖副本剥离后插件不再向 profile 依赖树引入任何 manager 副本（FR-1 真装观测 + FR-7 集成三面断言），A4 指向的风险面从插件侧不复存在；engines.dsh 钉版与可选 peer 的 fail-loud 形态保持。
 
 ## 验收折回（20261118-ef01 passed）
 
 残余风险（发布后核销义务随第 1 条）：①`@hankchen/dsh-mcp` 未发布（registry E404）——维护者按 plugin-assets.md §1.4 双包顺序 publish 后，须跑 `node --test test/e2e/dsh-mcp-e2e-integration.test.ts` 第二 test + `npm view` 版本对账（package.json 0.1.0）补齐 FR-3 人工对账；②官方兼容星座 latest 错位仍在（dsh latest=rc.1，兼容组合在 next=rc.4）——latest 宿主装插件被 engines 显式拒装属预期 fail-loud，生态修复后无需改插件直装；③测试串行形态无钉住断言（f2e3 留痕，~10 行补钉归后续 test/unit 票）；④zz-bad-fixture 根因仍在（坏 fixture 建在真实编目源，串行化已消除当前失败面，届时升级 root 注入）；⑤headless/acp 人类命令无官方触发面（非目标既定）；⑥docs/getting-started.md 插件叙事滞后一款（文档债归发布轮）。
 
 下一轮建议：发布轮（插件包 publish + 发布后核销 + 文档更新）；官方 latest 升级后观察项；测试面补钉随下次 test/unit 改动面票承接。无未核销成功标准（FR-1～FR-9 全核销，FR-3 带发布后核销义务）。
+
+## 验收折回（20261120-83bf passed）
+
+残余风险（round 2，验收报告 20261120-83bf）：①FR-8 desktop 真机验证未执行——spec 明文人工场景，宿主无 Electron 驱动原语；web 形态真跑全绿 + readiness 探针实证（2026-11-20 本机 desktop profile——2026-11-19 事故现场——manager 副本落点实测）两层支撑，真机端到端确认（双 active + /mcp list + 右栏面板）义务归维护者实操；②e2e 并行 pack 竞态（既有形态，8a57 已知）——失败用例恒为 dsh-demo 发布面用例、不在 round 2 任何改动面，串行 58/58 全绿 + 单跑恒绿佐证，进程级锁缓解在场、竞态面未根除；③文档残留三处「初始化器仍拒装 desktop」表述未随代码修订（docs/getting-started.md:83、docs/plugin-assets.md:130、agents/dsh/plugins/dsh-mcp/README.md:36，GLOSSARY.md「DeepSeek Harness」词条同款）——纯文档对齐债。
+
+下一轮建议：文档对齐小票（三处表述 + GLOSSARY 词条，[trivial] 或快通道）；e2e 并行 pack 竞态根治立项（pnpm staging 隔离或测试文件级串行策略）；FR-8 desktop 真机复验（按 README 处方端到端确认）；插件包版本 bump 与双包发布（0.3.2 与 registry 已烧版分叉，plugin-assets.md §1.4 顺序）；peer 范围拍板已落 ADR 20261120-5606（评审 20261119-47e1 指出的 design 欠账核销）。round 2 无未核销成功标准（FR-1～FR-7、FR-9 全核销；FR-8 为 spec 明文人工场景，未执行事实如实留残余风险）。
 
 ## 范围与非目标
 
