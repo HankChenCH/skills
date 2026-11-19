@@ -557,7 +557,7 @@ const GUIDE_ORDER = 30;
  * var() 引用；圆角全 var(--dsw-radius-*)；字号 14/12 两档；间距 px 直值（官方组件实况口径）。
  */
 const PANEL_STYLES = [
-  '.dsh-mcp-panel{box-sizing:border-box;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg);padding:12px;color:var(--dsw-alias-label-primary);font-size:14px;line-height:1.5}',
+  '.dsh-mcp-panel{box-sizing:border-box;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg);padding:12px;margin:8px;color:var(--dsw-alias-label-primary);font-size:14px;line-height:1.5}',
   '.dsh-mcp-panel *,.dsh-mcp-panel *::before,.dsh-mcp-panel *::after{box-sizing:border-box}',
   // 面板头（决策 1）：标题 + 计数次信息 + 「添加」常驻钮
   '.dsh-mcp-head{display:flex;align-items:center;gap:8px;padding:2px 4px 10px;border-bottom:1px solid var(--dsw-alias-border-l2)}',

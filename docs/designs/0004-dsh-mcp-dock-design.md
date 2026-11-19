@@ -41,7 +41,7 @@ Dock 页功能与布局经 round 1 验收（need 20261118-11f8 fulfilled），�
 1. 正文对比度 ≥4.5:1：**通过**——label-primary #0f1115 on bg-layer-1 #fff ≈17:1（light）、#f9fafb on #232324 ≈15:1（dark）；failed 内联文字 state-error-primary #ec1313 on #fff ≈4.6:1（light）/ #f25a5a on #232324 ≈4.6:1（dark）——边缘档留实现预案：实测低于 4.5 时加深一档 state 色（token 内选择，非基线偏离）。
 2. 正文字号 ≥14px：**通过**——正文/表单输入/引导文案 14px；12px 仅 transport、工具数、计数、原因线索、徽章文字（web 分册「12px 仅限辅助信息」口径）。
 3. 触控目标 ≥44px：**豁免**——桌面指针设备场景（面板属桌面 web 侧栏，round 1 D6 同口径），按钮实高约 26px 符合桌面密度惯例；豁免理由随本节留痕进述标。
-4. 间距与字号阶梯符合基线：**通过**——圆角全 token（radius-md/lg/xs/pill）、字号两档（14/12）、间距 px 直值按官方组件实况（基线「无全局 spacing token」口径）；原型与规格无阶梯外取值。
+4. 间距与字号阶梯符合基线：**通过**——圆角全 token（radius-md/lg/xs/pill）、字号两档（14/12）、间距 px 直值按官方组件实况（基线「无全局 spacing token」口径）；原型与规格无阶梯外取值。〔修订 2026-11-19〕面板卡新增**外边距 8px**（`.dsh-mcp-panel` margin）：宿主 Dock 容器自身零 padding，面板卡原贴边呈现（用户截图实测红框区域边距 ≈0，判局促）。8px 在既有 6px gap / 10–12px padding 阶梯内取中值，非阶梯外取值；面板内部 padding 12px 口径不变。样式契约断言钉此值（test/unit/dsh-mcp-client-style-contract.test.ts）。
 
 ## 原型
 

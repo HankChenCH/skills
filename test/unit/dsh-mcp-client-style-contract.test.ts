@@ -171,3 +171,12 @@ test('prepack 样式契约门放行 token 化产物：干净副本打包成功�
     '样式层随 client 产物编译入盘（FR-7 样式层随产物入 tarball 的打包面前置证据）',
   );
 });
+
+test('面板卡与宿主侧栏容器外缘呼吸感：.dsh-mcp-panel 外边距 8px（2026-11-19 用户截图实测：贴边 0 边距）', () => {
+  const product = compileClientProduct();
+  assert.match(
+    product,
+    /\.dsh-mcp-panel\{[^}]*margin:8px/,
+    '面板卡相对宿主 Dock 容器有外边距——宿主容器自身零 padding，卡片贴边判局部促（截图红框区域即外缘）',
+  );
+});
