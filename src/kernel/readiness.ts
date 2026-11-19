@@ -40,7 +40,13 @@ function parseRuntimeVersion(stdout: string): string | undefined {
   return undefined;
 }
 
-// manager 解析副本版本：读 profile 依赖树中 manager 包的 package.json（官方 pnpm 安装落点）。
+// manager 解析副本版本：读 profile 依赖树中 manager 包的 package.json。
+// 落点一手探针实证（2026-11-20 本机 desktop profile，2026-11-19 事故现场，留痕票 Progress）：
+// 官方 pnpm 安装管线下 manager（@hankchen/dsh-mcp 的普通 dependencies，非 peer）解析副本
+// 直达落点 `node_modules/@deepseek-ai/dsh-mcp-manager/package.json` 成立——实体目录非符号
+// 链接，`node_modules/.pnpm/` 内无该包虚拟仓条目（hoist 直达布局）；本机 web profile 依赖
+// 未装无反证。单元替身（makeManagerCopy）与 e2e shim 同写该直达路径，替身契约与实证落点
+// 一致；真实链路落点由 dsh-plugin-integration.test.ts 集成用例断言拦截（stub-fidelity 判据 2）。
 // 读不到 / 不合法 JSON / 缺 version = 依赖树无可用副本，同归「缺 manager」口径（不猜版本）。
 function readManagerVersion(profilePath: string): string | undefined {
   let raw;

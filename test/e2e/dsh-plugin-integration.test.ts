@@ -30,12 +30,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertPluginPreconditions, commandExists } from '../../src/kernel/dsh-command.ts';
+import { MANAGER_PACKAGE } from '../../src/kernel/readiness.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BIN = path.join(packageRoot, 'bin', 'infra.ts');
 // 期望值独立来源：包名/版本运行时读仓库内包清单（发布后与 registry 最新版对账），不写死字面量
 const DEMO_PKG = JSON.parse(fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-demo', 'package.json'), 'utf8'));
 const PKG = DEMO_PKG.name;
+// manager 宿主插件（就绪核验供给契约：装它即触发核验，manager 是其普通 dependencies）
+const MCP_PKG = JSON.parse(fs.readFileSync(path.join(packageRoot, 'agents', 'dsh', 'plugins', 'dsh-mcp', 'package.json'), 'utf8'));
 const PROFILE = 'infra-it'; // 测试 profile 名固定（可重复确定；非官方保留名）
 
 // npx 冷启动要拉官方 @deepseek-ai/dsh 及其依赖，可能很慢：安装给足 10 分钟硬顶，启动观测 2 分钟
@@ -64,8 +67,8 @@ function integrationPath() {
 
 // registry 探测：E404 = 待发布；其余失败 = registry/环境问题。两类原因都显式报因，
 // 区分「环境问题」与「回归」——探测失败只 skip 执行段，不伪装成代码失败。
-function probeRegistryVersion(): { published: true; version: string } | { published: false; skipReason: string } {
-  const probe = spawnSync('npm', ['view', PKG, 'version'], { encoding: 'utf8', timeout: 60 * 1000 });
+function probeRegistryVersion(pkgName = PKG): { published: true; version: string } | { published: false; skipReason: string } {
+  const probe = spawnSync('npm', ['view', pkgName, 'version'], { encoding: 'utf8', timeout: 60 * 1000 });
   if (probe.status === 0) {
     return { published: true, version: probe.stdout.trim() };
   }
@@ -73,7 +76,7 @@ function probeRegistryVersion(): { published: true; version: string } | { publis
   if (/E404|404 .*not found/i.test(output)) {
     return {
       published: false,
-      skipReason: `前置门：${PKG} 尚未发布到 registry（npm view E404）——执行段待发布后运行`,
+      skipReason: `前置门：${pkgName} 尚未发布到 registry（npm view E404）——执行段待发布后运行`,
     };
   }
   const reason = probe.error
@@ -129,10 +132,10 @@ function assertGate(t: TestContext): boolean {
 
 // —— CLI 新命令面安装（plugin add，npx 回退形态真实拉官方）——
 
-function runInstallCli(projectRoot: string, dshHome: string) {
+function runInstallCli(projectRoot: string, dshHome: string, pkgName = PKG) {
   const result = spawnSync(
     process.execPath,
-    [BIN, 'plugin', 'add', PKG, '--profile', PROFILE],
+    [BIN, 'plugin', 'add', pkgName, '--profile', PROFILE],
     {
       cwd: projectRoot,
       encoding: 'utf8',
@@ -155,9 +158,10 @@ function readProfilePkg(dshHome: string) {
 }
 
 // profile node_modules 下实装包的清单：scoped 包名 → 目录路径的截段只在此处定义
-//（parse-normalization 规则 1），安装段与幂等段共用同一读取口径。
-function readInstalledManifest(dshHome: string) {
-  const manifestPath = path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...PKG.split('/'), 'package.json');
+//（parse-normalization 规则 1），安装段与幂等段共用同一读取口径（demo 缺省，manager
+// 落点用例传 @deepseek-ai/dsh-mcp-manager——readManagerVersion 读取契约的同款直达路径）。
+function readInstalledManifest(dshHome: string, pkgName = PKG) {
+  const manifestPath = path.join(dshHome, 'profiles', PROFILE, 'node_modules', ...pkgName.split('/'), 'package.json');
   return JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 }
 
@@ -340,4 +344,75 @@ test(`[FR-1|集成级] ${PKG} 经 plugin add 真装进测试 profile 并真启�
   assert.deepEqual(Object.keys(lockfileAfter.plugins), [PKG], '重复安装后锁文件无重复条目');
   assert.equal(lockfileAfter.plugins[PKG].version, depRange);
   assert.equal(lockfileAfter.plugins[PKG].profile, PROFILE);
+});
+
+// —— [FR-5|集成级] manager 解析副本落点（评审 20261120-4f76 阻断 2 集成复核清单）——
+// 真实链路工件级断言（stub-fidelity-integration 判据 2：协作者写入的工件由协作者决定，
+// 替身写的字面 ≠ 协作者写的字面——单元 makeManagerCopy 与 shim e2e 写的直达落点不得只靠
+// 替身背书）：@hankchen/dsh-mcp 真装后 manager（其普通 dependencies）解析副本应直达可达
+// （readManagerVersion 读取契约的真实落点）；官方安装管线 hoist 形态漂移 → 副本缺失/错位
+// → 本用例红，且 CLI 装后就绪核验同位拦截（missing → fail-loud 退出非零）。
+// 一手探针实证（2026-11-20 本机 desktop profile 事故现场，留痕票 Progress）：直达落点成立、
+// node_modules/.pnpm 内无该包虚拟仓条目——本用例在真实链路上持续锚定该实证布局。
+
+test(`[FR-5|集成级] ${MCP_PKG.name} 真装：manager 解析副本落点直达可达、版本可读`, async (t) => {
+  // 门（node-test-skip-gate 纪律：门函数返回 boolean / 内联 return 截断；门内硬断言照常抛错）
+  try {
+    assertPluginPreconditions({ nodeVersion: process.version, profile: PROFILE });
+  } catch (err) {
+    t.skip(`前置门（环境问题，非回归）：${err.message}`);
+    return;
+  }
+  const probe = probeRegistryVersion(MCP_PKG.name);
+  if (!probe.published) {
+    t.skip(probe.skipReason);
+    return;
+  }
+  assert.equal(
+    probe.version,
+    MCP_PKG.version,
+    `registry ${MCP_PKG.name} 版本（${probe.version}）与仓库包（${MCP_PKG.version}）不一致——发布漂移，需对齐后再跑集成`,
+  );
+  const pnpmReason = probePnpm();
+  if (pnpmReason !== undefined) {
+    t.skip(pnpmReason);
+    return;
+  }
+
+  const projectRoot = makeTempDir(t, 'infra-integration-proj-');
+  spawnSync('git', ['init', '-q'], { cwd: projectRoot });
+  const dshHome = makeTempDir(t, 'infra-integration-dshhome-');
+
+  const installed = runInstallCli(projectRoot, dshHome, MCP_PKG.name);
+  // CLI 出口契约形态（本机 2026-11-20 真实链路实证留痕票 Progress）：官方生态版本漂移是
+  // 确定形态——registry 上 manager dist-tags.latest = 0.2.2-rc.2（未指最新 rc），`^0.2.2-rc.2`
+  // 解析副本锚 latest = 0.2.2-rc.2，而 CLI 探测 0.2.2-rc.5 → 核验 mismatch fail-loud 退出 1
+  //（恰是本核验门要拦截的真实伤害：宿主 boot 兼容门将静默禁用 manager 行）。出口断言钉
+  // 契约行为而非官方对齐状态：退出 0 = pass/降级；退出 1 必经 ✗ 核验未通过头行（fail-loud
+  // 有据）；崩溃/静默才红。
+  assert.ok(
+    installed.code === 0 || (installed.code === 1 && installed.stderr.includes('装后就绪核验未通过')),
+    `${MCP_PKG.name} 安装出口应落核验契约形态（0=通过/降级；1=✗ 未通过 fail-loud；实际 ${installed.code}${installed.error !== undefined ? `，error ${installed.error.message}` : installed.signal !== null ? `，signal ${installed.signal}` : ''}）：${installed.stdout}${installed.stderr}`,
+  );
+
+  // 工件级落点断言（本用例核心，独立于 CLI 出口形态）：manager 解析副本直达可达、版本可读
+  //（readManagerVersion 契约的真实落点——mismatch 分支能携带 managerVersion 即读取成功的
+  // 镜像；若官方管线 hoist 形态漂移，此断言红且 CLI 同位 missing fail-loud）。
+  const managerManifest = readInstalledManifest(dshHome, MANAGER_PACKAGE);
+  assert.equal(managerManifest.name, MANAGER_PACKAGE, 'manager 副本 package.json 应含正名');
+  assert.ok(
+    typeof managerManifest.version === 'string' && managerManifest.version.trim() !== '',
+    'manager 副本 package.json 应含非空 version（readManagerVersion 可解析）',
+  );
+  // 宿主插件实装齐备（manager 的供给方）：断言工件齐备语义（依赖行落盘 + 实装版本非空），
+  // 不钉 registry latest——官方写什么由官方决定（本机实证官方依赖范围解析滞后于 registry
+  // latest：npm view 0.3.2 vs 实装 0.3.1，stub-fidelity 判据 2 同款口径，留痕票 Progress）。
+  const profilePkgMcp = readProfilePkg(dshHome);
+  const mcpRange = profilePkgMcp.dependencies?.[MCP_PKG.name];
+  assert.ok(typeof mcpRange === 'string' && mcpRange.length > 0, '宿主插件依赖行应落盘（官方写入的依赖声明）');
+  const mcpManifest = readInstalledManifest(dshHome, MCP_PKG.name);
+  assert.ok(
+    typeof mcpManifest.version === 'string' && mcpManifest.version.trim() !== '',
+    '宿主插件实装版本应非空（实装齐备）',
+  );
 });
