@@ -169,10 +169,16 @@ function renderManagerReadiness(outcome: ReadinessOutcome, profilePath: string):
   switch (outcome.kind) {
     case 'mismatch':
     case 'missing': {
+      // missing 按实报因（评审 20261120-4f76 建议 3）：absent 真缺副本 / unreadable 副本在
+      // 但不可读 / corrupt 副本损坏——分支行为同归 fail-loud，headline 粒度按实因。
       const headline =
         outcome.kind === 'mismatch'
           ? `运行时 dsh ${outcome.runtimeVersion} 与 manager 解析版 ${outcome.managerVersion} 不同版（宿主要求精确同 rc）`
-          : `profile 依赖树缺 ${MANAGER_PACKAGE} 解析副本（运行时 dsh ${outcome.runtimeVersion}）`;
+          : outcome.cause === 'absent'
+            ? `profile 依赖树缺 ${MANAGER_PACKAGE} 解析副本（运行时 dsh ${outcome.runtimeVersion}）`
+            : outcome.cause === 'unreadable'
+              ? `${MANAGER_PACKAGE} 解析副本不可读（package.json 读取失败；运行时 dsh ${outcome.runtimeVersion}）`
+              : `${MANAGER_PACKAGE} 解析副本损坏（package.json 不可解析或缺 version；运行时 dsh ${outcome.runtimeVersion}）`;
       console.error(
         `✗ 装后就绪核验未通过：${headline}——安装已完成并记账，` +
           `但宿主 boot 兼容门将静默禁用 manager 行（装成 ≠ 跑得起来）。按以下三段处方修复：`,

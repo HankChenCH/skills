@@ -321,7 +321,33 @@ test('就绪核验（缺副本）：profile 依赖树无 manager 解析副本即
 
   const outcome = readiness(t, { profilePath, run: probe.run });
 
-  assert.deepEqual(outcome, { kind: 'missing', runtimeVersion: '0.2.2-rc.5' });
+  assert.deepEqual(outcome, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'absent' });
+});
+
+// 报因粒度（评审 20261120-4f76 建议 3）：missing 按实报因——absent 真缺副本（ENOENT）/
+// unreadable 副本在但 package.json 读失败 / corrupt 不可解析或缺 version；分支行为不变
+//（同归 missing fail-loud），只改报因粒度（ref-implementation #4 错误处理显式）。
+test('就绪核验（缺副本报因粒度）：不可读与损坏各报实因', (t) => {
+  const profilePath = makeProfileDir(t);
+  const probe = makeProbeStub(t, { status: 0, stdout: '0.2.2-rc.5\n' });
+  const managerPkgFile = path.join(profilePath, 'node_modules', '@deepseek-ai', 'dsh-mcp-manager', 'package.json');
+
+  // 副本在但 package.json 落成目录 → 读 EISDIR = unreadable
+  fs.mkdirSync(managerPkgFile, { recursive: true });
+  const unreadable = readiness(t, { profilePath, run: probe.run });
+  assert.deepEqual(unreadable, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'unreadable' });
+
+  // 坏 JSON = corrupt（先清掉上一形态落成目录的 package.json 再写文件）
+  fs.rmSync(managerPkgFile, { recursive: true, force: true });
+  makeManagerCopy(t, profilePath, '0.2.2-rc.5');
+  fs.writeFileSync(managerPkgFile, '{ not-json');
+  const corruptJson = readiness(t, { profilePath, run: probe.run });
+  assert.deepEqual(corruptJson, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'corrupt' });
+
+  // JSON 合法但 version 缺失 = corrupt（副本损坏口径）
+  fs.writeFileSync(managerPkgFile, JSON.stringify({ name: MANAGER_PACKAGE }));
+  const corruptVersion = readiness(t, { profilePath, run: probe.run });
+  assert.deepEqual(corruptVersion, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'corrupt' });
 });
 
 test('就绪核验（探测失败·非零退出）：probe-unavailable，不虚构版本', (t) => {

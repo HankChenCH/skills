@@ -22,8 +22,13 @@ export const READINESS_TRIGGER_PLUGIN = '@hankchen/dsh-mcp';
 export type ReadinessOutcome =
   | { kind: 'pass'; runtimeVersion: string; managerVersion: string }
   | { kind: 'mismatch'; runtimeVersion: string; managerVersion: string }
-  | { kind: 'missing'; runtimeVersion: string }
+  | { kind: 'missing'; runtimeVersion: string; cause: ManagerCopyCause }
   | { kind: 'probe-unavailable' };
+
+// manager 解析副本缺失报因（评审 20261120-4f76 建议 3）：分支行为不变（同归 missing
+// fail-loud），只改报因粒度——absent 真缺副本（ENOENT）/ unreadable 副本在但 package.json
+// 读失败（权限、落成目录等）/ corrupt 不可解析或缺非空 version。
+export type ManagerCopyCause = 'absent' | 'unreadable' | 'corrupt';
 
 // 从官方 CLI --version 输出提取版本：按裸版本行判定（判定单点，parse-normalization）。
 // 逐行 trim 后整行锚定取首个命中行（探针实证 2026-11-19 留痕票 Progress：官方
@@ -47,19 +52,20 @@ function parseRuntimeVersion(stdout: string): string | undefined {
 // 链接，`node_modules/.pnpm/` 内无该包虚拟仓条目（hoist 直达布局）；本机 web profile 依赖
 // 未装无反证。单元替身（makeManagerCopy）与 e2e shim 同写该直达路径，替身契约与实证落点
 // 一致；真实链路落点由 dsh-plugin-integration.test.ts 集成用例断言拦截（stub-fidelity 判据 2）。
-// 读不到 / 不合法 JSON / 缺 version = 依赖树无可用副本，同归「缺 manager」口径（不猜版本）。
-function readManagerVersion(profilePath: string): string | undefined {
+// 读不到（ENOENT）/ 读失败 / 不合法 JSON / 缺 version = 依赖树无可用解析副本，同归
+// 「缺 manager」口径（不猜版本）；读失败形态按 ManagerCopyCause 报因供 headline 实报。
+function readManagerVersion(profilePath: string): { version: string } | { cause: ManagerCopyCause } {
   let raw;
   try {
     raw = fs.readFileSync(path.join(profilePath, 'node_modules', ...MANAGER_PACKAGE.split('/'), 'package.json'), 'utf8');
-  } catch {
-    return undefined;
+  } catch (err) {
+    return { cause: (err as NodeJS.ErrnoException).code === 'ENOENT' ? 'absent' : 'unreadable' };
   }
   try {
     const version = (JSON.parse(raw) as { version?: unknown }).version;
-    return typeof version === 'string' && version.trim() !== '' ? version.trim() : undefined;
+    return typeof version === 'string' && version.trim() !== '' ? { version: version.trim() } : { cause: 'corrupt' };
   } catch {
-    return undefined;
+    return { cause: 'corrupt' };
   }
 }
 
@@ -81,14 +87,14 @@ export function checkManagerReadiness({
   if (runtimeVersion === undefined) {
     return { kind: 'probe-unavailable' };
   }
-  const managerVersion = readManagerVersion(profilePath);
-  if (managerVersion === undefined) {
-    return { kind: 'missing', runtimeVersion };
+  const copy = readManagerVersion(profilePath);
+  if (!('version' in copy)) {
+    return { kind: 'missing', runtimeVersion, cause: copy.cause };
   }
-  if (managerVersion === runtimeVersion) {
-    return { kind: 'pass', runtimeVersion, managerVersion };
+  if (copy.version === runtimeVersion) {
+    return { kind: 'pass', runtimeVersion, managerVersion: copy.version };
   }
-  return { kind: 'mismatch', runtimeVersion, managerVersion };
+  return { kind: 'mismatch', runtimeVersion, managerVersion: copy.version };
 }
 
 // 三段可复制处方（spec 就绪核验契约 ③；文本形态对照 README「已知边界」恢复配方逐段一致：

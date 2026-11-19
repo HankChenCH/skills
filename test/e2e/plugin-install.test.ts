@@ -67,10 +67,10 @@ if (idx !== -1) {
   if (pkgName === ${JSON.stringify(MCP)} && process.env.DSH_SHIM_MANAGER_VERSION !== 'absent') {
     const mgrDir = path.join(dir, 'node_modules', '@deepseek-ai', 'dsh-mcp-manager');
     fs.mkdirSync(mgrDir, { recursive: true });
-    fs.writeFileSync(
-      path.join(mgrDir, 'package.json'),
-      JSON.stringify({ name: '@deepseek-ai/dsh-mcp-manager', version: process.env.DSH_SHIM_MANAGER_VERSION || process.env.DSH_SHIM_CLI_VERSION || '0.2.2-rc.5' }, null, 2),
-    );
+    const body = process.env.DSH_SHIM_MANAGER_VERSION === 'corrupt'
+      ? '{ not-json'
+      : JSON.stringify({ name: '@deepseek-ai/dsh-mcp-manager', version: process.env.DSH_SHIM_MANAGER_VERSION || process.env.DSH_SHIM_CLI_VERSION || '0.2.2-rc.5' }, null, 2);
+    fs.writeFileSync(path.join(mgrDir, 'package.json'), body);
   }
 }
 process.exit(0);
@@ -711,6 +711,27 @@ test('[FR-5] plugin add @hankchen/dsh-mcp（缺副本）：退出非零 + 三段
   assert.match(stderr, /plugin_manager set_plugin/, '段 3 应含重载指引');
   const lockfile = readLockfileAt(project);
   assert.equal(lockfile.plugins[MCP].profile, 'dev', '安装应已记账（缺副本也是装后事实）');
+});
+
+test('[FR-5] plugin add @hankchen/dsh-mcp（副本损坏）：退出非零 + headline 按实报因（评审建议 3 报因粒度）', (t) => {
+  const project = makeProject(t);
+  const dshHome = makeDshHome(t, ['dev']);
+  const shimDir = makeShimDir(t, ['dsh']);
+  const shimLog = makeShimLog(t);
+
+  const { code, stdout, stderr } = runCliIn(project, ['plugin', 'add', MCP, '--profile', 'dev'], {
+    DSH_HOME: dshHome,
+    DSH_SHIM_LOG: shimLog,
+    DSH_SHIM_MANAGER_VERSION: 'corrupt',
+    PATH: `${shimDir}${path.delimiter}${process.env.PATH}`,
+  });
+  assert.equal(code, 1, '副本损坏应 fail-loud 退出非零');
+  assert.match(stderr, /✗ 装后就绪核验未通过/, '应经 ✗ 通道点名核验未通过');
+  assert.match(stderr, /解析副本损坏.*运行时 dsh 0\.2\.2-rc\.5/, '头行应按实报因（副本损坏）并带运行时版本');
+  assert.match(stderr, /overrides:/, '处方照常呈现');
+  assert.equal(stdout.includes('核验通过') || stderr.includes('核验通过'), false, '失败路径全文不得含「核验通过」');
+  const lockfile = readLockfileAt(project);
+  assert.equal(lockfile.plugins[MCP].profile, 'dev', '安装应已记账');
 });
 
 test('[FR-6] plugin add @hankchen/dsh-mcp（探测失败）：警告 + 继续完成安装退出零 + 手工核验途径，全文无核验通过', (t) => {
