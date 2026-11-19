@@ -66,6 +66,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertPluginPreconditions } from '../../src/kernel/dsh-command.ts';
+import { MANAGER_PACKAGE } from '../../src/kernel/readiness.ts';
 import { withPackLock } from './dsh-mcp-pack-lock.ts';
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -845,4 +846,334 @@ test(`[FR-8|集成级] ${PKG} 真 boot dsh web 形态：combo 路由分发 clien
     { timeoutMs: RESTART_VISIBLE_TIMEOUT_MS, fromIndex: framesBeforeDeadRestart },
   );
   assert.ok(visible.matched, `restart 后 ${DEAD_NAME} 应以新预算重投连接周期（watch 推送可见）——末帧：${visible.lastSeen.slice(0, 500)}`);
+});
+
+// —— FR-7 集成承载（spec 20261119-7a9a 验收场景 [FR-7|集成级|承载票 20261119-d0ff]）——
+//
+// 剥依赖后端到端回归：本地 pack 修订后插件 tarball（f3e4 产物：dependencies 无 manager、
+// 可选 peer ^0.2.2-rc.2）经官方命令装进临时 web profile，真跑 boot 断言四件事：
+// ① /mcp 命令注册可用——注册观测仪器经官方解析面 commands.find(agentLike,'mcp') 发现 +
+//    handler('list') 真调返回 kind=success；
+// ② mcp_manage 工具注册可用——tools.get 发现 + 只读 list execute 真调返回 ok=true；
+// ③ 官方 manager 行 active——正面链 = 观测仪器 inject mcpManager 激活成功（web 组合唯一
+//    provider 是官方行：插件补位行按 startedBundles 条件让位，让位失效则两行 duplicate
+//    留 "did not activate"，下方负面断言同位拦截）+ 供给 manager 实装版本 = 运行时同版
+//    （兼容星座钉版）+ mcpManager/watch mux 流收到全量批次（Remote 面真活）；负面面 =
+//    boot 日志无行激活失败、无兼容门禁用（与上方 FR-8 用例同口径）；
+// ④ 安装本插件后 profile 依赖树无 manager 副本（FR-1 集成面）——断言点在 manager 供给
+//    步骤之前：官方 web 模板 dependencies 为空（一手探针 2026-11-20：--from-default-profile
+//    web 落盘 dependencies:{} + nodeLinker:hoisted + autoInstallPeers:false）、插件已剥依赖
+//    （实装清单 dependencies 无 manager，剥依赖产物经 pack→官方装往返存活的工件级锚）、
+//    pnpm 12 对可选 peer 两形态均不自动装（f3e4 实证）三因共证；node_modules 全树扫
+//    （含嵌套层，hoisted 布局下副本只可能以名为 dsh-mcp-manager 的目录存在）。manager
+//    供给按就绪核验处方段 2 同形态补装（src/kernel/readiness.ts managerPrescriptionLines
+//    一手文本：pnpm --dir "<profile>" add manager@<运行时版>）——供给责任移交安装流
+//    （spec 方案 2），供给后钉实装版本 = 运行时同版。
+//
+// 前置门四条件（ad91 形态映射，工单 AC4）：node 版本 ≥24.9.0 / registry 可达 / 兼容星座
+// 可达——复用上方 assertGate 三探测，各 skip 留因（版本家族正则沿既有 rc 宽松匹配，不硬钉）；
+// 「包已 pack」= 本地 pack 真跑（tarball 形态不依赖 registry 发布，ad91「包未发布」条件的
+// 本形态映射，round 1 sdk 用例同款口径），pack 命令失败 skip 留输出尾；仓库树残留核对在
+// skip 捕获面之外保持真失败（postpack 还原被破坏 = 永不放行形态，falsified-form-gate 纪律）。
+//
+// 真实协作者 = 官方 dsh web 宿主（boot/token/认证/loader/gateway/manager 全官方链路）；
+// 受控替身两件 = 临时 DSH_HOME + 注册观测仪器（--patch overlay 测试资产，随临时目录生成
+// 销毁；round 1 sdk 形态同款仪器方法，本形态不退出宿主进程）。写通道端到端归 round 1
+// sdk 用例（/mcp add 全流）与本文件上方 FR-8 用例（Remote 线层全流，零修改回归基线）——
+// 本用例只钉剥依赖后的注册面与供给链，不重复承载。
+
+const OBSERVER_MODULE_FILE = 'dsh-mcp-web-fr7-observer.mjs';
+const OBSERVER_PATCH_FILE = 'dsh-mcp-web-fr7-observer.patch.yml';
+// 观测签名（emit 行格式与 observer 源共享口径；'PROBE ' 前缀区分宿主自身日志）
+const SIG_COMMAND_FOUND = /PROBE commands\.find\(mcp\): FOUND/;
+const SIG_TOOL_FOUND = /PROBE tools\.get\(mcp_manage\): FOUND/;
+const SIG_COMMAND_LIST_OK = /PROBE mcp list: kind=success/;
+const SIG_TOOL_LIST_OK = /PROBE mcp_manage list: ok=true/;
+const SIG_OBSERVER_CRASH = /PROBE OBSERVER-CRASH:/;
+// 仪器观测等待预算（仪器 apply 后延迟 2s 驱动；宿主 boot 完成时签名通常已在盘）
+const OBSERVER_TIMEOUT_MS = 60 * 1000;
+
+// 前置门条件「包已 pack」：本地 pack 剥依赖修订后的插件 tarball。pack 命令失败（含依赖未装
+// 的 MODULE_NOT_FOUND 等环境形态）→ skip 留输出尾；仓库树残留核对（postpack 还原）抛错
+// 穿透 skip 捕获面 = 真失败。
+async function packTarballOrSkip(t: TestContext): Promise<string | null> {
+  const destDir = makeTempDir(t, 'dsh-mcp-web-fr7-pack-');
+  const tarball = path.join(destDir, `hankchen-dsh-mcp-${PKG_MANIFEST.version}.tgz`);
+  let packed = false;
+  let failure = '';
+  await withPackLock(() => {
+    const result = runCommand('pnpm', ['pack', '--pack-destination', destDir], { timeout: INSTALL_TIMEOUT_MS, cwd: PLUGIN_DIR });
+    if (result.code !== 0) {
+      failure = `pnpm pack 退出码 ${result.code}（${result.error?.message ?? ''}）：${result.output.slice(-800)}`;
+      return;
+    }
+    // 仓库树零构建纪律的兜底核对——发布面还原回归必须真失败，不吃下方 skip
+    assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'index.js')), false, 'postpack 应已还原仓库树（包目录无 index.js 残留）');
+    assert.equal(fs.existsSync(path.join(PLUGIN_DIR, 'client.js')), false, 'postpack 应已还原仓库树（包目录无 client.js 残留）');
+    if (!fs.existsSync(tarball)) {
+      failure = `pack 产物不在目标目录：${tarball}（输出：${result.output.slice(-500)}）`;
+      return;
+    }
+    packed = true;
+  });
+  if (!packed) {
+    t.skip(`前置门：包未 pack（本地 pnpm pack 未产出 tarball——环境不可达，留因不静默）——${failure}`);
+    return null;
+  }
+  return tarball;
+}
+
+// FR-1 集成面：安装本插件后 profile 依赖树无 manager 副本。三面断言：
+// 声明面（profile dependencies）/ 实装树面（node_modules 全树扫）/ 插件自带依赖面
+// （实装插件清单 dependencies——剥依赖产物经 pack→官方装往返的工件级锚）。
+function scanManagerCopies(root: string): string[] {
+  const hits: string[] = [];
+  const walk = (dir: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return; // 目录不存在（无 node_modules）= 无副本
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.name === 'dsh-mcp-manager') {
+        hits.push(path.relative(root, full));
+        continue; // 副本内部不再下钻
+      }
+      walk(full);
+    }
+  };
+  walk(root);
+  return hits;
+}
+
+function assertProfileTreeWithoutManagerCopy(dshHome: string): void {
+  const profileDir = path.join(dshHome, 'profiles', PROFILE);
+  // Given 自证：常规安装路径形态在场（官方 web 模板 pnpm-workspace.yaml 一手探针形态）
+  const workspaceYaml = fs.readFileSync(path.join(profileDir, 'pnpm-workspace.yaml'), 'utf8');
+  assert.match(workspaceYaml, /autoInstallPeers:\s*false/, 'profile 工作区应处 autoInstallPeers:false（FR-1 Given 的常规安装路径）');
+  const profilePkg = JSON.parse(fs.readFileSync(path.join(profileDir, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>;
+  };
+  assert.ok(
+    typeof profilePkg.dependencies?.[PKG] === 'string' && profilePkg.dependencies[PKG].length > 0,
+    `插件依赖行应落盘（官方 add 写入）：${JSON.stringify(profilePkg.dependencies)}`,
+  );
+  assert.equal(
+    profilePkg.dependencies?.[MANAGER_PACKAGE],
+    undefined,
+    `profile 依赖声明不应含 manager（供给前）：${JSON.stringify(profilePkg.dependencies)}`,
+  );
+  const hits = scanManagerCopies(path.join(profileDir, 'node_modules'));
+  assert.deepEqual(hits, [], `profile 依赖树不应出现 manager 副本（FR-1 集成面）：${JSON.stringify(hits)}`);
+  const installedPlugin = JSON.parse(
+    fs.readFileSync(path.join(profileDir, 'node_modules', ...PKG.split('/'), 'package.json'), 'utf8'),
+  ) as { dependencies?: Record<string, string> };
+  assert.equal(
+    installedPlugin.dependencies?.[MANAGER_PACKAGE],
+    undefined,
+    '实装插件包清单 dependencies 不应含 manager（剥依赖产物经 pack→官方装往返存活）',
+  );
+}
+
+// manager 供给（就绪核验处方段 2 同形态，供给责任移交安装流）：pnpm --dir "<profile>" add
+// manager@<运行时版>；供给后钉实装版本 = 兼容星座同版（boot 兼容门 peer 精确钉同 rc）。
+function supplyManagerPerPrescription(dshHome: string): void {
+  const profileDir = path.join(dshHome, 'profiles', PROFILE);
+  const result = runCommand('pnpm', ['--dir', profileDir, 'add', `${MANAGER_PACKAGE}@${managerPinnedVersion}`], { timeout: INSTALL_TIMEOUT_MS });
+  assertCommandOk(`按处方段 2 补装 manager@${managerPinnedVersion}`, result);
+  const supplied = JSON.parse(
+    fs.readFileSync(path.join(profileDir, 'node_modules', ...MANAGER_PACKAGE.split('/'), 'package.json'), 'utf8'),
+  ) as { version: string };
+  assert.equal(supplied.version, managerPinnedVersion, '安装流供给的 manager 实装版本应等于运行时同版（兼容星座钉版）');
+}
+
+// 注册观测仪器（round 1 sdk 形态同款方法：apply 内同步解引用服务实例——生命周期实证
+// apply 返回后 ctx proxy get 被拒；延迟 2s 等插件行注册完成再驱动观测；本形态不退出宿主）。
+// inject: [commands, tools, mcpManager] 任一缺席本行 pending 不激活 → 无任何 PROBE 行 →
+// 测试签名等待超时失败（仪器激活本身就是官方 manager 行供出服务的正面证据）。
+function writeRegistrationObserver(dir: string): string {
+  fs.writeFileSync(path.join(dir, OBSERVER_MODULE_FILE), `// 注册观测仪器（测试资产，票 20261119-d0ff 自动生成，勿手工维护）：
+// 观测面 = 注册 seam 的外部可观察行为：/mcp 经官方解析面 commands.find(agentLike,'mcp')
+// （伪 agent {id} 安全：scopeChainOf 未知 scope 键只落 global 层，round 1 真跑实证）+
+// handler('list') 真调；mcp_manage 经 tools.get + 只读 list execute 真调。
+// 结果行写 stderr（宿主 boot 日志捕获），'PROBE ' 前缀与测试断言共享常量口径。
+const emit = (line) => process.stderr.write('PROBE ' + line + '\\n');
+const AGENT = { id: 'dsh-mcp-web-fr7-agent' };
+async function main(services) {
+  const commandDef = services.commands.find(AGENT, 'mcp');
+  emit('commands.find(mcp): ' + (commandDef ? 'FOUND' : 'MISSING'));
+  const toolDef = services.tools.get('mcp_manage');
+  emit('tools.get(mcp_manage): ' + (toolDef ? 'FOUND' : 'MISSING'));
+  if (commandDef) {
+    const listResult = await commandDef.handler({ agent: AGENT, rawInput: 'list' });
+    emit('mcp list: kind=' + listResult.kind + ' text=' + JSON.stringify(listResult.text));
+  }
+  if (toolDef) {
+    const listOutcome = await toolDef.execute({ action: 'list' }, { signal: new AbortController().signal });
+    emit('mcp_manage list: ok=' + String(listOutcome?.ok === true)
+      + ' servers=' + JSON.stringify(Array.isArray(listOutcome?.servers) ? listOutcome.servers.length : null));
+  }
+  emit('observer done');
+}
+export const name = 'dsh-mcp-web-fr7-observer';
+export function apply(ctx) {
+  const services = { commands: ctx.commands, tools: ctx.tools };
+  emit('observer applied: commands=' + typeof services.commands + ' tools=' + typeof services.tools);
+  setTimeout(() => {
+    main(services).catch((err) => emit('OBSERVER-CRASH: ' + (err && err.stack ? err.stack : String(err))));
+  }, 2000);
+}
+`);
+  const patchPath = path.join(dir, OBSERVER_PATCH_FILE);
+  fs.writeFileSync(patchPath, `# 测试仪器挂载（--patch overlay；条目相对说明符按本文件所在目录解析）
+- insert:
+    - id: dsh-mcp-web-fr7-observer
+      name: './${OBSERVER_MODULE_FILE}'
+      inject: [commands, tools, mcpManager]
+`);
+  return patchPath;
+}
+
+interface ObserverBoot {
+  ok: boolean;
+  port: number;
+  token: string;
+  log: () => string;
+}
+
+// boot 官方 web 宿主（--patch 挂观测仪器；detached 进程组纪律沿既有 bootWebHost 同款——
+// 直接 SIGKILL npx 会留下存活的 dsh 孙进程，settle 时整组收杀）。
+function bootWebWithObserver(
+  t: TestContext,
+  options: { dir: string; dshHome: string; observerPatch: string },
+): Promise<ObserverBoot> {
+  const child: ChildProcess = spawn(
+    'npx',
+    ['--yes', `@deepseek-ai/dsh@${dshPinnedVersion}`, '--profile', PROFILE, '--patch', options.observerPatch, '--no-open', '--port', '0'],
+    {
+      cwd: options.dir,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, DSH_HOME: options.dshHome, PATH: integrationPath() },
+      detached: true,
+    },
+  );
+  const killTree = () => {
+    if (child.pid === undefined) return;
+    try {
+      process.kill(-child.pid, 'SIGKILL'); // 负 pid = 整个进程组
+    } catch {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // 进程组已不存在——清理目的已达成
+      }
+    }
+  };
+  t.after(killTree);
+  let bootLog = '';
+  child.stdout?.setEncoding('utf8');
+  child.stderr?.setEncoding('utf8');
+  child.stdout?.on('data', (chunk: string) => { bootLog += chunk; });
+  child.stderr?.on('data', (chunk: string) => { bootLog += chunk; });
+  return new Promise((resolve) => {
+    const URL_PATTERN = /dsh web: http:\/\/127\.0\.0\.1:(\d+)\/\?token=(\S+)/;
+    const poll = setInterval(() => {
+      const match = bootLog.match(URL_PATTERN);
+      if (match) {
+        clearInterval(poll);
+        clearTimeout(deadline);
+        resolve({ ok: true, port: Number(match[1]), token: match[2], log: () => bootLog });
+      }
+    }, 500);
+    const deadline = setTimeout(() => {
+      clearInterval(poll);
+      // web boot 形态不可达 = skip 口径（留宿主日志尾作因），不判失败
+      resolve({ ok: false, port: 0, token: '', log: () => bootLog });
+    }, BOOT_TIMEOUT_MS);
+    deadline.unref();
+  });
+}
+
+// 轮询累积 boot 日志直到签名命中（或崩溃签名提前失败）；失败附日志尾快照供定位
+//（e2e 失败留证据纪律）。日志跨 chunk 拼接由显式 utf8 解码保证（多字节签名不烂码）。
+async function waitForBootSignature(
+  readLog: () => string,
+  pattern: RegExp,
+  options: { timeoutMs: number },
+): Promise<{ matched: boolean; snapshot: string }> {
+  const deadline = Date.now() + options.timeoutMs;
+  for (;;) {
+    const log = readLog();
+    if (pattern.test(log)) return { matched: true, snapshot: log.slice(-800) };
+    if (SIG_OBSERVER_CRASH.test(log)) return { matched: false, snapshot: log.slice(-1200) };
+    if (Date.now() >= deadline) return { matched: false, snapshot: log.slice(-1200) };
+    await sleep(500);
+  }
+}
+
+async function expectObserverSignature(readLog: () => string, pattern: RegExp, what: string): Promise<void> {
+  const outcome = await waitForBootSignature(readLog, pattern, { timeoutMs: OBSERVER_TIMEOUT_MS });
+  assert.ok(outcome.matched, `${what}（${OBSERVER_TIMEOUT_MS / 1000}s 内未观测到签名）——宿主日志尾：${outcome.snapshot}`);
+}
+
+test(`[FR-7|集成级] ${PKG} 剥依赖后真跑回归：官方命令装进 web profile → 真 boot → /mcp 命令与 mcp_manage 工具注册可用、官方 manager 行 active、安装后依赖树无 manager 副本`, async (t) => {
+  // 前置门四条件：node 版本 / pnpm / registry / 兼容星座（assertGate 内各 skip 留因）+
+  // 包已 pack（packTarballOrSkip skip 留输出尾）
+  if (!assertGate(t)) return;
+
+  // —— 准备段：临时 DSH_HOME（绝不指向 ~/.dsh）+ 官方链路装剥依赖插件（无供给步骤）——
+  const dshHome = makeTempDir(t, 'dsh-mcp-web-fr7-home-');
+  const workDir = makeTempDir(t, 'dsh-mcp-web-fr7-work-');
+  const tarball = await packTarballOrSkip(t);
+  if (tarball === null) return;
+  initWebProfile(dshHome);
+  pluginAddTarball(dshHome, tarball);
+
+  // —— FR-1 集成面：安装本插件后（供给前）profile 依赖树无 manager 副本 ——
+  assertProfileTreeWithoutManagerCopy(dshHome);
+
+  // —— manager 供给责任移交安装流（处方段 2 同形态补装，钉运行时同版）——
+  supplyManagerPerPrescription(dshHome);
+
+  // —— boot 官方 web 宿主（--patch 挂注册观测仪器；启动行不可达 = skip 口径留因）——
+  const observerPatch = writeRegistrationObserver(workDir);
+  const booted = await bootWebWithObserver(t, { dir: workDir, dshHome, observerPatch });
+  if (!booted.ok) {
+    t.skip(`前置门：web boot 形态不可达（${BOOT_TIMEOUT_MS / 1000}s 内无 dsh web 启动行）——宿主日志尾：${booted.log().slice(-800)}`);
+    return;
+  }
+
+  // —— 激活卫生（与上方 FR-8 用例同口径的负面面）：无行激活失败、无兼容门禁用 ——
+  assert.ok(
+    !booted.log().includes('did not activate'),
+    `boot 日志不应含行激活失败（官方行独供 mcpManager、插件补位行让位生效）：宿主日志：${booted.log().slice(-1500)}`,
+  );
+  assert.ok(
+    !booted.log().includes('disabling profile plugin row'),
+    `boot 日志不应含兼容门禁用行（供给 manager 与宿主同 rc）：宿主日志：${booted.log().slice(-1500)}`,
+  );
+
+  // —— 注册观测签名：/mcp 命令与 mcp_manage 工具注册可用（FOUND = 注册面；list 真调 =
+  // 功能面经官方解析通道走通）。仪器激活（PROBE observer applied）即官方 manager 行供出
+  // mcpManager 服务的正面证据——inject 三服务任一缺席仪器行 pending 不激活、签名必超时 ——
+  await expectObserverSignature(booted.log, SIG_COMMAND_FOUND, '/mcp 命令应在官方宿主注册（commands.find 经官方解析面发现）');
+  await expectObserverSignature(booted.log, SIG_TOOL_FOUND, 'mcp_manage 工具应在官方宿主注册（tools.get 发现）');
+  await expectObserverSignature(booted.log, SIG_COMMAND_LIST_OK, '/mcp list 应经官方解析面真调成功（kind=success）');
+  await expectObserverSignature(booted.log, SIG_TOOL_LIST_OK, 'mcp_manage list 应经工具面真调成功（ok=true）');
+
+  // —— 官方 manager Remote 面真活（line 级正面证据）：认证交换 → mux watch 开流 →
+  // 订阅即推全量列表批次（manager 行 active 的 Remote 消费面）——
+  const cookie = await exchangeSessionCookie(booted.port, booted.token);
+  const watch = await openMuxStream(booted.port, cookie);
+  t.after(() => watch.close());
+  watch.send({ type: 'open', streamId: 'fr7-watch', endpoint: 'mcpManager/watch', payload: { args: {} } });
+  const initial = await waitForWatchItem(watch, () => true, { timeoutMs: CONNECT_TIMEOUT_MS });
+  assert.ok(initial.matched, `mcpManager/watch 订阅应推送全量列表批次（官方 manager 行 Remote 面真活；${CONNECT_TIMEOUT_MS / 1000}s 内无 item 帧）——末帧：${initial.lastSeen.slice(0, 400)}`);
+  assert.ok(
+    Array.isArray(JSON.parse(initial.lastSeen) as unknown),
+    `watch 首批应为 McpManagedServerView 全量数组：${initial.lastSeen.slice(0, 200)}`,
+  );
 });
