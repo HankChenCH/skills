@@ -288,3 +288,7 @@ docs/tickets/spec20261119-7a9a-20261119-443c-installer-allow-desktop-profile.md	
 docs/tickets/spec20261119-7a9a-20261119-9bd3-installer-post-install-readiness-check.md	303	https://github.com/HankChenCH/ai-infra/issues/303
 docs/tickets/spec20261119-7a9a-20261119-d0ff-dsh-mcp-integration-runtime-regression.md	304	https://github.com/HankChenCH/ai-infra/issues/304
 docs/tickets/spec20261119-7a9a-20261119-f3e4-dsh-mcp-strip-manager-dep.md	305	https://github.com/HankChenCH/ai-infra/issues/305
+docs/needs/20261119-8458-codeup-mcp-projection.md	306	https://github.com/HankChenCH/ai-infra/issues/306
+docs/specs/need20261119-8458-20261119-20b1-codeup-mcp-projection.md	307	https://github.com/HankChenCH/ai-infra/issues/307
+docs/tickets/spec20261119-20b1-20261119-2521-codeup-mcp-projection.md	308	https://github.com/HankChenCH/ai-infra/issues/308
+docs/acceptance/spec20261119-7a9a-20261120-83bf-dsh-mcp-manager-runtime-decouple.md	309	https://github.com/HankChenCH/ai-infra/issues/309
