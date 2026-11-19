@@ -10,7 +10,7 @@ import { readLockfile, writeLockfile, LOCKFILE_NAME } from '../../src/kernel/loc
 
 // 批量插件安装编排（spec 20261115-495e 实现决策「命令组装与执行」批量语义 +「锁文件多类型」）：
 // 逐条顺序执行官方命令（执行体注入——本套件不实跑），装后对账，锁文件插件区按对账结果
-// 刷新；单条失败即中止并报告已完成/未完成清单；node/desktop 前置在第一次执行前。
+// 刷新；单条失败即中止并报告已完成/未完成清单；node 前置在第一次执行前。
 // 注入桩模拟官方命令的两落点效果（dependencies 行 + dsh.profile.bundles 行，docs §2.3）。
 
 const PKG = '@hankchen/dsh-demo';
@@ -225,30 +225,32 @@ test('node 低于基线：第一时刻拒装，官方命令一次都不执行', 
   assert.equal(fs.existsSync(path.join(projectRoot, LOCKFILE_NAME)), false, '拒装不得写锁文件');
 });
 
-// desktop 拒装对新包不变（spec 20261117-34d4 FR-6，票 20261117-218b）：官方保留名 profile
-// 的拒装前置对两款插件包同口径——拒装在任何官方命令执行前，不落锁文件。
-for (const name of REAL_PLUGIN_NAMES) {
-  test(`目标 profile 为 desktop：拒装，官方命令一次都不执行（${name}）`, (t) => {
-    const projectRoot = makeProject(t);
-    const profilePath = makeProfileDir(t);
-    const sim = makeOfficialSim(t, profilePath);
+// desktop 放行（spec 20261119-7a9a FR-3，票 20261119-443c）：官方 CLI 已放行 desktop 插件
+// 管理（2026-11-19 实证，need 339e F4 结论失效），保留名拒装移除——desktop 走与普通
+// profile 完全相同的 前置 → 转发 → 对账 → 记账 链。
+test('目标 profile 为 desktop：前置放行，全链照旧（官方命令转发、对账、锁文件记账）', (t) => {
+  const projectRoot = makeProject(t);
+  const profilePath = makeProfileDir(t);
+  const sim = makeOfficialSim(t, profilePath);
 
-    assert.throws(
-      () =>
-        installPlugins({
-          profile: 'desktop',
-          plugins: [name],
-          profilePath,
-          dshInPath: true,
-          projectRoot,
-          packageVersion: '0.1.0',
-          now: '2026-11-15T00:00:00Z',
-          nodeVersion: 'v24.22.1',
-          run: sim.run,
-        }),
-      (err) => (err as Error).message.includes('desktop'),
-    );
-    assert.equal(sim.calls.length, 0, '拒装不得执行任何官方命令');
-    assert.equal(fs.existsSync(path.join(projectRoot, LOCKFILE_NAME)), false, '拒装不得写锁文件');
+  const result = installPlugins({
+    profile: 'desktop',
+    plugins: [PKG],
+    profilePath,
+    dshInPath: true,
+    projectRoot,
+    packageVersion: '0.1.0',
+    now: '2026-11-15T00:00:00Z',
+    nodeVersion: 'v24.22.1',
+    run: sim.run,
   });
-}
+
+  assert.deepEqual(result, { profile: 'desktop', installed: [{ name: PKG, version: '0.1.0' }] });
+  assert.equal(sim.calls.length, 1, '官方命令应照常执行一次');
+  assert.equal(sim.calls[0].command, 'dsh');
+  assert.deepEqual(sim.calls[0].args, ['plugin', '--profile', 'desktop', 'add', PKG]);
+  const lockfile = readLockfile(projectRoot)!;
+  assert.deepEqual(lockfile.plugins, {
+    [PKG]: { version: '0.1.0', profile: 'desktop', installedAt: '2026-11-15T00:00:00Z' },
+  });
+});
