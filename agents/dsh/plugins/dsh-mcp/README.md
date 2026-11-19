@@ -22,7 +22,7 @@ npx @deepseek-ai/dsh plugin --profile <名> add @hankchen/dsh-mcp
 
 ## 启用
 
-装进 profile 即启用，无额外开关：包自带 `cordis.patch.yml` 随 profile 加载，插入两行——官方 MCP 管理器 `@deepseek-ai/dsh-mcp-manager`（官方只在 Web/Desktop profile 自带该管理器，headless/sdk/acp 自定义 profile 由本插件自带挂载行补齐）与本插件模块。宿主加载本插件后即具备对话内管理入口（列含状态/添加/移除/启停）。
+装进 profile 即启用，无额外开关：包自带 `cordis.patch.yml` 随 profile 加载，插入两行——官方 MCP 管理器 `@deepseek-ai/dsh-mcp-manager` 的补位挂载行（官方只在 Web/Desktop profile 预挂该管理器，headless/sdk/acp 自定义 profile 由本插件的挂载行补位；本插件不携带 manager 依赖副本，该模块的解析可用性由安装途径保证，见「已知边界」）与本插件模块。宿主加载本插件后即具备对话内管理入口（列含状态/添加/移除/启停）。
 
 ## 凭据：用 `${credential:…}` 模板，不用明文
 
@@ -31,7 +31,7 @@ server 条目的 `env` / `headers` / `command` / `args` / `cwd` / `url` 值支�
 ## 已知边界
 
 - **官方兼容星座未定（2026-11-18 核验，票 20261118-2d72）**：官方 `@deepseek-ai/dsh-mcp-manager` 0.2.2-rc.2+ 的 peer 精确钉同 rc 兄弟套件，要求宿主 dsh ≥ `0.2.2-rc.2`；官方 npm `latest` 标签仍是 `0.2.2-rc.1`（rc.2+ 已发布于 `next` 标签，`latest` 未跟进）。本插件因此声明 `engines.dsh >=0.2.2-rc.2`——装进 latest（rc.1）宿主 profile 会被版本声明显式拒绝，属预期 fail-loud 而非缺陷。官方发布兼容星座后无需改插件即可直装。（2026-11-19 补充：manager 解析版与运行时对齐是另一独立风险面，见下条——范围钉版不保证跨宿主成立，钉版策略修订归 ADR 通道。）
-- **manager 解析版必须与宿主运行时同 rc（2026-11-19 desktop 实证）**：本插件的 `@deepseek-ai/dsh-mcp-manager: ^0.2.2-rc.2` 依赖会被 profile 的 `minimumReleaseAge` 供应链门解析到**最老满足版**（desktop 实解为 rc.2）；宿主运行时若已前移（desktop 实跑 rc.5），boot 兼容门按 peer 精确钉同 rc 校验失败，**静默禁用 manager 行——连官方预挂行一起**（本插件依赖副本会劫持官方行的模块解析）。症状三联征：`/mcp` 不被命令面板识别、右栏面板报 "no active Remote method exports this endpoint"、插件管理器视角本体行 fiber `pending`——此时 devtools console 无错、`--dump-config` 合成树一切正常，金标准证据只在 boot 日志：`dsh: disabling profile plugin row "mcp-manager": … incompatible with dsh …`。恢复配方：profile 的 `pnpm-workspace.yaml` 加 `overrides` 把 manager 钉到运行时同版 → 重装 profile 依赖 → 插件管理器开关重载（`plugin_manager set_plugin` 或 GUI）。
+- **manager 解析版必须与宿主运行时同 rc（2026-11-19 desktop 实证；插件已剥离依赖副本）**：宿主 boot 兼容门按 peer 精确钉同 rc 校验 manager，失败即**静默禁用 manager 行——连官方预挂行一起**。事故形态：本插件曾以 `dependencies` 携带 `@deepseek-ai/dsh-mcp-manager: ^0.2.2-rc.2` 副本，该副本被 profile 的 `minimumReleaseAge` 供应链门解析到**最老满足版**（desktop 实解为 rc.2）而运行时已前移（desktop 实跑 rc.5），插件依赖副本劫持了官方预挂行的模块解析——现已改用可选 peer 声明（任何安装形态装完本插件，profile 依赖树不再出现 manager 副本），副本劫持路径就此消除；manager 版本供给责任移交安装途径（官方直装见下述恢复配方，初始化器装后核验另见套件文档）。症状三联征（排查同类故障仍适用）：`/mcp` 不被命令面板识别、右栏面板报 "no active Remote method exports this endpoint"、插件管理器视角本体行 fiber `pending`——此时 devtools console 无错、`--dump-config` 合成树一切正常，金标准证据只在 boot 日志：`dsh: disabling profile plugin row "mcp-manager": … incompatible with dsh …`。恢复配方：profile 的 `pnpm-workspace.yaml` 加 `overrides` 把 manager 钉到运行时同版 → 重装 profile 依赖 → 插件管理器开关重载（`plugin_manager set_plugin` 或 GUI）。
 - **合成树 ≠ 运行时状态，装成 ≠ 跑得起来**：`--dump-config` 里行 `disabled: false` 不代表运行时启用——插件管理器的持久开关与 boot 兼容门禁用都作用在合成层之上（兼容门禁用时开关报 `overridden`）；客户端 bundle 只随页面加载注入，Host 行激活经开关重载或重启 app 生效。
 - **`desktop` profile 直装已放行，初始化器仍拒装**：官方 CLI 对 desktop 的插件管理（`dsh plugin --profile desktop add/remove`）2026-11-19 实证放行（boot/dump 类 profile 级操作仍归 Electron app 独占）；套件初始化器按 2026-11-15 查证结论（need 339e F4）仍在执行前拒装 desktop（`RESERVED_PROFILES`），源码修订走正式通道，暂可经官方命令绕过。
 - **斜杠命令的值解析边界（2026-11-19 会话实测反馈）**：`/mcp add` 的选项值按空白切 token、不做引号剥离——含引号的值现在会在**添加期被拒收并提示**（失败不再延迟到连接期才暴露）；含空格/引号的复杂值请走 `mcp_manage` 工具或右栏面板入口（结构化传参），敏感值一律优先 `${credential:REF}` 模板。

@@ -18,11 +18,13 @@
 // {__jsExpr}，与 dsh-mcp-plugin.test.ts 同款）。
 // demo 特例保留两个包历史约束：版本高于已烧版 0.1.0、apply 打一条加载日志。
 
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as loadYaml, JSON_SCHEMA, defineScalarTag } from 'js-yaml';
 
@@ -102,6 +104,9 @@ interface PluginPackageJson {
   main: unknown;
   files?: string[];
   scripts?: Record<string, unknown>;
+  dependencies?: Record<string, unknown>;
+  peerDependencies?: Record<string, unknown>;
+  peerDependenciesMeta?: Record<string, { optional?: unknown }>;
   devDependencies?: Record<string, unknown>;
   engines?: Record<string, unknown>;
   dsh?: { bundle?: unknown; client?: Record<string, unknown> };
@@ -230,6 +235,114 @@ test('dsh-mcp 源码态 files 含客户端源码目录 client（发布态换载�
   assert.ok(
     pkg.files?.includes('client'),
     `源码态 files 须含 client 源码目录，实际：${JSON.stringify(pkg.files)}`,
+  );
+});
+
+// ---------- dsh-mcp 依赖面契约（spec 20261119-7a9a round 2 实现决策，票 20261119-f3e4）----------
+// 期望值独立来源 = spec 实现决策「依赖面契约」（dependencies 不含 manager、兼容意图以可选
+// peer 表达）+ ADR 20261118-ad91 决策 1 认证的版本范围字面 ^0.2.2-rc.2（覆盖 rc.2/3/4 与
+// 0.2.2 正式版、prerelease 语义不误吸 0.3.x——决策 1 的 dependencies 钉版条款被 round 2
+// 证伪取代：宿主强制 manager ≡ 运行时同 rc，发布期静态范围无法跨宿主版本保证；范围语义
+// 延续到 peer 声明）。optional 元数据是 npm 7+ 免自动安装 peer 的关键标记（npm 官方语义：
+// 非 optional peer 默认自动安装，optional peer 不装）；pnpm 侧 autoInstallPeers 对 optional
+// peer 同样不自动安装（票 20261119-f3e4 实验实证：pnpm 12 两形态均零副本）。
+// 实装观测（下一测试）= 临时 profile 工作区真跑 pnpm install 钉装配结果——依赖面单测钉
+// 声明，实装钉装配，两者互补（stub-fidelity 口径：装配是真实协作者 pnpm 的行为面，声明替不了）。
+
+test('dsh-mcp 依赖面：dependencies 不含 manager，兼容意图 = manager 可选 peer（^0.2.2-rc.2 + optional 元数据）', async () => {
+  const pkg = await readPackageJson('dsh-mcp');
+  assert.equal(
+    pkg.dependencies?.['@deepseek-ai/dsh-mcp-manager'],
+    undefined,
+    'dependencies 不得携带 manager 副本——副本会被 profile 供应链门解析到过旧版并劫持官方预挂行的模块解析' +
+      '（2026-11-19 desktop 事故根因，spec 20261119-7a9a round 2 依赖面契约）',
+  );
+  assert.equal(
+    pkg.peerDependencies?.['@deepseek-ai/dsh-mcp-manager'],
+    '^0.2.2-rc.2',
+    '兼容意图以可选 peer 表达，范围 = ADR ad91 认证的 ^0.2.2-rc.2（覆盖 rc.2/3/4 与 0.2.2 正式版、不误吸 0.3.x）',
+  );
+  assert.equal(
+    pkg.peerDependenciesMeta?.['@deepseek-ai/dsh-mcp-manager']?.optional,
+    true,
+    'peer 须标 optional（npm 7+ 只对 optional peer 免自动安装——缺标记则 npm 常规安装路径仍会带入 manager 副本）',
+  );
+});
+
+test('dsh-mcp 实装观测：profile 工作区（auto-install-peers=false）装本插件后依赖树无 manager 副本', async (t) => {
+  // 前置门（node-test-skip-gate 纪律）：门函数返回 boolean 报因 + 调用方内联 return 截断
+  // （skip 只做标注）；禁把 skip 封在不截断的 helper 里。pnpm 可用属环境事实，探测失败是
+  // 环境问题非回归。
+  const probe = spawnSync('pnpm', ['--version'], { encoding: 'utf8', timeout: 30_000 });
+  if (probe.status !== 0) {
+    const reason = probe.error?.message ?? probe.stderr?.trim() ?? `退出码 ${probe.status}`;
+    t.skip(`前置门：pnpm 不可用（实装观测经 pnpm install 复现 profile 装配形态）——${reason}`);
+    return;
+  }
+
+  // 临时 profile 工作区（spec 实现决策指名的常规安装形态：autoInstallPeers=false）：
+  // 依赖行 file: 直指仓库插件目录——零 registry 访问（--offline），实装可重复确定；
+  // 依赖行形态对齐官方 plugin add 写入的语义化范围落盘（dsh-plugin-integration 一手观测）。
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-mcp-install-observation-'));
+  t.after(() => fs.rmSync(workspace, { recursive: true, force: true }));
+  const pluginDir = path.join(PLUGINS_ROOT, 'dsh-mcp');
+  fs.writeFileSync(
+    path.join(workspace, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: 'dsh-mcp-install-observation',
+        version: '0.0.0',
+        dependencies: { '@hankchen/dsh-mcp': `file:${pluginDir}` },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  fs.writeFileSync(path.join(workspace, '.npmrc'), 'auto-install-peers=false\n');
+
+  const install = spawnSync('pnpm', ['install', '--offline'], {
+    cwd: workspace,
+    encoding: 'utf8',
+    timeout: 120_000,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  assert.equal(
+    install.status,
+    0,
+    `临时 profile 工作区 pnpm install 应成功（${install.error?.message ?? `退出码 ${install.status}`}）：` +
+      `${install.stderr ?? ''}${install.stdout ?? ''}`,
+  );
+
+  // 本体在树（防空树假绿）：插件经 file: 依赖真实落进 node_modules
+  assert.ok(
+    fs.existsSync(path.join(workspace, 'node_modules', '@hankchen', 'dsh-mcp', 'package.json')),
+    '本插件应真实实装进临时工作区依赖树（file: 依赖落盘）',
+  );
+
+  // 全树扫 manager 副本：pnpm 顶层与 .pnpm store 区（含复合目录名）任何形态都不容出现；
+  // symlink 不下钻（Dirent.isDirectory 为 lstat 语义，pnpm store symlink 天然不跟随）
+  const copies: string[] = [];
+  const walk = (dir: string): void => {
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.name === 'dsh-mcp-manager') {
+        copies.push(path.relative(workspace, full));
+      } else if (entry.isDirectory()) {
+        walk(full);
+      }
+    }
+  };
+  walk(path.join(workspace, 'node_modules'));
+  assert.deepEqual(
+    copies,
+    [],
+    `常规安装路径（auto-install-peers=false）装本插件后依赖树不得出现 manager 副本（FR-1：安装本插件不得使 profile 依赖树出现 manager 副本），实际命中：${JSON.stringify(copies)}`,
   );
 });
 

@@ -21,7 +21,7 @@ const PLUGIN_ADD_HELP = `用法：npx @hankchen/infra plugin add [名...] [选�
   名...    要安装的插件包名；空格或逗号分隔均可（如 @hankchen/dsh-demo）
 
 选项：
-  --profile <名>    目标 dsh profile（带名安装时必填；desktop 为官方保留名拒装）
+  --profile <名>    目标 dsh profile（带名安装时必填）
   -h, --help        显示本帮助
 
 示例：
@@ -34,7 +34,7 @@ export function createPluginAddCommand(context: ProgramContext, reportExitCode: 
   configureCommandChannel(add);
   add.description('安装套件插件：带名免交互（须配 --profile）、无参交互勾选（需终端）');
   add.argument('[names...]', '要安装的插件包名；空格或逗号分隔均可（如 @hankchen/dsh-demo）');
-  add.option('--profile <名>', '目标 dsh profile（带名安装时必填；desktop 为官方保留名拒装）');
+  add.option('--profile <名>', '目标 dsh profile（带名安装时必填）');
   add.helpInformation = () => `${PLUGIN_ADD_HELP}\n`;
   // --profile 值必需由 commander 选项声明承担（spec 实现决策）：缺值时 commander 抛
   // optionMissingArgument，此处翻成 spec 契约原文走 ✗ 通道（装配层收口退出码 1）；

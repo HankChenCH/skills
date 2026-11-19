@@ -36,6 +36,12 @@
 //      装出去官方启动即抛 missing bundle composition error）。
 // tarball 入口按 pnpm/npm pack 产物 package/ 单包布局解包后走目录口径。
 //
+// 依赖面常驻拒绝（两态同查，票 20261119-f3e4 / 评审 20261119-47e1 阻断 1）：dependencies
+// 不得携带 @deepseek-ai/dsh-mcp-manager——2026-11-19 desktop 事故证伪形态（插件依赖副本被
+// profile 供应链门解析到过旧版、劫持官方预挂 manager 行的模块解析致宿主静默禁用官方行），
+// falsified-form-gate.md 证伪形态常驻门；verify-pack.ts 查 2 复用同一判定单点
+// collectBundleDefectsFor，一处加门即同时武装发布对账与 --tarball 发布态。
+//
 // scripts/verify-pack.ts 的插件侧复用源码态实现（根初始化器包内嵌插件目录 = 编目数据，
 // 源码态语义；发布态口径供插件包 publish 面把关）。独立调用：
 //
@@ -48,12 +54,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// 被校验插件包 package.json 的清单切片（四要素 + 客户端载体相关字段；其余键不进核对范围）。
+// 被校验插件包 package.json 的清单切片（四要素 + 客户端载体 + 依赖面相关字段；其余键不进核对范围）。
 interface PluginPackageJson {
   name?: string;
   type?: string;
   files?: string[];
   main?: string;
+  dependencies?: Record<string, string>;
   exports?: Record<string, unknown>;
   dsh?: { bundle?: { patch?: string }; client?: unknown };
 }
@@ -594,6 +601,23 @@ function collectBundleDefectsFor(pluginDir: string, published: boolean): string[
 
   if (!name) {
     defects.push(`${displayName}：package.json 缺 name——patch 引用名无从对账`);
+  }
+
+  // 依赖面常驻拒绝（票 20261119-f3e4，评审 20261119-47e1 阻断 1；falsified-form-gate.md
+  // 「被真实协作者证伪的发布形态固化为发布门常驻拒绝校验，缺陷信息引用证伪报告」）：
+  // dependencies 携带 @deepseek-ai/dsh-mcp-manager 副本即 2026-11-19 desktop 事故证伪的
+  // 发布形态——插件依赖副本被 profile 供应链门解析到过旧版、劫持官方预挂 manager 行的
+  // 模块解析，宿主静默禁用官方行。两态同查（本判定单点被 verify-pack.ts 查 2 发布对账与
+  // --tarball 发布态复用，一处加门即同时武装发布对账与发布面）；先例 FR-7 证伪形态落
+  // verify-bundle 拒绝。兼容意图以可选 peer 表达（禁入 dependencies，不封 peer 声明）。
+  const managerDependency = pkg.dependencies?.['@deepseek-ai/dsh-mcp-manager'];
+  if (managerDependency !== undefined) {
+    defects.push(
+      `${displayName}：package.json dependencies 不得携带 @deepseek-ai/dsh-mcp-manager` +
+        `（2026-11-19 desktop 事故证伪形态：插件依赖副本被 profile 供应链门解析到过旧版、` +
+        `劫持官方预挂 manager 行的模块解析致宿主静默禁用官方行；兼容意图以可选 peer 表达，` +
+        `docs/standards/falsified-form-gate.md 证伪形态常驻拒绝）——实际：${JSON.stringify(managerDependency)}`,
+    );
   }
 
   // 要素 1：type 须为 module（§1.2 要素表第 1 行；两态同查）

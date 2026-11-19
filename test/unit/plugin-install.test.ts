@@ -3,14 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { installPlugins } from '../../src/kernel/plugin-install.ts';
 import type { CommandRunner } from '../../src/kernel/plugin-install.ts';
+import { checkManagerReadiness, MANAGER_PACKAGE, managerPrescriptionLines } from '../../src/kernel/readiness.ts';
+import type { Executor } from '../../src/kernel/dsh-command.ts';
 import { readLockfile, writeLockfile, LOCKFILE_NAME } from '../../src/kernel/lockfile.ts';
 
 // 批量插件安装编排（spec 20261115-495e 实现决策「命令组装与执行」批量语义 +「锁文件多类型」）：
 // 逐条顺序执行官方命令（执行体注入——本套件不实跑），装后对账，锁文件插件区按对账结果
-// 刷新；单条失败即中止并报告已完成/未完成清单；node/desktop 前置在第一次执行前。
+// 刷新；单条失败即中止并报告已完成/未完成清单；node 前置在第一次执行前。
 // 注入桩模拟官方命令的两落点效果（dependencies 行 + dsh.profile.bundles 行，docs §2.3）。
 
 const PKG = '@hankchen/dsh-demo';
@@ -225,30 +228,203 @@ test('node 低于基线：第一时刻拒装，官方命令一次都不执行', 
   assert.equal(fs.existsSync(path.join(projectRoot, LOCKFILE_NAME)), false, '拒装不得写锁文件');
 });
 
-// desktop 拒装对新包不变（spec 20261117-34d4 FR-6，票 20261117-218b）：官方保留名 profile
-// 的拒装前置对两款插件包同口径——拒装在任何官方命令执行前，不落锁文件。
-for (const name of REAL_PLUGIN_NAMES) {
-  test(`目标 profile 为 desktop：拒装，官方命令一次都不执行（${name}）`, (t) => {
-    const projectRoot = makeProject(t);
-    const profilePath = makeProfileDir(t);
-    const sim = makeOfficialSim(t, profilePath);
+// desktop 放行（spec 20261119-7a9a FR-3，票 20261119-443c）：官方 CLI 已放行 desktop 插件
+// 管理（2026-11-19 实证，need 339e F4 结论失效），保留名拒装移除——desktop 走与普通
+// profile 完全相同的 前置 → 转发 → 对账 → 记账 链。
+test('目标 profile 为 desktop：前置放行，全链照旧（官方命令转发、对账、锁文件记账）', (t) => {
+  const projectRoot = makeProject(t);
+  const profilePath = makeProfileDir(t);
+  const sim = makeOfficialSim(t, profilePath);
 
-    assert.throws(
-      () =>
-        installPlugins({
-          profile: 'desktop',
-          plugins: [name],
-          profilePath,
-          dshInPath: true,
-          projectRoot,
-          packageVersion: '0.1.0',
-          now: '2026-11-15T00:00:00Z',
-          nodeVersion: 'v24.22.1',
-          run: sim.run,
-        }),
-      (err) => (err as Error).message.includes('desktop'),
-    );
-    assert.equal(sim.calls.length, 0, '拒装不得执行任何官方命令');
-    assert.equal(fs.existsSync(path.join(projectRoot, LOCKFILE_NAME)), false, '拒装不得写锁文件');
+  const result = installPlugins({
+    profile: 'desktop',
+    plugins: [PKG],
+    profilePath,
+    dshInPath: true,
+    projectRoot,
+    packageVersion: '0.1.0',
+    now: '2026-11-15T00:00:00Z',
+    nodeVersion: 'v24.22.1',
+    run: sim.run,
   });
+
+  assert.deepEqual(result, { profile: 'desktop', installed: [{ name: PKG, version: '0.1.0' }] });
+  assert.equal(sim.calls.length, 1, '官方命令应照常执行一次');
+  assert.equal(sim.calls[0].command, 'dsh');
+  assert.deepEqual(sim.calls[0].args, ['plugin', '--profile', 'desktop', 'add', PKG]);
+  const lockfile = readLockfile(projectRoot)!;
+  assert.deepEqual(lockfile.plugins, {
+    [PKG]: { version: '0.1.0', profile: 'desktop', installedAt: '2026-11-15T00:00:00Z' },
+  });
+});
+
+// ---------- 装后就绪核验（spec 20261119-7a9a 就绪核验契约，票 20261119-9bd3）----------
+// seam ③：运行时版本探测替身（run 注入桩，形态沿本文件官方命令模拟执行体先例）；
+// seam ④：处方文本契约（独立来源 = agents/dsh/plugins/dsh-mcp/README.md「已知边界」恢复配方）。
+// 通过判据 = 运行时版本与 manager 解析副本精确同版（宿主 boot 兼容门 peer 精确钉同 rc 的镜像，
+// ADR 20261118-ad91 一手实证）；四分支（同 rc / 异 rc / 缺副本 / 探测失败）各自独立可测。
+
+const DIRECT_EXECUTOR: Executor = { command: 'dsh', launcher: [] };
+const NPX_EXECUTOR: Executor = { command: 'npx', launcher: ['--yes', '@deepseek-ai/dsh'] };
+// 包根（处方契约的 README 锚词独立来源用）：e2e 同款 import.meta.url 推导
+const testPackageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+
+// 探测替身：记录调用并按桩返回 --version 探测结果（模拟官方 CLI 输出形态）
+function makeProbeStub(reply: { status: number; stdout: string; stderr?: string }) {
+  const calls: { command: string; args: string[] }[] = [];
+  const run: CommandRunner = ({ command, args }) => {
+    calls.push({ command, args });
+    return { status: reply.status, stdout: reply.stdout, stderr: reply.stderr ?? '' };
+  };
+  return { calls, run };
 }
+
+// manager 解析副本替身：按官方 pnpm 安装语义把 manager 写进 profile 依赖树
+function makeManagerCopy(profilePath: string, version: string): void {
+  const dir = path.join(profilePath, 'node_modules', '@deepseek-ai', 'dsh-mcp-manager');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: MANAGER_PACKAGE, version }));
+}
+
+function readiness({ profilePath, executor = DIRECT_EXECUTOR, run }: {
+  profilePath: string;
+  executor?: Executor;
+  run: CommandRunner;
+}) {
+  return checkManagerReadiness({ profilePath, executor, run });
+}
+
+test('就绪核验（同 rc）：探测走安装同款执行体 --version、通过并返回两版本号', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
+
+  const outcome = readiness({ profilePath, run: probe.run });
+
+  assert.deepEqual(outcome, { kind: 'pass', runtimeVersion: '0.2.2-rc.5', managerVersion: '0.2.2-rc.5' });
+  assert.deepEqual(probe.calls, [{ command: 'dsh', args: ['--version'] }], '探测应沿安装同款执行体发 --version');
+});
+
+test('就绪核验（异 rc）：mismatch 携带运行时与 manager 两版本号', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(profilePath, '0.2.2-rc.2');
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
+
+  const outcome = readiness({ profilePath, run: probe.run });
+
+  assert.deepEqual(outcome, { kind: 'mismatch', runtimeVersion: '0.2.2-rc.5', managerVersion: '0.2.2-rc.2' });
+});
+
+test('就绪核验（缺副本）：profile 依赖树无 manager 解析副本即 missing、带运行时版本', (t) => {
+  const profilePath = makeProfileDir(t);
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
+
+  const outcome = readiness({ profilePath, run: probe.run });
+
+  assert.deepEqual(outcome, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'absent' });
+});
+
+// 报因粒度（评审 20261120-4f76 建议 3）：missing 按实报因——absent 真缺副本（ENOENT）/
+// unreadable 副本在但 package.json 读失败 / corrupt 不可解析或缺 version；分支行为不变
+//（同归 missing fail-loud），只改报因粒度（ref-implementation #4 错误处理显式）。
+test('就绪核验（缺副本报因粒度）：不可读与损坏各报实因', (t) => {
+  const profilePath = makeProfileDir(t);
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
+  const managerPkgFile = path.join(profilePath, 'node_modules', '@deepseek-ai', 'dsh-mcp-manager', 'package.json');
+
+  // 副本在但 package.json 落成目录 → 读 EISDIR = unreadable
+  fs.mkdirSync(managerPkgFile, { recursive: true });
+  const unreadable = readiness({ profilePath, run: probe.run });
+  assert.deepEqual(unreadable, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'unreadable' });
+
+  // 坏 JSON = corrupt（先清掉上一形态落成目录的 package.json 再写文件）
+  fs.rmSync(managerPkgFile, { recursive: true, force: true });
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  fs.writeFileSync(managerPkgFile, '{ not-json');
+  const corruptJson = readiness({ profilePath, run: probe.run });
+  assert.deepEqual(corruptJson, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'corrupt' });
+
+  // JSON 合法但 version 缺失 = corrupt（副本损坏口径）
+  fs.writeFileSync(managerPkgFile, JSON.stringify({ name: MANAGER_PACKAGE }));
+  const corruptVersion = readiness({ profilePath, run: probe.run });
+  assert.deepEqual(corruptVersion, { kind: 'missing', runtimeVersion: '0.2.2-rc.5', cause: 'corrupt' });
+});
+
+test('就绪核验（探测失败·非零退出）：probe-unavailable，不虚构版本', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 1, stdout: '', stderr: 'npm error' });
+
+  const outcome = readiness({ profilePath, run: probe.run });
+
+  assert.deepEqual(outcome, { kind: 'probe-unavailable' });
+});
+
+test('就绪核验（探测失败·输出不可解析）：probe-unavailable', (t) => {
+  const profilePath = makeProfileDir(t);
+  const probe = makeProbeStub({ status: 0, stdout: 'dsh: unrecognized option\n' });
+
+  const outcome = readiness({ profilePath, run: probe.run });
+
+  assert.deepEqual(outcome, { kind: 'probe-unavailable' });
+});
+
+// 非法变体逐个喂解析入口（parse-normalization 规则 3/4 自查口径：解析失败显式落
+// probe-unavailable、分支带尾锚）——四段版本不得截段、日期横幅不得错位命中。
+test('就绪核验（探测失败·输出非法变体）：四段版本不截段、日期横幅不错位', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const illegal = ['1.2.3.4\n', '2026.11.19 dsh 0.2.2-rc.5\n'];
+  for (const stdout of illegal) {
+    const probe = makeProbeStub({ status: 0, stdout });
+    const outcome = readiness({ profilePath, run: probe.run });
+    assert.deepEqual(outcome, { kind: 'probe-unavailable' }, `输出 ${JSON.stringify(stdout)} 应落探测失败，不得静默接受为版本`);
+  }
+});
+
+// 裸行形态（探针实证：官方 --version 输出 '0.2.2-rc.5\n' 裸行）逐行锚定取首个命中行：
+// 横幅行 + 裸版本行共存时取裸版本行；v 前缀与行首尾空白容忍、整行非版本不命中。
+test('就绪核验（探测·裸行形态）：多行取首个命中行，v 前缀与首尾空白可解析', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 0, stdout: '2026.11.19 dsh\n v0.2.2-rc.5 \n' });
+
+  const outcome = readiness({ profilePath, run: probe.run });
+
+  assert.deepEqual(outcome, { kind: 'pass', runtimeVersion: '0.2.2-rc.5', managerVersion: '0.2.2-rc.5' });
+});
+
+test('就绪核验：dsh 不在 PATH 时探测沿 npx 执行体同款 launcher', (t) => {
+  const profilePath = makeProfileDir(t);
+  makeManagerCopy(profilePath, '0.2.2-rc.5');
+  const probe = makeProbeStub({ status: 0, stdout: '0.2.2-rc.5\n' });
+
+  readiness({ profilePath, executor: NPX_EXECUTOR, run: probe.run });
+
+  assert.deepEqual(probe.calls, [{ command: 'npx', args: ['--yes', '@deepseek-ai/dsh', '--version'] }]);
+});
+
+// 处方文本契约（seam ④）：三段可复制，与 README「已知边界」恢复配方逐段一致——
+// 锚词独立来源 = README 恢复配方原文（README 漂移即红，配方与处方是同一条契约的两面）。
+test('处方文本契约：三段各含 README 恢复配方对应锚词，且版本与 profile 路径可复制替换', (t) => {
+  const profilePath = makeProfileDir(t);
+  const readme = fs.readFileSync(
+    path.join(testPackageRoot, 'agents', 'dsh', 'plugins', 'dsh-mcp', 'README.md'),
+    'utf8',
+  );
+  // README 恢复配方锚词在场（配方文本本身是契约的一半）
+  for (const anchor of ['overrides', '重装 profile 依赖', 'plugin_manager set_plugin', 'GUI']) {
+    assert.ok(readme.includes(anchor), `README 恢复配方应含锚词 ${anchor}`);
+  }
+
+  const segments = managerPrescriptionLines({ profilePath, runtimeVersion: '0.2.2-rc.5' });
+  assert.equal(segments.length, 3, '处方恰三段');
+  assert.ok(segments[0].includes('pnpm-workspace.yaml'), '段 1 应点名 profile 的 pnpm-workspace.yaml');
+  assert.ok(segments[0].includes('overrides'), '段 1 应含覆盖配置写法锚词');
+  assert.ok(segments[0].includes(`'${MANAGER_PACKAGE}': 0.2.2-rc.5`), '段 1 覆盖配置应钉运行时同版（可复制 YAML）');
+  assert.ok(segments[1].includes('重装 profile 依赖'), '段 2 应含 README 段 2 锚词');
+  assert.ok(segments[1].includes(`pnpm --dir "${profilePath}"`), '段 2 应是可复制执行的命令（带 profile 路径）');
+  assert.ok(segments[1].includes(`${MANAGER_PACKAGE}@0.2.2-rc.5`), '段 2 补装应钉运行时同版');
+  assert.ok(segments[2].includes('plugin_manager set_plugin'), '段 3 应含重载指引锚词（工具路径）');
+  assert.ok(segments[2].includes('GUI'), '段 3 应含重载指引锚词（GUI 途径）');
+});
