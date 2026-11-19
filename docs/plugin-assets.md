@@ -127,7 +127,7 @@ dsh plugin --profile <名> add <包>
 ### 2.4 官方侧边界
 
 - 安装前置：官方 CLI `@deepseek-ai/dsh` 要求 node ≥ 24.9.0（F4）；`dsh` 不在 PATH 时初始化器经 `npx @deepseek-ai/dsh` 转发同一条官方命令。
-- profile 名 `desktop` 为官方保留名，官方 CLI 拒绝对其做插件管理（F4）；初始化器同样在执行前拒装（README「desktop 例外」）。
+- profile 名 `desktop`：官方 CLI 对其插件管理的拒绝已于 2026-11-19 实证失效（`dsh plugin --profile desktop add/remove` 放行；boot/dump 类 profile 级操作仍归 Electron app 独占）。初始化器当前仍按 F4 结论（2026-11-15）在执行前拒装（`src/kernel/dsh-command.ts` `RESERVED_PROFILES`），源码修订走正式通道；过渡期用户可经官方命令直装 desktop（README「已知边界」同条留痕）。
 - 只采用 bundle 形态（npm 包 + dsh.bundle 清单）；repository 插件形态（`.dsh-plugin` 目录）不在套件范围（need 定稿拍板）。
 - 插件卸载/升级由官方 `dsh plugin` 命令手动管理，套件不做 CLI 包装（need 非目标 5）。
 
