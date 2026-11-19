@@ -3,6 +3,23 @@
 本项目的所有显著变更记录于此。
 格式遵循 Keep a Changelog（https://keepachangelog.com），版本遵循语义化版本。
 
+## [v0.3.0] - 2026-11-20
+
+### Added
+
+- 初始化器 `plugin add` 装后就绪核验（spec 20261119-7a9a FR-4/FR-5/FR-6，票 20261119-9bd3；新增 `src/kernel/readiness.ts` 窄接口内核）：装完插件即对账目标 profile 的运行时 dsh 版本与 manager 解析版——精确同版通过并在完成摘要报告两版本号；非精确同版或缺副本退出非零并输出三段可复制处方（profile 级依赖覆盖写法 / manager 补装命令 / 插件管理器重载指引，与插件 README「已知边界」恢复配方逐段一致）；探测失败降级警告继续安装、不虚构通过。核验仅对 `@hankchen/dsh-mcp` 触发，其余插件行为零变化；manager 副本落点经本机 desktop profile（2026-11-19 事故现场）一手探针实证留痕。
+
+### Changed
+
+- `@hankchen/dsh-mcp` 0.3.3：插件剥离 `@deepseek-ai/dsh-mcp-manager` 依赖副本——`dependencies` 键整体移除、兼容意图改可选 peer（`peerDependencies` `^0.2.2-rc.2` + `peerDependenciesMeta.optional`），任何安装形态装插件不再使 profile 依赖树出现 manager 副本，从根上杜绝「依赖副本劫持官方 manager 行解析」的 desktop 事故（spec 20261119-7a9a FR-1，票 20261119-f3e4；ADR 20261120-5606 取代 ADR 20261118-ad91 决策 1）。registry 已烧 0.3.2 仍为事故依赖面，升 0.3.3 后即修复
+- 初始化器放行 desktop profile 插件安装：保留名拒装分支删除，`plugin add --profile desktop` 带名与交互勾选两路径放行，官方命令转发/两落点对账/锁文件记账照旧（官方 CLI 2026-11-19 实证已放行 desktop 插件管理，need 339e F4 拒装结论失效；spec 20261119-7a9a FR-3，票 20261119-443c）
+- verify-bundle 双态判定单点固化依赖面常驻拒绝校验：任何插件 bundle `dependencies` 携带 `@deepseek-ai/dsh-mcp-manager` 即缺陷（源码态与 tarball 发布态同查，verify-pack 复用同一判定函数），缺陷信息引用 desktop 事故（falsified-form-gate 证伪形态常驻门；票 20261119-f3e4 评审阻断 1 修复）
+- 就绪核验版本解析整行锚定 + 集成守卫 IO 错收窄：非法变体（截段/日期横幅错位）不再被静默接受为运行时版本；`scanManagerCopies` 只容忍根调用 ENOENT，其余 IO 错带路径上抛，消除 FR-1 集成级守卫假绿面（票 20261119-9bd3/d0ff 评审阻断修复，red-green 实证）
+
+### Fixed
+
+- `@hankchen/dsh-mcp` 0.3.3：README「已知边界」随依赖剥离对齐——副本劫持改述为历史形态、挂载行表述去依赖歧义（票 20261119-f3e4）
+
 ## [v0.2.4] - 2026-11-19
 
 ### Changed
