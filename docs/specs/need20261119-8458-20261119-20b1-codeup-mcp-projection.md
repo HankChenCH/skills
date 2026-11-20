@@ -1,6 +1,7 @@
 ---
 id: 20261119-20b1
-status: approved
+status: done
+done: 2026-11-20
 approved: 2026-11-19
 need: 20261119-8458
 round: 1
