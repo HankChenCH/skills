@@ -73,6 +73,7 @@ GLOSSARY.md 项目术语 → 粗探相关代码现状。落盘前用 Skill 工�
 3. **定稿（决策点，必须问）**：完整念一遍七节内容，请求确认。沉默不算确认，
    要改 → 回 §3 改完重念。通过 → `status: confirmed`、追加 `confirmed: <今日>`，
    重跑 validate 与 `.sdlc/check.sh publish`，提交留痕 `[trivial]`。
+   投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
 4. **出口**：抛决策问题："need NNNN 已 confirmed，建议 /dev-spec 开 round 1，
    范围可从假设与风险表中代价最高的圈起。"分轮归 dev-spec，只指路不代定。
 

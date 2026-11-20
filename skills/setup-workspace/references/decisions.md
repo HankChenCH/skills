@@ -21,7 +21,7 @@
 
 **选 Codeup**：
 1. 检查当前会话是否已配置 Codeup MCP（列出可用 MCP 工具即可判断）。
-2. 如实说明两条路径：**适配器直连优先**——publish 投影只需个人访问令牌与坐标，零 MCP 依赖，请用户准备四项：`TRACKER_REPO=<organizationId>/<spaceIdentifier>`（organizationId 见云效访问链接 `https://devops.aliyun.com/organization/<OrganizationId>`）、`CODEUP_TOKEN`（个人访问令牌，`pt-` 前缀）、`CODEUP_ASSIGNEE`（负责人阿里云 accountID）、`CODEUP_WORKITEM_TYPE`（项目下 Task 类工作项类型标识，OpenAPI Explorer 查得）；可写入 config.sh 或环境变量。**MCP 为可选增强**——只在需要对话内直接操作工作项时才配置：按所用智能体的 MCP 配置方式添加云效 OpenAPI MCP server，并说明"配置后重启会话生效"；未配置不影响适配器。
+2. 如实说明两条路径（投影行为细则以 docs/METHOD.md「投影约定」为单点，不在此复述判定树）：**MCP 优先（零配置）**——检测到 Codeup MCP 即投影零 REST 配置：组织/空间/需求类型/负责人全由 MCP 发现；空间未配置 `TRACKER_REPO` 时按仓库名自动匹配，多命中或零命中问人，选定后回写 config.sh `TRACKER_REPO` 记忆化（config.sh 归用户所有，回写可删）。**适配器兜底（三项 REST 配置）**——未配 MCP 或 MCP 不可用时 publish 走 `.sdlc/trackers/codeup.sh`，请用户准备：`TRACKER_REPO=<organizationId>/<spaceIdentifier>`（organizationId 见云效访问链接 `https://devops.aliyun.com/organization/<OrganizationId>`，适配器路径必配坐标——bash 无法调 MCP，空间自动匹配只在 MCP 路径成立）与三项 REST 配置——`CODEUP_TOKEN`（个人访问令牌，`pt-` 前缀）、`CODEUP_ASSIGNEE`（负责人阿里云 accountID）、`CODEUP_WORKITEM_TYPE`（需求类 Req 工作项类型标识，经 MCP `get_work_item_types` 查询或 Projex 界面一次查得）；可写入 config.sh 或环境变量，任一缺失投影逐项警告跳过不阻断。MCP 配置方式：按所用智能体的 MCP 配置方式添加云效 OpenAPI MCP server，说明"配置后重启会话生效"。
 3. 不阻断初始化：TRACKER=codeup 照写，适配器照装，待补项进收尾报告。
 
 **通用说明（如实相告，不隐瞒）**：github/gitlab/codeup 的 publish 适配器随本技能分发（assets/trackers/），生成阶段按所选出口安装；投影失败（CLI 缺失/未认证/API 报错/配置缺失）一律警告跳过（exit 0），不阻断技能出口链——产物在盘上（docs/ 是真相源）。

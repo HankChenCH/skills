@@ -70,6 +70,7 @@ TRACKER 指向平台且 PR 已建 → 按确认的方式在平台合并；否则
 1. 同步本地 BASE_REF（平台合并过就先 pull），逐张把本次交付覆盖的工单 frontmatter
    `status` 改为 `done` 并追加 `done: <今日>`；每张跑 `.sdlc/check.sh validate`
    与 `publish`。
+   投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
 2. 状态变更提交用 `[trivial]`——工单此刻已 done，[#NNNN] 轻门禁按设计拒绝引用
    done 工单的提交；这是流程状态落盘，不是绕门禁（dev-retro 可审计）。
 3. 逐个检查关联 spec：名下工单已全部 done → **立即用 Skill 工具调用 dev-accept**。

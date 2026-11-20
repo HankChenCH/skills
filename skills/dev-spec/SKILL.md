@@ -96,6 +96,7 @@ created: <date>
    **批准是决策点，必须用户显式确认**，不接受沉默或"都行"。要改 → 回 §3，改完重走本节。
 3. 批准 → frontmatter `status` 改 `approved`、追加 `approved: <今日>`，
    运行 `.sdlc/check.sh publish <取号返回的路径>`。
+   投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
 4. **含界面交付的建议（只建议不强制）**：spec 的用户故事或验收场景提及
    界面、页面、原型 → 建议用户"先述标再拆票"：走 /design-brief 链（design-brief →
    design-baseline → design-ui → design-deliver）产出述标说明与可评审的界面原型，

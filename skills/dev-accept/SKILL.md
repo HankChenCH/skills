@@ -97,6 +97,7 @@ Progress、实现交接转交验收代理。串联调用时执行体自带实现
    入口原子分配、全历史唯一，父为 spec（知识档）自动带 `spec<父ID>-` 谱系前缀；
    用下面的固定模板写正文覆盖占位文件（frontmatter `id` 填文件名的 ID 段），跑
    `.sdlc/check.sh validate <占位路径>` 必须通过，再跑 `publish <占位路径>`。
+   投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
 3. **分级有判据、判定按判据机械执行，不问人**：无硬伤且 `check.sh all` 全绿 → `status: passed`（瑕疵留痕不阻塞）；存在硬伤或检查有红灯 → `status: rejected`，硬伤与范围问题如实写进报告。判定权：判定从不问人，无人值守运行下 passed/rejected 同样由 AI 按本分级判据机械作出；need 置 fulfilled 不属判定，永远停点留人（见本节第 4 项末段）。报告状态变更的提交用 `[trivial]`——流程状态落盘，不是绕门禁（dev-retro 可审计）。
 4. **passed 出口（固定序列，顺序不可换）**：
    **编排形态时点注记（承载 = 合并候选）**：passed 判定与报告落盘即停，不即时走
