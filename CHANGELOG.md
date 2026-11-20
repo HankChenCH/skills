@@ -3,6 +3,23 @@
 本项目的所有显著变更记录于此。
 格式遵循 Keep a Changelog（https://keepachangelog.com），版本遵循语义化版本。
 
+## [v0.4.0] - 2026-11-20
+
+### Added
+
+- Codeup MCP 投影路径——codeup 腿三级判定树（spec 20261119-20b1 FR-1/FR-3，票 20261119-2521，提交 a43b2c6/7636e8f）：TRACKER=codeup 时会话检测到 Codeup MCP 工具即走 MCP 路径（零 REST 配置——组织经 `get_current_organization_info`、空间按仓库名 `search_projects` 自动匹配（唯一命中直用/多命中问人并回写 `TRACKER_REPO` 记忆化）、Req 默认类型与当前用户负责人均由 MCP 工具发现）；未配 MCP 回落 REST 适配器同口径；路径失败警告跳过 exit 0、投影永不断出口链。判定树单点落 docs/METHOD.md §7.1「投影约定」+ 蓝图 v1.41（§5.4/§11.1/§14），七技能 publish 步骤引用话术（d7dc245）。外部人工校验：另一真实项目（已装本套件）开单实测 MCP 投影云效正确。
+- codeup 腿产物终态同步关闭云效工作项（FR-5，a43b2c6）：产物 status 终态（GLOSSARY 终态集合 8 态）→ 已完成 100014、rejected → 已取消 141230（2026-11-19 需求工作流 `get_work_item_workflow` 一手实探 + UpdateWorkitem 官方文档核验；REST 路径用系统内置 ID，MCP 路径经 nameEn 解析回落内置 ID）。github 腿同款语义 v1.40 已有，本轮补齐 codeup 腿。
+
+### Changed
+
+- codeup.sh 适配器投影形态新口径（FR-2/FR-4/FR-6，a43b2c6）：由「全产物各自独立 Task 单」改为 need → Req 类需求单、带 need 谱系前缀的 spec/design/adr/research → 对应需求单下追加 MARKDOWN 评论（首行盘上指针行 + 全文，60000 字节超限截断注记）、票与过程档及无谱系独立知识档不投（stderr 说明后 exit 0）；幂等靠两路径共用映射文件 `codeup.map`（三字段契约不变，知识档行第二列记承载 need 的工作项标识），重复投影一律追加评论不新建。`CODEUP_WORKITEM_TYPE` 配置语义由 Task 类类型标识变更为需求类（Req）类型标识——已配四项 REST 的项目升级后需手动更新该值（经 MCP `get_work_item_types(category=Req)` 一次查得）；MCP 路径项目零配置零动作。
+- setup-workspace 决策 1 Codeup 分支改「MCP 优先（零配置）+ 适配器兜底（三项 REST 配置）」（FR-7，8b3ba66）：decisions.md / SKILL.md / generation.md 同步，assets/trackers/codeup.sh 与 `.sdlc/trackers/codeup.sh` 双副本同文（cmp 逐字校验 + 静态断言常驻）。
+- GLOSSARY「投影」「映射文件」词条随形态变更修订（7636e8f）：codeup 终态关闭补齐、投影约定引用 METHOD §7.1。
+
+### Fixed
+
+- legacy 守护套件 codeup 节同批重指向新契约（a43b2c6，spec 20261119-20b1 测试决策 round 1 缺口处置 d3242e6）：12 条断言保留 case id 与流结构重指向 need 夹具（建单/评论/映射/幂等），新增「无谱系知识档跳过 + 零平台调用」2 条——非删测非改弱；test/unit 新增适配器进程替身（假 curl，11 断言）与技能文档同步静态断言（10 断言）两文件常驻守护。
+
 ## [v0.3.0] - 2026-11-20
 
 ### Added
