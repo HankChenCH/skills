@@ -65,7 +65,7 @@
 （首个项目术语落盘时由对应技能在此追加；格式：`术语 —— 定义（首次出现的产物）`）
 
 - **稳态假设** —— 混沌测试的前置判据：一句可度量的系统正常状态描述，加"用哪些指标证明它成立"（如"下单成功率 ≥99.9%，以订单表增长与错误率为证"）；先有稳态假设才准注入故障（首次出现：ref-testing 技能 references/chaos.md）。
-- **投影** —— tracker 适配器把 docs/ 产物单向镜像到平台对象（GitHub/GitLab issue、Codeup 工作项+评论）的行为；产物 `status` 已终态时投影同步关闭平台 issue（终态集合与关闭理由对齐本表状态机：done/fulfilled/passed/accepted/superseded/approved/reviewed/reconstructed → completed，rejected → not_planned；codeup 工作项关闭暂不实现）——关闭是产物生命周期终点的表达，不是清扫回删，投影仍单向不回删；投影/关闭失败一律警告跳过不阻断，盘上产物永远是真相源（首次出现：need 0002 / spec 0004；终态关闭：spec 0004 修订 2026-11-19）。
+- **投影** —— tracker 适配器或 Codeup MCP 会话把 docs/ 产物单向镜像到平台对象的行为，两路径同口径（判定树单点 METHOD「投影约定」，各技能 publish 步骤只引用不复述）：GitHub/GitLab 全产物独立 issue；Codeup 按 need 建需求单（Req 类）、带 need 谱系前缀的 spec/design/adr/research 挂对应需求单评论、票与过程档及无 need 谱系独立知识档不投。产物 `status` 已终态时投影同步关闭平台投影对象（终态集合对齐本表状态机：GitHub/GitLab done/fulfilled/passed/accepted/superseded/approved/reviewed/reconstructed → completed，rejected → not_planned；Codeup 同终态集合 → 已完成（内置状态 100014），rejected → 已取消（141230））——关闭是产物生命周期终点的表达，不是清扫回删，投影仍单向不回删；投影/关闭失败一律警告跳过不阻断，盘上产物永远是真相源（首次出现：need 0002 / spec 0004；终态关闭：spec 0004 修订 2026-11-19；MCP 双路径与 codeup 受理面：spec 20261119-20b1 修订 2026-11-20）。
 - **映射文件** —— 适配器同目录的 `<tracker>.map` 三字段表（盘上相对路径、平台对象编号、对象 URL），支撑同一产物重复 publish 时更新而非新建；丢失映射的后果仅是可能新建重复对象（首次出现：spec 0004 实现决策）。
 - **运行（run）** —— dev-execute 对一张 approved spec 的一次完整编排执行：独立运行分支 + 运行 worktree 内按运行依赖顺序图推进名下全部工票，止于一次合并确认；票合回运行分支是机械操作，不设人工门（首次出现：need 0004）。
 - **工作区仓库** —— 多仓工作区形态下由 setup-workspace 在根目录 git init 出的仓库：只装流程基础设施（`.sdlc/`、`docs/`、AGENTS.md 等），不装子仓库源码（首次出现：need 0008）。

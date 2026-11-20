@@ -123,7 +123,28 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | `validate <file>` | 模板完整性：必填节、frontmatter、id 与文件名、FR 追溯（孤儿报错）、依赖无环、总览五节与 spec 引用校验、done spec 名下过程档残留扫描（未清扫即报错并逐个列出文件） | 各产物技能的出口门禁 |
 | `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单 in-progress/implemented，或带 `[trivial]`；Merge/Revert 信息头机械放行（合并/回退无工单可挂）（挂 git commit-msg hook） | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖 | git hook |
-| `publish <file>` | 按 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh` 发布产物；产物 `status` 已终态（GLOSSARY 状态机）时投影同步关闭平台 issue（rejected 以 not_planned 关闭，其余终态 completed；codeup 工作项关闭暂不实现）；适配器未安装或投影/关闭失败（CLI 缺失/未认证/API 报错）时明确警告并跳过，不阻断 | 各技能落盘后 |
+| `publish <file>` | 按 §7.1 投影约定执行：会话检测到 Codeup MCP 工具走 MCP 路径（投影零 REST 配置），未检测到按 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh`，两路径同口径受理面与终态关闭见 §7.1；适配器未安装或投影/关闭失败（CLI 缺失/未认证/API 报错/配置缺失）时明确警告并跳过，不阻断 | 各技能落盘后 |
+
+### 7.1 投影约定（publish 投影路径与受理面的单点定义）
+
+publish 的投影路径与受理面全在此节定义；各技能 publish 步骤只引用本节并做会话自查，不复制判定树全文。
+
+**三级判定树**：会话检测到 Codeup MCP 工具 → 走 MCP 路径（投影零 REST 配置）；未检测到 → 走 REST 适配器路径（按 config.sh 的 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh`）；任一路径投影失败 → 明确警告并跳过（exit 0），不阻断技能出口链——产物在盘上已是真相源。
+
+**MCP 路径发现链**（Codeup）：组织经 `get_current_organization_info` 发现；空间坐标优先取 config.sh `TRACKER_REPO`，未配置则 `search_projects` 按仓库名与项目自定义码自动匹配——唯一命中直接用，多命中列出候选名问人，零命中问人，选定后回写 config.sh `TRACKER_REPO` 记忆化（config.sh 归用户所有，回写可删）；类型经 `get_work_item_types(category=Req)` 取 defaultType 项；负责人经 `get_current_user` 取当前用户。
+
+**投影受理面**（两路径同口径；GitHub/GitLab 腿维持全产物独立 issue 口径不变）：
+
+| 产物 | 形态 |
+|---|---|
+| need | 新建 Codeup 需求单（category=Req，标题 = 产物一级标题） |
+| spec / design / adr / research（文件名带 need 谱系前缀） | 对应需求单下追加 MARKDOWN 评论（正文首行盘上指针行 + 产物全文，超 60000 字节截断并注记） |
+| 票与过程档（tickets / reviews / acceptance / overviews） | 不投，stderr 说明「过程档不入云效」 |
+| 无 need 谱系前缀的独立知识档 | 不投，stderr 说明「无 need 谱系」 |
+
+**幂等共账**：两路径共用映射文件（`.sdlc/trackers/<tracker>.map` 三字段：盘上相对路径 / 工作项标识 / 对象 URL）；知识档行第二列记其承载 need 的工作项标识（评论形态）；同产物重复投影一律追加评论不新建。
+
+**终态关闭**：产物 frontmatter `status` ∈ GLOSSARY 终态集合时同步关闭平台投影对象——done / fulfilled / passed / accepted / superseded / approved / reviewed / reconstructed → GitHub/GitLab completed、Codeup 已完成（内置状态 100014）；rejected → not_planned、Codeup 已取消（141230）。Codeup REST 适配器直接用内置状态 ID（不做运行时工作流查询，对应工作流查询端点未核验）；MCP 路径投影前经 get_work_item_workflow 按 nameEn（Done / Canceled）解析状态标识，未命中回落内置 ID。关闭失败与投影失败同款警告跳过；已关再关的非零按失败留痕，幂等无害。状态由技能序列先落盘后 publish，适配器只读 frontmatter 不做状态推断；research 无 status 行不命中终态集。
 
 ## 8. config.sh 字段参考
 
