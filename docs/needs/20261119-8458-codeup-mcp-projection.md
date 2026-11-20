@@ -1,6 +1,7 @@
 ---
 id: 20261119-8458
-status: confirmed
+status: fulfilled
+fulfilled: 2026-11-20
 confirmed: 2026-11-19
 created: 2026-11-19
 ---
