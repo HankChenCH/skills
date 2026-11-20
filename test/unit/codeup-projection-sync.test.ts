@@ -138,3 +138,31 @@ test('七技能不复制判定树全文（发现链与终态映射细节不出�
     }
   }
 });
+
+test('setup 决策 1 Codeup 分支：MCP 优先（零配置）+ 适配器兜底（三项 REST 配置）形态', () => {
+  const decisions = read(path.join('skills', 'setup-workspace', 'references', 'decisions.md'));
+  for (const needle of [
+    'MCP 优先（零配置）',
+    '适配器兜底（三项 REST 配置）',
+    '回写 config.sh `TRACKER_REPO` 记忆化',
+  ]) {
+    assert.ok(decisions.includes(needle), `决策 1 Codeup 分支应含 ${needle}`);
+  }
+  assert.equal(
+    decisions.includes('适配器直连优先'),
+    false,
+    '决策 1 不得残留「适配器直连优先」旧形态',
+  );
+});
+
+test('setup SKILL.md 与 generation.md：MCP 优先话术同步', () => {
+  const skill = read(path.join('skills', 'setup-workspace', 'SKILL.md'));
+  const generation = read(path.join('skills', 'setup-workspace', 'references', 'generation.md'));
+  for (const [name, text] of [
+    ['SKILL.md', skill],
+    ['generation.md', generation],
+  ] as const) {
+    assert.ok(text.includes('MCP 优先'), `${name} 应含 MCP 优先话术`);
+    assert.ok(text.includes('三项 REST 配置'), `${name} 应含适配器兜底配置清单话术`);
+  }
+});
