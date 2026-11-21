@@ -125,9 +125,16 @@ design 产物两段续写，中间态 `analyzed`，终态 `approved`。
    字段缺省（spec 还没 approved）→ **拦停**："方案段要挂 spec 谱系，先
    /dev-spec 让 spec 过批准"——不起草方案段。（机械校验同款在
    `.sdlc/check.sh validate`：analyzed 缺 spec 直改 approved 会被拒。）
-2. spec 已 approved → 回补方案段四节（重入时从盘上 analyzed 续写）；
-   frontmatter 补 `spec: <spec-ID>`，**文件名 need 谱系前缀不变**——谱系
-   权威记录是 frontmatter 父引用字段，文件名不重命名。
+2. spec 已 approved，按盘上状态取支：
+   - **盘上无本 spec 名下的 design**（非重入，直接进方案形态）→ 用
+     `claim design <slug> spec <spec-ID>` 取号（文件名带 spec 谱系前缀，
+     frontmatter `spec` 填父 spec 的 ID 段），以 design 模板落盘方案段四节，
+     跑 `.sdlc/check.sh validate <返回的路径>` 必须通过，再跑 `publish`。
+     提交留痕用 `[trivial]`（流程产物落盘）。
+   - **盘上有本 spec 名下的 analyzed design**（分析态回补，§1.1 重入的
+     续写点）→ 续写方案段四节；frontmatter 补 `spec: <spec-ID>`，
+     **文件名 need 谱系前缀不变**——谱系权威记录是 frontmatter 父引用
+     字段，文件名不重命名。
 3. 命中三条件的决策逐条按 adr 模板落盘 `docs/adr/NNNN-slug.md`
    （`status: accepted`）；新决策取代旧 ADR → 旧的置 `superseded` 并追加
    日期，不删除。
