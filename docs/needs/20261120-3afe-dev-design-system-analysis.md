@@ -1,8 +1,9 @@
 ---
 id: 20261120-3afe
-status: confirmed
+status: fulfilled
 confirmed: 2026-11-20
 created: 2026-11-20
+fulfilled: 2026-11-21
 ---
 # dev-design 重定位：承接澄清后的系统分析与设计（双形态）
 
