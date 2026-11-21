@@ -75,7 +75,8 @@ GLOSSARY.md 项目术语 → 粗探相关代码现状。落盘前用 Skill 工�
    重跑 validate 与 `.sdlc/check.sh publish`，提交留痕 `[trivial]`。
    投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
 4. **出口**：抛决策问题："need NNNN 已 confirmed，建议 /dev-spec 开 round 1，
-   范围可从假设与风险表中代价最高的圈起。"分轮归 dev-spec，只指路不代定。
+   范围可从假设与风险表中代价最高的圈起；结构非显而易见时建议先 /dev-design
+   做系统分析再进 spec。"分轮归 dev-spec，只指路不代定。
 
 ## 5. 中断与交接
 

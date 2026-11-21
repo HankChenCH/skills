@@ -32,7 +32,9 @@ description: 按 docs/tickets/ 中的工单实现功能。入口校验工单状�
 
 ## 2. 装载上下文
 
-按顺序读：工单全文 → 关联 spec 的对应章节 → docs/adr/ 中与改动区域相关的
+按顺序读：工单全文 → 关联 spec 的对应章节 → 该 spec 关联的 design 产物
+（docs/designs/ 中 frontmatter `spec` 或 `need` 指向本 spec 及其 need 时装载，
+重点方案段 seam 清单——测试落点的锚；缺省跳过）→ docs/adr/ 中与改动区域相关的
 ADR → GLOSSARY.md → CODING_STANDARDS.md。
 再用 Skill 工具装载三个参考：ref-implementation、ref-testing、ref-git-commit；
 写测试前重读 ref-testing，写哪类测试再按其场景路由表读取对应细则，一次只载一个。
