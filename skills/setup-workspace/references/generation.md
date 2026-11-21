@@ -19,7 +19,7 @@
 ### .sdlc/trackers/{local,github,gitlab,codeup}.sh
 
 - 拷贝 `assets/trackers/local.sh` → `<repo>/.sdlc/trackers/local.sh`，`chmod +x`，可整体覆盖。
-- 决策 1 选了 github / gitlab / codeup → 追加拷贝 `assets/trackers/<决策1>.sh` 并 `chmod +x`，可整体覆盖；codeup 形态为 MCP 优先（检测到 Codeup MCP 即零配置投影，`TRACKER_REPO` 未配置时按仓库名自动匹配并回写记忆化）+ 适配器兜底（`TRACKER_REPO` 坐标与 `CODEUP_TOKEN` / `CODEUP_ASSIGNEE` / `CODEUP_WORKITEM_TYPE` 三项 REST 配置，未配 MCP 时必填，缺失逐项警告跳过）——待补项在收尾报告"config 待补项"中列出（写法见 references/decisions.md 决策 1）。
+- 决策 1 选了 github / gitlab / codeup → 追加拷贝 `assets/trackers/<决策1>.sh` 并 `chmod +x`，可整体覆盖；codeup 形态为 MCP 优先（TRACKER=codeup 且检测到 Codeup MCP 即零配置投影，`TRACKER_REPO` 未配置时按仓库名自动匹配并回写记忆化；TRACKER=github/gitlab 时不进 MCP 路径）+ 适配器兜底（`TRACKER_REPO` 坐标与 `CODEUP_TOKEN` / `CODEUP_ASSIGNEE` / `CODEUP_WORKITEM_TYPE` 三项 REST 配置，未配 MCP 时必填，缺失逐项警告跳过）——待补项在收尾报告"config 待补项"中列出（写法见 references/decisions.md 决策 1）。
 - 扫描发现的其他 `.sdlc/trackers/*.sh`（用户自定义适配器）**一律不动**。
 
 ### .sdlc/config.sh（仅缺失时生成）

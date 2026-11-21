@@ -123,13 +123,13 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 | `validate <file>` | 模板完整性：必填节、frontmatter、id 与文件名、FR 追溯（孤儿报错）、依赖无环、总览五节与 spec 引用校验、done spec 名下过程档残留扫描（未清扫即报错并逐个列出文件） | 各产物技能的出口门禁 |
 | `commit-msg` | 轻门禁：message 带 `[#NNNN]` 且工单 in-progress/implemented，或带 `[trivial]`；Merge/Revert 信息头机械放行（合并/回退无工单可挂）（挂 git commit-msg hook） | git hook |
 | `pre-push` | 重门禁：分支上所有 implemented 工单都被某张 approved 评审覆盖 | git hook |
-| `publish <file>` | 按 §7.1 投影约定执行：会话检测到 Codeup MCP 工具走 MCP 路径（投影零 REST 配置），未检测到按 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh`，两路径同口径受理面与终态关闭见 §7.1；适配器未安装或投影/关闭失败（CLI 缺失/未认证/API 报错/配置缺失）时明确警告并跳过，不阻断 | 各技能落盘后 |
+| `publish <file>` | 按 §7.1 投影约定执行：TRACKER=codeup 且会话检测到 Codeup MCP 工具走 MCP 路径（投影零 REST 配置），其余按 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh`，两路径同口径受理面与终态关闭见 §7.1；适配器未安装或投影/关闭失败（CLI 缺失/未认证/API 报错/配置缺失）时明确警告并跳过，不阻断 | 各技能落盘后 |
 
 ### 7.1 投影约定（publish 投影路径与受理面的单点定义）
 
 publish 的投影路径与受理面全在此节定义；各技能 publish 步骤只引用本节并做会话自查，不复制判定树全文。
 
-**三级判定树**：会话检测到 Codeup MCP 工具 → 走 MCP 路径（投影零 REST 配置）；未检测到 → 走 REST 适配器路径（按 config.sh 的 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh`）；任一路径投影失败 → 明确警告并跳过（exit 0），不阻断技能出口链——产物在盘上已是真相源。
+**三级判定树**：config.sh `TRACKER=codeup` 且会话检测到 Codeup MCP 工具 → 走 MCP 路径（投影零 REST 配置）；其余一律走 REST 适配器路径（按 config.sh 的 TRACKER 调用 `.sdlc/trackers/<TRACKER>.sh`；TRACKER=codeup 但会话无 MCP 工具同落此腿——TRACKER≠codeup 的项目不进 MCP 路径，github/gitlab 腿零改动承诺不受用户环境挂了云效 MCP 影响）；任一路径投影失败 → 明确警告并跳过（exit 0），不阻断技能出口链——产物在盘上已是真相源。
 
 **MCP 路径发现链**（Codeup）：组织经 `get_current_organization_info` 发现；空间坐标优先取 config.sh `TRACKER_REPO`，未配置则 `search_projects` 按仓库名与项目自定义码自动匹配——唯一命中直接用，多命中列出候选名问人，零命中问人，选定后回写 config.sh `TRACKER_REPO` 记忆化（config.sh 归用户所有，回写可删）；类型经 `get_work_item_types(category=Req)` 取 defaultType 项；负责人经 `get_current_user` 取当前用户。
 

@@ -50,7 +50,7 @@ git 仓库列为候选，按 §2 决策 4 确认入册后补装门禁与哨兵�
 凭据验证、MCP 引导、字段映射、导入流程等细则见 references/decisions.md。
 
 1. **产物与 issue 出口**：local（默认）/ GitHub / GitLab / 云效 Codeup。GitHub 验 gh；
-   GitLab 验 glab；Codeup 引导添加 MCP——MCP 优先（检测到 Codeup MCP 即零配置投影；
+   GitLab 验 glab；Codeup 引导添加 MCP——MCP 优先（TRACKER=codeup 且检测到 Codeup MCP 即零配置投影；
    未配 MCP 走适配器兜底，需三项 REST 配置）。不通过 → 明确告知后回落 local，不静默降级。
 2. **执行环境缺口**：每语言三问（跑在哪/版本管理/包管理器），仓库已述的直接复述；
    结果写 config.sh 的 RUN_ENV / RUN_PREFIX / PKG_MGR / CODE_DIRS。

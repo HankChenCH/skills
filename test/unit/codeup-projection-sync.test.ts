@@ -72,8 +72,8 @@ test('蓝图 v1.41：修订记录、§5.4 publish 行、§11.1 决策①、§14 
   const blueprint = read(path.join('docs', 'sdlc-skills-blueprint.md'));
   assert.ok(blueprint.includes('v1.41 修订记录'), '蓝图应含 v1.41 修订记录');
   for (const needle of [
-    // §11.1 决策① Codeup 分支 MCP 优先形态
-    'MCP 优先：检测到 Codeup MCP 即投影零 REST 配置',
+    // §11.1 决策① Codeup 分支 MCP 优先形态（v1.43 起 TRACKER=codeup 为前置门语境）
+    'MCP 优先：选 Codeup 出口即 TRACKER=codeup，检测到 Codeup MCP 即投影零 REST 配置',
     // §14 MCP 指引条目反转（v1.12 旧形态退役）
     'MCP 优先（零 REST 配置投影',
     // §5.4 publish 行双路径同口径 + codeup 终态映射
@@ -106,7 +106,7 @@ test('分发副本逐字同文：codeup.sh 活本与 assets 分发副本', () =>
 // 七技能 publish 步骤引用话术（spec 实现决策 1：只引用投影约定 + 会话自查 MCP，不复制判定树全文）。
 // 话术全库唯一出处 = 本常量与七份 SKILL.md；METHOD §7.1 是约定本体，技能层只保留这一句引用。
 const PUBLISH_CITATION =
-  '投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。';
+  '投影按 METHOD「投影约定」执行：config.sh TRACKER=codeup 且会话有 Codeup MCP 工具走 MCP 路径零 REST 配置，其余一律走 REST 适配器同口径，失败警告跳过 exit 0 不阻断。';
 const SEVEN_SKILLS = [
   'dev-clarify',
   'dev-spec',
@@ -165,4 +165,55 @@ test('setup SKILL.md 与 generation.md：MCP 优先话术同步', () => {
     assert.ok(text.includes('MCP 优先'), `${name} 应含 MCP 优先话术`);
     assert.ok(text.includes('三项 REST 配置'), `${name} 应含适配器兜底配置清单话术`);
   }
+});
+
+// ── fix 票 20261121-6089：MCP 路径加 TRACKER=codeup 前置门 ──
+// 缺陷：旧判定树第一级只看「会话有无 Codeup MCP 工具」，TRACKER=github/gitlab/local 的项目在
+// 挂了云效 MCP 的会话里被 MCP 路径截胡（浪费发现链调用、产物投错远端），违反 spec 20261119-20b1
+// 非目标「github/gitlab 腿零改动」。期望值独立来源 = 票 20261121-6089 验收标准与 v1.43 修订拍板话术。
+
+test('METHOD 判定树：MCP 路径以 TRACKER=codeup 为前置门，TRACKER≠codeup 项目不被截胡', () => {
+  const method = read(path.join('docs', 'METHOD.md'));
+  // 新门话术存在：判定树第一级以 TRACKER=codeup 起头
+  assert.ok(
+    method.includes('`TRACKER=codeup` 且会话检测到 Codeup MCP 工具 → 走 MCP 路径（投影零 REST 配置）'),
+    '§7.1 判定树第一级应含 TRACKER=codeup 前置门',
+  );
+  // 旧无门形态退役：缺陷文本本身不得残留
+  assert.equal(
+    method.includes('**三级判定树**：会话检测到 Codeup MCP 工具'),
+    false,
+    '§7.1 判定树不得残留无 TRACKER 门的旧形态',
+  );
+  // §7 publish 行同口径
+  assert.ok(
+    method.includes('TRACKER=codeup 且会话检测到 Codeup MCP 工具走 MCP 路径'),
+    '§7 publish 行应含 TRACKER=codeup 前置门话术',
+  );
+});
+
+test('七技能 publish 步骤投影话术：含 TRACKER=codeup 前置门，旧无门话术退役', () => {
+  for (const skill of SEVEN_SKILLS) {
+    const text = read(path.join('skills', skill, 'SKILL.md'));
+    assert.ok(text.includes('TRACKER=codeup'), `${skill} 投影话术应含 TRACKER=codeup 前置门`);
+    assert.equal(
+      text.includes('先自查会话有无 Codeup MCP 工具'),
+      false,
+      `${skill} 不得残留无门旧话术`,
+    );
+  }
+});
+
+test('蓝图 v1.43 与 setup 侧：TRACKER=codeup 前置门修订齐备', () => {
+  const blueprint = read(path.join('docs', 'sdlc-skills-blueprint.md'));
+  assert.ok(blueprint.includes('v1.43 修订记录'), '蓝图应含 v1.43 修订记录');
+  assert.ok(
+    blueprint.includes('TRACKER=codeup 时 MCP 优先'),
+    '蓝图 §14 应含 TRACKER=codeup 时 MCP 优先话术',
+  );
+  const decisions = read(path.join('skills', 'setup-workspace', 'references', 'decisions.md'));
+  assert.ok(
+    decisions.includes('TRACKER=codeup）且检测到 Codeup MCP'),
+    '决策 1 MCP 优先分支应含 TRACKER=codeup 语境门',
+  );
 });
