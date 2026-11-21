@@ -195,7 +195,10 @@ test('METHOD 判定树：MCP 路径以 TRACKER=codeup 为前置门，TRACKER≠c
 test('七技能 publish 步骤投影话术：含 TRACKER=codeup 前置门，旧无门话术退役', () => {
   for (const skill of SEVEN_SKILLS) {
     const text = read(path.join('skills', skill, 'SKILL.md'));
-    assert.ok(text.includes('TRACKER=codeup'), `${skill} 投影话术应含 TRACKER=codeup 前置门`);
+    assert.ok(
+      text.includes('config.sh TRACKER=codeup 且会话有 Codeup MCP 工具走 MCP 路径零 REST 配置'),
+      `${skill} 投影话术应含 TRACKER=codeup 前置门话术`,
+    );
     assert.equal(
       text.includes('先自查会话有无 Codeup MCP 工具'),
       false,
