@@ -10,7 +10,7 @@
 |---|---|
 | need | 需求纪要：业务目标、干系人、系统能力需求（FR-N）、场景、假设与风险。一轮迭代的最上层依据。 |
 | spec | 规格：用户视角的问题陈述、方案、用户故事、实现与测试决策、验收场景。改源码前的必要产物。 |
-| design | 技术方案：模块划分、数据流、seam（测试边界）。配合 ADR 记录架构决策。 |
+| design | 技术方案与系统分析：分析段产三视图系统分析（流程 / 对象 / 数据模型 + 缺口与矛盾），方案段产模块划分、数据流、seam（测试边界）。配合 ADR 记录架构决策。 |
 | ticket | 工单：一张可独立开工、可独立验收的实现单元，分 feature / fix 两类，同池编号。 |
 | overview | 总览：开工前对单张 spec 名下产物的纯读合成文档，固定五节（全景一行、全景矩阵、黄金场景走查、样张、差距清单）；过程档归置，详见项目术语章。 |
 | review | 评审报告：双轴（标准轴 + Spec 轴）findings 汇总，`tickets: []` 声明覆盖面。 |
@@ -31,7 +31,9 @@
 | spec.approved | 用户已显式批准，可拆工单 | dev-spec |
 | spec.done | 验收通过，且名下过程档已清扫（终态） | dev-accept |
 | spec.reconstructed | 逆向扫描 / 迁移沉淀的 spec 落盘即置：不进正向待办流（frontier 不受理），phase 照常显示 | setup-reconstruct / setup-migrate |
-| design.draft / approved | 技术方案起草 / 定稿 | dev-design / design-deliver |
+| design.draft | 设计起草中（分析段或方案段；need / spec 至少引用其一） | dev-design / design-deliver |
+| design.analyzed | 分析走查已批准、方案节未补（中间态；必有 need 引用） | dev-design |
+| design.approved | 定稿（必有 spec 引用） | dev-design / design-deliver |
 | ticket.ready | 阻塞已清、可开工 | dev-plan |
 | ticket.in-progress | 开工中，进展写进 ## Progress | dev-implement |
 | ticket.implemented | 实现完成、全量检查绿，待评审 | dev-implement |
