@@ -10,7 +10,7 @@
 |---|---|
 | need | 需求纪要：业务目标、干系人、系统能力需求（FR-N）、场景、假设与风险。一轮迭代的最上层依据。 |
 | spec | 规格：用户视角的问题陈述、方案、用户故事、实现与测试决策、验收场景。改源码前的必要产物。 |
-| design | 技术方案：模块划分、数据流、seam（测试边界）。配合 ADR 记录架构决策。 |
+| design | 技术方案与系统分析：分析段产三视图系统分析（流程 / 对象 / 数据模型 + 缺口与矛盾），方案段产模块划分、数据流、seam（测试边界）。配合 ADR 记录架构决策。 |
 | ticket | 工单：一张可独立开工、可独立验收的实现单元，分 feature / fix 两类，同池编号。 |
 | overview | 总览：开工前对单张 spec 名下产物的纯读合成文档，固定五节（全景一行、全景矩阵、黄金场景走查、样张、差距清单）；过程档归置，详见项目术语章。 |
 | review | 评审报告：双轴（标准轴 + Spec 轴）findings 汇总，`tickets: []` 声明覆盖面。 |
@@ -31,7 +31,9 @@
 | spec.approved | 用户已显式批准，可拆工单 | dev-spec |
 | spec.done | 验收通过，且名下过程档已清扫（终态） | dev-accept |
 | spec.reconstructed | 逆向扫描 / 迁移沉淀的 spec 落盘即置：不进正向待办流（frontier 不受理），phase 照常显示 | setup-reconstruct / setup-migrate |
-| design.draft / approved | 技术方案起草 / 定稿 | dev-design / design-deliver |
+| design.draft | 设计起草中（分析段或方案段；need / spec 至少引用其一） | dev-design / design-deliver |
+| design.analyzed | 分析走查已批准、方案节未补（中间态；必有 need 引用） | dev-design |
+| design.approved | 定稿（必有 spec 引用） | dev-design / design-deliver |
 | ticket.ready | 阻塞已清、可开工 | dev-plan |
 | ticket.in-progress | 开工中，进展写进 ## Progress | dev-implement |
 | ticket.implemented | 实现完成、全量检查绿，待评审 | dev-implement |
@@ -111,3 +113,5 @@
 - **套件资产** —— 自建 npm 初始化器 `@hankchen/infra`（need 20261114-1f2f，定位对标 `pnpm create vite` 式的交互初始化）的安装对象单元：本套件经 npm registry 对外分发的可安装内容，按「资产类型 → 安装目标」映射表组织（当前仅一行：技能 → `.agents/skills/`）；当前资产类型为技能（31 个），未来可能扩展规范类等其他资产类型，新增类型按映射表加行扩展；need 20261115-339e 起新增第二类资产 **agent 插件**（首宿主 DeepSeek Harness），「规范」占位行退第三行；spec 20261116-2c58 起命令面为子命令形态——`skill add [名...] [--all]` 与 `plugin add [名...] --profile <名>`（无参进交互勾选，裸跑与 `-h`/`--help` 打印对应层级帮助；旧旗标 `--all/--skills/--plugins` 与裸跑两层菜单退役，未知命令/未知旗标按 spec 口径报错）（首次出现：need 20261114-1f2f）。
 - **agent 插件（插件资产）** —— infra 第二类套件资产：面向特定 agent 宿主的扩展包，以该宿主官方插件格式分发；首个宿主 DeepSeek Harness，形态为 dsh bundle——npm 包在 package.json 声明 `"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }`、随包携带 cordis.patch.yml（按包名引用自己），经官方命令 `dsh plugin --profile <名> add <包>` 装进目标 profile（依赖行 + `dsh.profile.bundles` 追加行）；套件侧以 demo 插件立两层规范：生产约定 + 运行时形态（首次出现：need 20261115-339e）。
 - **DeepSeek Harness（dsh）** —— DeepSeek 开源 agent harness（everything-is-a-plugin 架构，基于 Cordis 框架）：一切组件皆插件（npm 包导出 `apply(ctx)`）；profile 位于 `~/.dsh/profiles/<名>/`（DSH_HOME 可覆盖），其 package.json 持有依赖与 `dsh.profile.bundles` 有序 bundles 清单；官方 CLI 为 npm 包 `@deepseek-ai/dsh`（engines node ≥24.9.0）；`desktop` 为保留 profile 名、官方 CLI 拒绝插件管理（首次出现：need 20261115-339e）。
+- **分析形态** —— dev-design 的双形态之一：输入 confirmed 的 need，经信号清单亮牌 + 用户点名进入，探索代码库后以 mermaid 三视图（流程模型 = 数据流图 / 对象模型 = UML 类图 / 数据模型 = ER 图）起草系统分析，固定带「缺口与矛盾」节，经走查批准（第一道 approved 门）后指路 dev-spec；分析节为快照，偏离走偏离记录制不回改（首次出现：need 20261120-3afe）。
+- **方案形态** —— dev-design 的双形态之一：现状保留的"approved spec → 技术方案"路径，spec approved 后回补方案节（模块划分 / 数据流 / seam 清单 / ADR 索引）并经独立批准（第二道 approved 门）后指路 dev-plan；与分析形态共用同一张 design 产物两段续写（首次出现：need 20261120-3afe）。

@@ -37,7 +37,7 @@
 
 | 技能 | 职责 |
 |---|---|
-| [dev-design](../skills/dev-design/SKILL.md) | spec → 技术方案（design/ADR；ADR 三条件命中才写） |
+| [dev-design](../skills/dev-design/SKILL.md) | 双形态（spec 20261120-fedf，规格见蓝图 §11.12）：分析形态 confirmed need → 信号清单亮牌点名 → mermaid 三视图系统分析 + 缺口与矛盾节，走查批准置 analyzed 指路 dev-spec；方案形态 approved spec → 模块划分 / 数据流 / seam / ADR，批准置 approved 指路 dev-plan；design 为可选产物 |
 | [dev-research](../skills/dev-research/SKILL.md) | 技术调研 → 带一手来源引用的调研报告 |
 | [dev-release](../skills/dev-release/SKILL.md) | 语义化版本 + CHANGELOG + 发布检查单（tag 与推送是单向门，必须问人） |
 | [dev-docs](../skills/dev-docs/SKILL.md) | 面向人的文档维护：每条行为断言先核验后落笔 |

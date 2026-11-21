@@ -111,7 +111,7 @@ allowed_list() {
   case "$1" in
     need) echo "draft confirmed fulfilled reconstructed" ;;
     spec) echo "draft approved done reconstructed" ;;
-    design) echo "draft approved" ;;
+    design) echo "draft analyzed approved" ;;
     ticket) echo "ready in-progress implemented done" ;;
     overview) echo "draft reviewed" ;;
     review) echo "draft approved blocked" ;;
@@ -801,6 +801,32 @@ cmd_validate() {
       fi
       round="$(fm_get "$file" round)"
       [ -n "$round" ] || err "缺 frontmatter 字段 round"
+      ;;
+    design)
+      # design frontmatter 三态约束（spec 20261120-fedf，蓝图 §6.1）：
+      # draft 态 need 或 spec 至少其一（双形态两入口）；analyzed 态必有 need（分析态挂
+      # need 谱系）；approved 态必有 spec（方案态挂 spec）——analyzed 缺 spec 时把 status
+      # 改成 approved 会落在本分支被拦（两门制动线的机械面，dev-design 出口纪律据此拦停）。
+      spec_id="$(fm_get "$file" spec)"
+      need_id="$(fm_get "$file" need)"
+      case "$status" in
+        draft)
+          [ -n "$spec_id" ] || [ -n "$need_id" ] || err "design draft 态须有 need 或 spec 至少其一（谱系父引用）"
+          ;;
+        analyzed)
+          [ -n "$need_id" ] || err "design analyzed 态必有 need 字段（分析态挂 need 谱系）"
+          ;;
+        approved)
+          [ -n "$spec_id" ] || err "design approved 态必有 spec 字段（方案态挂 spec）"
+          ;;
+      esac
+      # 父引用存在性：与 spec 分支对 need 字段、ticket 分支对 spec 字段同构
+      if [ -n "$need_id" ]; then
+        artifact_file need "$need_id" >/dev/null 2>&1 || err "need 字段指向的 need $need_id 不存在"
+      fi
+      if [ -n "$spec_id" ]; then
+        artifact_file spec "$spec_id" >/dev/null 2>&1 || err "spec 字段指向的 spec $spec_id 不存在"
+      fi
       ;;
     adr|research)
       : ;;
