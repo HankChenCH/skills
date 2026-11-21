@@ -407,7 +407,7 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 |---|---|---|
 | dev-clarify | 建议进 dev-spec | 方法论亮牌确认；need 定稿 |
 | dev-spec | publish → 进 dev-plan | **spec 批准**；MVP 分轮范围 |
-| dev-design | publish design + ADR → 建议进 dev-plan | **方案批准**；ADR 级取舍 |
+| dev-design | publish design + ADR → analyzed 指路 dev-spec（不自动串联）；approved 指路 dev-plan | **走查批准**（第一道门，沉默不算）；**方案批准**（第二道门，沉默不算）；ADR 级取舍 |
 | dev-plan | publish 工单 → 名下全部票数 ≥2（不分状态，与 overview_gate 同口径）自动链式进 dev-overview（携带 spec 编号免点名合成，走查归置清零）后再提示 frontier 与开工点名；单票直接提示 frontier；推迟走查或中断指路 /dev-overview 重入（v1.31） | 拆分粒度确认（含同层改动面互斥处置：并票 / blocked-by 串行 / expand–contract 重切三选一） |
 | dev-overview | 置 reviewed 后停，指路 /dev-implement（回路：缺 FR 场景回 /dev-spec、缺票回 /dev-plan；不自动串联） | 总览走查确认（缝隙归置清零后须用户显式确认才置 reviewed，沉默不算） |
 | dev-implement | **自动调 dev-review** | 无（spec 缺口时停下报告，属门禁回路） |
@@ -598,12 +598,15 @@ dev-implement / dev-fix 按上表固定时机装载 ref-testing **本体**（通
 
 ### 11.12 dev-design
 
-- **触发**：用户手动（技术设计、方案、架构决策请求）；不进自动串联链的必经路径——design 是可选产物。
-- **输入**：approved 的 spec（重点实现决策、测试决策、验收场景）；docs/adr/ 既有 ADR（新决策不得与之无声冲突）。
-- **值得做的判据（入口亮牌）**：ADR 三条件（难逆转、无上下文会困惑、真实权衡）命中任一，或模块划分 / 数据流非显而易见。都不命中 → 亮牌"这张 spec 没有设计级问题，直接 dev-plan 更省"，用户坚持才做。
-- **做什么**：起草 design（§6.5 要点：模块划分 / 数据流 / seam 清单 / ADR 索引）→ 命中三条件的决策逐条落 ADR（背景 / 决策 / 后果，status: accepted；被取代的旧 ADR 置 superseded 并追加日期）→ 用户批准（决策点）→ design status: approved。
-- **出口**：publish design + ADR → spec 名下无工单则建议进 dev-plan；已有工单 → 提醒实现遵守 seam 清单。管线门禁不含 design（§11.5 dev-plan 输入只有 spec），design 的约束力靠评审与实现纪律，不靠硬门禁。
-- **门禁**：出口 = validate 通过 + 用户批准记录。validate 对 design / adr 只查 frontmatter 与状态，节同构靠模板内嵌保证（§6.6 ①）——与 adr 同款轻校验。
+- **触发**：用户手动（系统分析、技术设计、方案、架构决策请求）；不进自动串联链的必经路径——design 是可选产物（v1.9 口径延续）。
+- **双形态入口判定（v1.42）**：① **重入判定先行**——盘上该 need 或 spec 名下存在 draft / analyzed 的 design → 续接不重起草；② **形态判定**——用户点名 need 编号（或存在恰一张 confirmed need 且点名做分析）→ **分析形态**；用户点名 spec 编号（或存在恰一张 approved spec）→ **方案形态**；confirmed need 与 approved spec 并存 → 请用户点名，禁止代挑。既无 confirmed need 也无 approved spec → 停止并指路（无 need → /dev-clarify；有 need 未有 spec → /dev-spec），零产物。
+- **分析形态入口亮牌（信号清单，可拒绝）**：六信号——need 涉多角色 / 数据沉淀 / 状态流转 / 外部系统对接 / 流程分支多 / 多子域术语歧义；信号命中 → 亮牌清单 + 默认建议做系统分析，用户点名决定；清单不命中 → 亮牌拒绝、零产物、指路 dev-spec；信号命中但用户否决 → 放行直进 dev-spec。方案形态保留现「值得做判据」（ADR 三条件或结构非显而易见）不变，不命中 → 亮牌"这张 spec 没有设计级问题，直接 dev-plan 更省"，用户坚持才做。
+- **做什么（同一张 design 产物两段续写，§6.5 要点）**：**分析形态**——探索代码库（既有实体 / 流程 / 存储入图作起点，图中标注区分既有与新增）→ 起草分析段四节（流程模型 / 对象模型 / 数据模型 / 缺口与矛盾）→ 沿 need 场景节逐条 Given/When/Then 在三视图上走查并留走查记录，走不通的路径逐条进「缺口与矛盾」节（need 本体不回改）→ 用户显式批准（**第一道门**）→ design `status: analyzed`、追加 analyzed 日期 → 指路 dev-spec（不自动串联）。**方案形态**——输入 approved 的 spec（重点实现决策、测试决策、验收场景）+ docs/adr/ 既有 ADR（新决策不得与之无声冲突）→ 回补方案段四节（模块划分 / 数据流 / seam 清单 / ADR 索引）→ 命中三条件的决策逐条落 ADR（背景 / 决策 / 后果，status: accepted；被取代的旧 ADR 置 superseded 并追加日期）→ 用户显式批准（**第二道门**）→ design `status: approved`（frontmatter 补 `spec` 字段，文件名 need 谱系前缀不变——谱系权威记录是 frontmatter 父引用字段，§5.6 / METHOD §4.2 既有规则）→ 指路 dev-plan（不自动串联）。
+- **两门制动线**：analyzed 态直接尝试推进 approved 而其 `spec` 字段缺省（spec 未 approved）→ 拦停并指路 dev-spec，顺序约束机械可校验；两道门都是决策点，**沉默不算批准**。分析段批准后为快照：后续起草发现已批准分析段有错 / 过时 → spec「实现决策」节逐条记「偏离设计点 + 理由」，分析段不回改；偏离属 ADR 级（难逆转 / 真权衡）→ 升格记 ADR。
+- **缺口与矛盾归置**：缺口逐条留「缺口与矛盾」节；dev-spec 起草时读到该节 → 逐条与用户确认后归置（落本 spec / 列入下一轮建议 / 判定为非目标），归置结论留痕（接线随 §11.4）。
+- **下游消费接线**：该 need 名下存在设计产物时——dev-spec 实现决策引用其结论不从零重写、dev-plan 切片边界参照其对象 / 流程边界、dev-implement 开工装载清单含设计产物、dev-review Spec 轴材料含设计产物且偏离记录条目按显式豁免处理（四技能接线文本随下游实现票落）。
+- **出口**：publish design + ADR（analyzed 与 approved 两个出口各自 publish）→ analyzed 指路 dev-spec、approved 指路 dev-plan；spec 名下无工单且 approved 则建议进 dev-plan；已有工单 → 提醒实现遵守 seam 清单。管线门禁不含 design（§11.5 dev-plan 输入只有 spec），design 的约束力靠评审与实现纪律，不靠硬门禁。
+- **门禁**：出口 = validate 通过 + 用户批准记录（analyzed 与 approved 各自的批准日期）。validate 对 design / adr 只查 frontmatter 与状态，节同构靠模板内嵌保证（§6.6 ①）——与 adr 同款轻校验；design frontmatter 三态约束（draft `need`/`spec` 至少其一、analyzed 必有 `need`、approved 必有 `spec`）为机械面契约（check.sh 词表与 claim design 父参数 need / spec 二选一，随技能本体实现票落）。
 - 落盘前加载 ref-writing。
 
 ### 11.13 dev-clarify
