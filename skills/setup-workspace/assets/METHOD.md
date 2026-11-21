@@ -89,7 +89,7 @@ frontmatter 是 check.sh 的解析依据，全流程单一真相。列表字段�
 |---|---|---|
 | need | `id` `status` | draft →confirmed（dev-clarify）→fulfilled（dev-accept，末轮通过且成功标准核销、无未接受风险）；逆向产物落盘即 reconstructed（setup-reconstruct / setup-migrate，不进正向待办流） |
 | spec | `id` `status` `need?` `round` | draft →approved（dev-spec，须用户批准）→done（dev-accept 验收通过，且名下过程档已清扫）；逆向产物落盘即 reconstructed（setup-reconstruct / setup-migrate，不进正向待办流） |
-| design | `id` `spec` `status` | draft →approved（dev-design / design-deliver） |
+| design | `id` `spec?` `need?` `status` | draft →analyzed（dev-design，分析走查批准）→approved（dev-design / design-deliver）；design-deliver 简单 spec 自 draft 直达 approved；analyzed 必有 need、approved 必有 spec、draft 两者至少其一 |
 | ticket | `id` `type: feature\|fix` `spec` `blocked-by: []` `repos?` `status` | ready（dev-plan）→in-progress / implemented（dev-implement）→done（dev-ship 合并后） |
 | overview | `id` `spec` `status` | draft →reviewed（dev-overview，须用户显式确认）；reviewed →draft（dev-overview，补票回置，不需显式确认） |
 | review | `id` `tickets: []` `branch` `status` | draft →approved | blocked（dev-review；approved = 两轴阻断项清零，blocked = 设计级阻断出口，修复后复审） |
