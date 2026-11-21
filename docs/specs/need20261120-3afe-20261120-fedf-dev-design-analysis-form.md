@@ -1,10 +1,11 @@
 ---
 id: 20261120-fedf
-status: approved
+status: done
 need: 20261120-3afe
 round: 1
 created: 2026-11-20
 approved: 2026-11-20
+done: 2026-11-21
 ---
 # dev-design 双形态重定位：分析形态（系统分析三视图）+ 方案形态（现状保留）
 
