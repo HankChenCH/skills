@@ -3,6 +3,22 @@
 本项目的所有显著变更记录于此。
 格式遵循 Keep a Changelog（https://keepachangelog.com），版本遵循语义化版本。
 
+## [v0.5.0] - 2026-11-21
+
+### Added
+
+- dev-design 双形态重定位——新增**分析形态**（spec 20261120-fedf，need 20261120-3afe，票 20261120-8594，PR #321；验收 20261121-22fc passed，561 pytest + unit/e2e/typecheck 全绿）：输入 confirmed 的 need，信号清单亮牌 + 用户点名进入，探索代码库后以 mermaid 三视图（流程模型 / 对象模型 / 数据模型）起草系统分析，固定「缺口与矛盾」节，沿 need 场景逐条走查批准（第一道门）→ 状态 `analyzed` → 指路 dev-spec；**方案形态**保留现状（approved spec 后回补模块划分/数据流/seam/ADR，第二道门独立批准）——同一张 design 产物两段续写。方法内容依据调研报告 20261120-0b9e，参考层四分册落 skills/dev-design/references/{flows,objects,data,walkthrough}.md。外部人工校验：need 20261120-3afe 全量 FR-1~FR-10 逐条核销。
+
+### Changed
+
+- 下游四技能接线设计产物消费面（票 20261120-ca88，提交 2087328）：dev-plan / dev-implement / dev-review / dev-clarify 引用话术接 design 产物；dev-spec 入口补缺口节读取归置与偏离记录制接线（提交 1a7b999）——spec「实现决策」可引用设计结论，偏离记录显式豁免留痕。
+- check.sh 机械面适配双形态（票 20261120-8594，提交 c0f9bcb）：design 词表加 `analyzed` 中间态并立 design frontmatter 三态校验（need 谱系必填），新形态产物过 validate / publish 不靠自觉。
+- 契约面文档同步（票 20261120-f4ba）：蓝图 §6.1 design 行改双形态契约并新增修订记录 v1.42（12fea63）、§6.5 design 模板补分析段四节（5922256）、§8/§11.12 决策点改两道门（fd6411e）；METHOD §5 状态机表 design 行同步 `analyzed` 中间态（57f2381）；GLOSSARY 双份登记「分析形态/方案形态」词条 + design.analyzed 状态行（b32ccb0）；docs/skills.md dev-design 清单行改双形态描述（07d3c81）。
+
+### Fixed
+
+- 投影判定树 MCP 路径加 `TRACKER=codeup` 前置门（票 20261121-6089，PR #323，提交 58c4a5c/0925396；评审 20261121-a2f8 阻断项修复）：TRACKER≠codeup（github/gitlab/local）的项目一律走对应 REST 适配器，即使会话挂了 Codeup MCP 工具也不走 MCP 路径。此前三级判定树第一级只看「会话检测到 Codeup MCP 工具」，全局配了云效 MCP 的用户任何 TRACKER 的项目 publish 都先执行 MCP 发现链（组织/空间/类型/负责人多次调用），产物可能投错目标（本仓库 TRACKER=github 实况复现：开票投影投向云效）。守 spec 20261119-20b1 非目标「github/gitlab 腿零改动」承诺。改动面：METHOD §7.1 判定树 + 七技能 publish 投影引用话术（PUBLISH_CITATION 同步契约对）+ 蓝图 v1.43 修订记录；静态守护测试契约升级——test/unit/codeup-projection-sync.test.ts 先红 5（判定树无门/七技能旧话术/无 v1.43）后转绿 13/13。
+
 ## [v0.4.0] - 2026-11-20
 
 ### Added
