@@ -107,7 +107,7 @@ created: <date>
 2. 确认后逐张取号落盘（§3 固定模板的 claim 步骤），每张运行
    `.sdlc/check.sh validate <该票占位路径>`，都必须通过；不过 → 修复后重跑。
 3. 逐张运行 `.sdlc/check.sh publish <该票占位路径>`。
-   投影按 METHOD「投影约定」执行：先自查会话有无 Codeup MCP 工具（有走 MCP 路径零 REST 配置，无走 REST 适配器同口径），失败警告跳过 exit 0 不阻断。
+   投影按 METHOD「投影约定」执行：config.sh TRACKER=codeup 且会话有 Codeup MCP 工具走 MCP 路径零 REST 配置，其余一律走 REST 适配器同口径，失败警告跳过 exit 0 不阻断。
 4. **出口衔接**：名下票全部 publish 后统计本 spec 名下全部票数（docs/tickets/ 中 `spec: NNNN`
    指向本 spec 的工单，不分状态，与开工门禁 overview_gate 同口径）——≥2 → 立即用 Skill 工具调用
    dev-overview 并携带本轮 spec 编号（先例：dev-spec 出口调 dev-plan、dev-fix 出口调

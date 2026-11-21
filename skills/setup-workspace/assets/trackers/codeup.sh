@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# codeup tracker 适配器：publish 的 REST 投影路径。会话检测到 Codeup MCP 工具时按
-# METHOD §7.1 投影约定走 MCP 路径（零 REST 配置），本适配器是无 MCP 时的兜底，两路径同口径。
+# codeup tracker 适配器：publish 的 REST 投影路径。MCP 路径判定以 METHOD §7.1 投影约定为
+# 单点——TRACKER=codeup 且会话检测到 Codeup MCP 工具才走 MCP 路径（零 REST 配置），
+# 无 MCP 时走本适配器（REST 腿），两路径同口径。
 # 投影受理面（spec 20261119-20b1）：
 #   need → 新建需求单（category=Req，标题 = 产物一级标题）；
 #   带 need 谱系前缀（need<父ID>-）的 spec/design/adr/research → 对应需求单下追加 MARKDOWN 评论；
